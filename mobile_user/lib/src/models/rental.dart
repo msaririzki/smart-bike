@@ -8,6 +8,8 @@ class Rental {
     required this.distanceCost,
     required this.idleCost,
     required this.totalCost,
+    this.startedAt,
+    this.currentSpeedKmh,
     this.bike,
   });
 
@@ -17,9 +19,15 @@ class Rental {
   final int distanceCost;
   final int idleCost;
   final int totalCost;
+  final DateTime? startedAt;
+  final double? currentSpeedKmh;
   final Bike? bike;
 
+  double get totalDistanceKilometers => totalDistanceMeters / 1000;
+
   factory Rental.fromJson(Map<String, dynamic> json) {
+    final latestPoint = json['latest_location_point'];
+
     return Rental(
       id: json['id'] as int,
       status: json['status'] as String,
@@ -27,6 +35,12 @@ class Rental {
       distanceCost: _toInt(json['distance_cost']),
       idleCost: _toInt(json['idle_cost']),
       totalCost: _toInt(json['total_cost']),
+      startedAt: _toDateTime(json['started_at']),
+      currentSpeedKmh:
+          _toDouble(json['current_speed_kmh']) ??
+          (latestPoint is Map<String, dynamic>
+              ? _toDouble(latestPoint['speed_kmh'])
+              : null),
       bike: json['bike'] == null
           ? null
           : Bike.fromJson(json['bike'] as Map<String, dynamic>),
@@ -52,4 +66,11 @@ int _toInt(dynamic value) {
     return value.toInt();
   }
   return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+DateTime? _toDateTime(dynamic value) {
+  if (value == null) {
+    return null;
+  }
+  return DateTime.tryParse(value.toString())?.toLocal();
 }

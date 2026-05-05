@@ -75,6 +75,12 @@ class ApiClient {
     return data == null ? null : Rental.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<Map<String, dynamic>?> activeRentalDetail() async {
+    final json = await _get('/rentals/active');
+    final data = json['data'];
+    return data == null ? null : data as Map<String, dynamic>;
+  }
+
   Future<Rental> startRental(int bikeId) async {
     final json = await _post('/rentals/start', body: {'bike_id': bikeId});
     return Rental.fromJson(json['data'] as Map<String, dynamic>);
