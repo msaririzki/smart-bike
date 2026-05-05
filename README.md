@@ -1,6 +1,6 @@
 # 🚲 Smart Bike Rental — Mobile Computing
 
-> Prototipe sistem penyewaan sepeda pintar berbasis **Mobile Computing** — Mata Kuliah Mobile Computing, Universitas Bina Bangsa, Semester 6.
+> Prototipe sistem penyewaan sepeda pintar berbasis **Mobile Computing** — Mata Kuliah Mobile Computing, Universitas Bumigora, Semester 6.
 
 ---
 
@@ -318,4 +318,4 @@ Selesai Sewa → Tampil ringkasan biaya
 
 ## 📄 Lisensi
 
-Proyek ini dibuat untuk keperluan akademik — Mata Kuliah Mobile Computing, Universitas Bina Bangsa.
+Proyek ini dibuat untuk keperluan akademik — Mata Kuliah Mobile Computing, Universitas Bumigora.
