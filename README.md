@@ -1,321 +1,215 @@
-# 🚲 Smart Bike Rental — Mobile Computing
+# Smart Bike Rental - Mobile Computing
 
-> Prototipe sistem penyewaan sepeda pintar berbasis **Mobile Computing** — Mata Kuliah Mobile Computing, Universitas Bina Bangsa, Semester 6.
+Prototipe sistem penyewaan sepeda pintar berbasis Mobile Computing untuk Mata Kuliah Mobile Computing, Universitas Bina Bangsa.
 
----
+## Tentang Proyek
 
-## 📌 Tentang Proyek
+Sistem ini mensimulasikan penyewaan sepeda pintar dengan smartphone sebagai simulator perangkat IoT pada sepeda. Simulator mengirim GPS dan heartbeat ke backend, lalu backend menghitung jarak, biaya, status idle, dan status online sepeda.
 
-Sistem ini mensimulasikan penyewaan sepeda pintar yang memanfaatkan konsep **mobile computing** secara nyata:
+Konsep mobile computing yang ditunjukkan:
 
-- **Mobility** — Sepeda sebagai terminal bergerak
-- **Wireless Communication** — Komunikasi via data seluler
-- **Location Awareness** — GPS real-time untuk tracking posisi sepeda
-- **Context Awareness** — Sistem membedakan kondisi bergerak dan diam (idle)
-- **Dynamic Computing** — Biaya dihitung berdasarkan jarak tempuh aktual
+- Mobility: sepeda menjadi terminal bergerak.
+- Wireless Communication: data dikirim melalui jaringan mobile/Wi-Fi.
+- Location Awareness: posisi sepeda dipantau dari GPS.
+- Context Awareness: sistem membedakan kondisi bergerak dan idle.
+- Dynamic Computing: biaya dihitung dari jarak dan status aktual rental.
 
-### Fitur Utama
-- ✅ Login & Register user
-- ✅ Lihat daftar sepeda tersedia
-- ✅ Mulai & selesaikan sewa
-- 🔄 GPS tracking real-time _(coming soon)_
-- 🔄 Perhitungan biaya berbasis jarak — Haversine formula _(coming soon)_
-- 🔄 Idle detection & idle billing _(coming soon)_
-- 🔄 Admin panel & superadmin settings _(coming soon)_
+## Fitur Utama
 
----
+- Login dan register user.
+- Role `user`, `admin`, `superadmin`, dan `device`.
+- Daftar sepeda tersedia.
+- Mulai dan selesaikan rental.
+- Bike Simulator App untuk GPS stream dan heartbeat.
+- Perhitungan jarak menggunakan Haversine formula.
+- Distance billing, idle warning, idle billing, dan auto-resume saat bergerak lagi.
+- Admin panel untuk dashboard, bike management, rental monitoring, dan pricing settings.
+- Live active rental screen di aplikasi user sedang dikerjakan oleh tim.
 
-## 🗂️ Struktur Proyek
+## Struktur Proyek
 
+```text
+smart-bike/
+|-- backend/       Laravel 13 API + Admin Panel
+|-- mobile_user/   Flutter App untuk pengguna rental
+|-- mobile_bike/   Flutter App simulator perangkat sepeda
+|-- README.md
 ```
-smart-bike-rental/
-├── backend/          ← Laravel 12 API + Admin Panel
-├── mobile_user/      ← Flutter App (User)
-└── README.md
-```
 
----
+## Kebutuhan Development
 
-## 👥 Role di Sistem
-
-| Role | Akses |
+| Software | Versi |
 |---|---|
-| `user` | Login, lihat sepeda, sewa, histori |
-| `admin` | Monitor rental, lihat data |
-| `superadmin` | Ubah tarif, threshold, semua setting |
-| `device` | Simulator sepeda (kirim GPS, heartbeat) |
+| PHP | >= 8.3 |
+| Composer | >= 2.x |
+| Node.js | >= 18.x |
+| Git | Terbaru |
+| Flutter SDK | >= 3.x |
+| Android Studio | Terbaru |
 
----
-
-## 💻 Yang Harus Disiapkan di Laptop
-
-### ✅ Wajib untuk semua anggota tim
-
-| Software | Versi | Download |
-|---|---|---|
-| **PHP** | >= 8.2 | https://www.php.net/downloads |
-| **Composer** | >= 2.x | https://getcomposer.org |
-| **Node.js** | >= 18.x | https://nodejs.org |
-| **Git** | Terbaru | https://git-scm.com |
-| **Flutter SDK** | >= 3.x | https://flutter.dev/docs/get-started/install |
-| **Android Studio** | Terbaru | https://developer.android.com/studio |
-| **VS Code** | Terbaru | https://code.visualstudio.com |
-
-### ✅ Extension VS Code yang disarankan
-
-- **Dart** — `dart-code.dart-code`
-- **Flutter** — `dart-code.flutter`
-- **PHP Intelephense** — `bmewburn.vscode-intelephense-client`
-- **Laravel Blade Snippets** — `onecentlin.laravel-blade`
-- **GitLens** — `eamodio.gitlens`
-
-### ✅ Cek instalasi di terminal
-
-```bash
-php --version        # Harus >= 8.2
-composer --version   # Harus >= 2.x
-flutter --version    # Harus >= 3.x
-node --version       # Harus >= 18.x
-git --version
-```
-
----
-
-## 🚀 Setup Proyek (Pertama Kali)
-
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/msaririzki/smart-bike.git
-cd smart-bike-rental
-```
-
-### 2. Setup Backend (Laravel)
+## Setup Backend
 
 ```bash
 cd backend
-
-# Install dependencies
 composer install
-
-# Salin file environment
 cp .env.example .env
-
-# Generate app key
 php artisan key:generate
-
-# Jalankan migrasi & seeder (isi data demo)
 php artisan migrate:fresh --seed
-
-# Jalankan server
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-> ⚠️ **Penting:** Gunakan `--host=0.0.0.0` agar bisa diakses dari emulator Android
+Gunakan `--host=0.0.0.0` agar backend bisa diakses dari emulator Android atau HP fisik.
 
-Backend akan jalan di: `http://localhost:8000`
+Backend berjalan di:
 
-### 3. Setup Flutter App (mobile_user)
+```text
+http://localhost:8000
+```
 
-Buka terminal baru:
+Admin panel:
+
+```text
+http://localhost:8000/admin/login
+```
+
+## Setup Flutter User App
 
 ```bash
 cd mobile_user
-
-# Install dependencies Flutter
 flutter pub get
-```
-
-### 4. Jalankan Flutter App
-
-#### Untuk Android Emulator:
-```bash
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
 ```
 
-#### Untuk HP Fisik (sambungkan HP via USB):
-Cari IP laptop terlebih dulu:
-```bash
-# Windows
-ipconfig
-# Cari "IPv4 Address" di bagian Wi-Fi, contoh: 192.168.1.5
-```
-Lalu jalankan:
+Untuk HP fisik, ganti `10.0.2.2` dengan IP laptop, misalnya:
+
 ```bash
 flutter run --dart-define=API_BASE_URL=http://192.168.1.5:8000/api
 ```
 
-> 💡 HP dan laptop harus tersambung ke **Wi-Fi yang sama**
+## Setup Flutter Bike Simulator
 
----
+```bash
+cd mobile_bike
+flutter pub get
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
+```
 
-## 🔐 Akun Demo (Sudah Ada Setelah Seed)
+## Akun Demo
 
 | Role | Email | Password |
 |---|---|---|
-| **Superadmin** | `superadmin@smartbike.test` | `password` |
-| **Admin** | `admin@smartbike.test` | `password` |
-| **User** | `user@smartbike.test` | `password` |
+| Superadmin | `superadmin@smartbike.test` | `password` |
+| Admin | `admin@smartbike.test` | `password` |
+| User | `user@smartbike.test` | `password` |
+| Device | `device@smartbike.test` | `password` |
 
-### Akses Admin Panel (di browser):
-```
-http://localhost:8000/admin/login
-```
-
-### Akses API:
-```
-http://localhost:8000/api
-```
-
----
-
-## 📡 Daftar API Endpoint
+## API Endpoint
 
 ### Auth
+
 | Method | Endpoint | Keterangan |
 |---|---|---|
-| POST | `/api/auth/register` | Daftar akun baru |
+| POST | `/api/auth/register` | Daftar akun user |
 | POST | `/api/auth/login` | Login |
 | POST | `/api/auth/logout` | Logout |
 | GET | `/api/auth/me` | Data user login |
 
 ### Bikes
+
 | Method | Endpoint | Keterangan |
 |---|---|---|
-| GET | `/api/bikes` | Daftar sepeda tersedia |
+| GET | `/api/bikes` | Daftar sepeda |
 | GET | `/api/bikes/{id}` | Detail sepeda |
 
 ### Rentals
+
 | Method | Endpoint | Keterangan |
 |---|---|---|
 | POST | `/api/rentals/start` | Mulai sewa |
-| GET | `/api/rentals/active` | Rental aktif user |
-| POST | `/api/rentals/{id}/finish` | Selesaikan sewa |
+| GET | `/api/rentals/active` | Rental aktif user, termasuk bike, latest GPS point, dan `current_speed_kmh` |
 | GET | `/api/rentals/history` | Histori sewa |
+| POST | `/api/rentals/{id}/finish` | Selesaikan sewa |
+| POST | `/api/rentals/{id}/idle/continue` | Lanjutkan sewa dari idle warning |
 
-### Device / Simulator _(coming soon)_
+### Device / Simulator
+
 | Method | Endpoint | Keterangan |
 |---|---|---|
+| GET | `/api/device/current-assignment` | Ambil sepeda yang di-assign ke device |
 | POST | `/api/device/location-update` | Kirim data GPS |
-| POST | `/api/device/heartbeat` | Heartbeat perangkat |
+| POST | `/api/device/heartbeat` | Kirim heartbeat perangkat |
 
----
+## Sistem Billing
 
-## ⚙️ Sistem Billing
+Biaya jarak:
 
-### Biaya Jarak
+```text
+distance_cost = floor(total_distance_meters / distance_unit_meters) * distance_price_amount
 ```
-biaya_jarak = floor(total_jarak_meter / unit_meter) × harga_per_unit
-```
-Contoh:
-- Jarak: 550 meter
-- Unit: 100 meter → Rp 500
-- Hasil: floor(550/100) × 500 = **Rp 2.500**
 
-### Biaya Idle
-Jika sepeda diam > 5 menit:
-- Muncul **peringatan idle**
-- Jika user pilih lanjut → kena biaya idle **Rp 200 / 5 menit**
+Default:
 
-### Default Parameter
-| Parameter | Nilai Default |
+| Parameter | Nilai |
 |---|---|
 | Unit jarak | 100 meter |
 | Harga per unit | Rp 500 |
 | Threshold gerakan valid | 10 meter |
-| Akurasi GPS max | 25 meter |
+| Akurasi GPS maksimum | 25 meter |
 | Idle warning setelah | 5 menit |
 | Interval idle billing | 5 menit |
 | Biaya idle | Rp 200 |
-| Kecepatan max valid | 40 km/h |
+| Kecepatan maksimum valid | 40 km/h |
 
-> Semua parameter di atas bisa diubah oleh **Superadmin** melalui admin panel
+Semua parameter billing dan aturan GPS bisa diubah oleh superadmin melalui admin panel.
 
----
+## Alur Sistem
 
-## 🔄 Alur Kerja Sistem
-
-```
-User Login
-    ↓
-Pilih Sepeda Tersedia
-    ↓
-Mulai Sewa → Bike status: in_use
-    ↓
-Bike Simulator kirim GPS tiap 5 detik
-    ↓
-Server hitung jarak (Haversine) → Update biaya
-    ↓
-Jika diam > 5 menit → Idle Warning
-    ↓
-User pilih: Lanjut (idle billing) / Selesai
-    ↓
-Selesai Sewa → Tampil ringkasan biaya
+```text
+User login
+  -> pilih sepeda tersedia
+  -> mulai sewa, bike status menjadi in_use
+  -> simulator mengirim GPS tiap beberapa detik
+  -> backend menghitung jarak dan biaya
+  -> jika sepeda idle, status berubah ke idle_warning
+  -> user bisa lanjut ke idle_billing atau menyelesaikan sewa
+  -> rental selesai, bike kembali tersedia
 ```
 
----
-
-## 🐛 Troubleshooting
-
-### ❌ Flutter tidak bisa konek ke backend di emulator
-- Pastikan backend jalan dengan `--host=0.0.0.0`
-- Pastikan Flutter dijalankan dengan `--dart-define=API_BASE_URL=http://10.0.2.2:8000/api`
-
-### ❌ `php artisan serve` tidak bisa diakses dari HP fisik
-- Gunakan `--host=0.0.0.0`
-- Cek firewall Windows — izinkan port 8000
-- HP dan laptop harus di jaringan Wi-Fi yang sama
-
-### ❌ Error `SQLSTATE` saat migrate
-- Pastikan file `.env` sudah ada (copy dari `.env.example`)
-- Jalankan `php artisan key:generate`
-
-### ❌ `flutter pub get` gagal
-- Pastikan Flutter SDK sudah terinstall: `flutter doctor`
-- Pastikan koneksi internet aktif
-
-### ❌ Emulator tidak muncul di `flutter run`
-- Buka Android Studio → Device Manager → Start emulator
-- Atau jalankan `flutter devices` untuk cek device tersedia
-
----
-
-## 📋 Fase Pengembangan
+## Fase Pengembangan
 
 | Phase | Fitur | Status |
 |---|---|---|
-| **Phase 1** | Auth, roles, bike master, setup backend | ✅ Done |
-| **Phase 2** | Start/finish rental, active rental view | ✅ Done |
-| **Phase 3** | Bike Simulator App, GPS stream, live map | 🔄 Planned |
-| **Phase 4** | Haversine, movement validation, distance billing | 🔄 Planned |
-| **Phase 5** | Idle warning, idle billing, auto resume | 🔄 Planned |
-| **Phase 6** | Superadmin settings UI, pricing config | 🔄 Planned |
-| **Phase 7** | Reports, billing logs, UI polish | 🔄 Planned |
+| Phase 1 | Auth, roles, bike master, setup backend | Done |
+| Phase 2 | Start/finish rental, active rental basic | Done |
+| Phase 3 | Bike Simulator App, GPS stream, heartbeat | Done |
+| Phase 4 | Haversine, movement validation, distance billing backend | Done |
+| Phase 4 | Live active rental screen di user app | In Progress |
+| Phase 5 | Idle warning, idle billing, auto resume backend | Done |
+| Phase 6 | Superadmin settings UI dan pricing config | Done |
+| Phase 7 | Reports, rental history detail, UI polish | Planned |
 
----
+## Testing Cepat
 
-## 👨‍💻 Tim Pengembang
+Backend feature tests:
 
-| Nama | GitHub | Peran |
-|---|---|---|
-| M. Sari Rizki | [@msaririzki](https://github.com/msaririzki) | Project Lead / Backend / Mobile |
+```bash
+cd backend
+php artisan test --compact tests/Feature
+```
 
----
+Catatan: full `php artisan test` saat ini membutuhkan perapihan `tests/Unit` atau konfigurasi `phpunit.xml`.
 
-## 📚 Teknologi yang Digunakan
+## Teknologi
 
 | Layer | Teknologi |
 |---|---|
-| Mobile | Flutter (Dart) |
-| Backend | Laravel 12, PHP 8.2 |
+| Mobile | Flutter, Dart |
+| Backend | Laravel 13, PHP 8.3 |
 | Auth | Laravel Sanctum |
-| Database | SQLite (dev) / MySQL (prod) |
-| Map | OpenStreetMap + flutter_map _(planned)_ |
-| GPS | geolocator _(planned)_ |
-| Real-time | Laravel Reverb / Pusher _(planned)_ |
+| Database | SQLite untuk development, MySQL opsional untuk produksi |
+| GPS | geolocator |
+| Map | OpenStreetMap + flutter_map planned untuk user app |
 
----
+## Lisensi
 
-## 📄 Lisensi
-
-Proyek ini dibuat untuk keperluan akademik — Mata Kuliah Mobile Computing, Universitas Bina Bangsa.
+Proyek ini dibuat untuk keperluan akademik.

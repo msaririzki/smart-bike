@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'user_id',
@@ -63,6 +64,11 @@ class Rental extends Model
     public function locationPoints(): HasMany
     {
         return $this->hasMany(RentalLocationPoint::class);
+    }
+
+    public function latestLocationPoint(): HasOne
+    {
+        return $this->hasOne(RentalLocationPoint::class)->latestOfMany('recorded_at');
     }
 
     public function idleEvents(): HasMany

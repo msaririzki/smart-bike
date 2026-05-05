@@ -27,11 +27,15 @@ class RentalController extends Controller
     public function active(Request $request): JsonResponse
     {
         $rental = Rental::query()
-            ->with('bike')
+            ->with(['bike', 'latestLocationPoint'])
             ->where('user_id', $request->user()->id)
             ->whereIn('status', [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING])
             ->latest('started_at')
             ->first();
+
+        if ($rental) {
+            $rental->setAttribute('current_speed_kmh', $rental->latestLocationPoint?->speed_kmh);
+        }
 
         return response()->json(['data' => $rental]);
     }
