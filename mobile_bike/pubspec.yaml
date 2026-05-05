@@ -1,0 +1,24 @@
+name: mobile_bike
+description: Smart Bike Rental — Bike Simulator App (IoT Device)
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.3.0
+  geolocator: ^13.0.2
+  permission_handler: ^11.3.1
+  connectivity_plus: ^6.0.5
+  battery_plus: ^6.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
