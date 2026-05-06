@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../models/bike.dart';
 import '../../models/rental.dart';
 import '../../services/api_client.dart';
+import '../rental/map_test_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.api, required this.onLogout, super.key});
@@ -114,6 +115,14 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Smart Bike'),
         actions: [
+          IconButton(
+            tooltip: 'Test Peta',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MapTestScreen()),
+            ),
+            icon: const Icon(Icons.map),
+          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: _isLoading ? null : _load,
