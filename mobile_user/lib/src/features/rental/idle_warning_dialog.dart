@@ -44,7 +44,7 @@ class IdleWarningDialog extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.orange.shade200.withOpacity(0.6),
+                    color: Colors.orange.shade200.withValues(alpha: 0.6),
                     blurRadius: 20,
                     spreadRadius: 2,
                     offset: const Offset(0, 6),
@@ -95,7 +95,7 @@ class IdleWarningDialog extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: Colors.orange.shade200.withOpacity(0.6),
+                  color: Colors.orange.shade200.withValues(alpha: 0.6),
                 ),
               ),
               child: Row(
@@ -168,7 +168,9 @@ class IdleWarningDialog extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xff0f766e).withOpacity(0.35),
+                            color: const Color(0xff0f766e).withValues(
+                              alpha: 0.35,
+                            ),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),

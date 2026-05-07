@@ -6,6 +6,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../../models/rental.dart';
 import '../../services/api_client.dart';
+import 'idle_badge_widget.dart';
+import 'idle_warning_dialog.dart';
 import 'map_widget.dart';
 
 class ActiveRentalScreen extends StatefulWidget {
@@ -32,6 +34,7 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isFinishing = false;
+  bool _idleDialogOpen = false;
   String? _error;
   DateTime _now = DateTime.now();
 
@@ -83,6 +86,7 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
         _syncRoutePoints(rental);
         _error = null;
       });
+      _handleIdleStatus(rental);
     } on ApiException catch (error) {
       if (mounted) {
         setState(() => _error = error.message);
@@ -101,17 +105,17 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
     }
   }
 
-  Future<void> _finishRental() async {
+  Future<bool> _finishRental({bool closeScreen = true}) async {
     final rental = _rental;
     if (rental == null) {
-      return;
+      return false;
     }
 
     setState(() => _isFinishing = true);
     try {
       final finished = await widget.api.finishRental(rental.id);
       if (!mounted) {
-        return;
+        return false;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -121,7 +125,10 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
           ),
         ),
       );
-      Navigator.of(context).pop(true);
+      if (closeScreen) {
+        Navigator.of(context).pop(true);
+      }
+      return true;
     } on ApiException catch (error) {
       _showMessage(error.message);
     } catch (_) {
@@ -131,6 +138,7 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
         setState(() => _isFinishing = false);
       }
     }
+    return false;
   }
 
   void _showMessage(String message) {
@@ -165,6 +173,96 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
         calculateDistance(_routePoints.last, nextPoint) >= 1) {
       _routePoints.add(nextPoint);
     }
+  }
+
+  void _handleIdleStatus(Rental? rental) {
+    if (!mounted) {
+      return;
+    }
+
+    if (rental?.status == 'idle_warning') {
+      if (!_idleDialogOpen && !_isFinishing) {
+        _showIdleDialog(rental!.id);
+      }
+      return;
+    }
+
+    if (_idleDialogOpen) {
+      Navigator.of(context, rootNavigator: true).pop();
+      _idleDialogOpen = false;
+    }
+  }
+
+  void _closeIdleDialog() {
+    if (!_idleDialogOpen || !mounted) {
+      return;
+    }
+
+    Navigator.of(context, rootNavigator: true).pop();
+    _idleDialogOpen = false;
+  }
+
+  void _showIdleDialog(int rentalId) {
+    _idleDialogOpen = true;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        var isLoading = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return IdleWarningDialog(
+              isLoading: isLoading,
+              onContinue: () async {
+                setDialogState(() => isLoading = true);
+
+                try {
+                  await widget.api.continueIdle(rentalId);
+                  if (!mounted) {
+                    return;
+                  }
+
+                  _closeIdleDialog();
+                  _showMessage('Sewa dilanjutkan. Biaya idle mulai berjalan.');
+                  await _loadRental(silent: true);
+                } on ApiException catch (error) {
+                  if (mounted) {
+                    setDialogState(() => isLoading = false);
+                    _showMessage(error.message);
+                  }
+                } catch (_) {
+                  if (mounted) {
+                    setDialogState(() => isLoading = false);
+                    _showMessage('Gagal melanjutkan sewa.');
+                  }
+                }
+              },
+              onFinish: () async {
+                setDialogState(() => isLoading = true);
+
+                final screenNavigator = Navigator.of(this.context);
+                final success = await _finishRental(closeScreen: false);
+                if (!mounted) {
+                  return;
+                }
+
+                if (success) {
+                  _closeIdleDialog();
+                  screenNavigator.pop(true);
+                  return;
+                }
+
+                if (dialogContext.mounted) {
+                  setDialogState(() => isLoading = false);
+                }
+              },
+            );
+          },
+        );
+      },
+    ).whenComplete(() => _idleDialogOpen = false);
   }
 
   @override
@@ -205,7 +303,7 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                       duration: _durationFor(rental),
                       routePoints: List.unmodifiable(_routePoints),
                       isFinishing: _isFinishing,
-                      onFinish: _finishRental,
+                      onFinish: () => _finishRental(),
                     ),
                 ],
               ),
@@ -392,21 +490,7 @@ class _StatusHeader extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xccffffff),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              style.label,
-              style: TextStyle(
-                color: style.foreground,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          StatusBadge(status: status),
         ],
       ),
     );

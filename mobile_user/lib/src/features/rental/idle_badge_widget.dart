@@ -67,7 +67,7 @@ class StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: glowColor.withOpacity(0.4),
+            color: glowColor.withValues(alpha: 0.4),
             blurRadius: 12,
             spreadRadius: 1,
             offset: const Offset(0, 4),
