@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'map_widget.dart';
@@ -14,22 +15,8 @@ class MapTestScreen extends StatefulWidget {
 }
 
 class _MapTestScreenState extends State<MapTestScreen> {
-  static const _pickupPoint = LatLng(-8.5830, 116.1163);
-
-  static const _defaultRoute = [
-    LatLng(-8.5833, 116.1167),
-    LatLng(-8.5836, 116.1170),
-    LatLng(-8.5840, 116.1174),
-    LatLng(-8.5843, 116.1178),
-    LatLng(-8.5848, 116.1182),
-    LatLng(-8.5851, 116.1185),
-    LatLng(-8.5855, 116.1190),
-    LatLng(-8.5858, 116.1193),
-    LatLng(-8.5862, 116.1198),
-    LatLng(-8.5865, 116.1202),
-    LatLng(-8.5869, 116.1207),
-    LatLng(-8.5872, 116.1211),
-  ];
+  // Fallback jika GPS gagal (Mataram city center)
+  static const _fallbackPosition = LatLng(-8.5830, 116.1163);
 
   static final _popularSpots = [
     const PopularSpot(
@@ -58,31 +45,104 @@ class _MapTestScreenState extends State<MapTestScreen> {
     ),
     const PopularSpot(
       name: 'Universitas Bumigora',
-      position: LatLng(-8.5845, 116.1160),
+      position: LatLng(-8.5776, 116.1264),
       icon: Icons.school,
       category: 'Kampus',
     ),
+    const PopularSpot(
+      name: 'Taman Mayura',
+      position: LatLng(-8.5868, 116.1331),
+      icon: Icons.temple_hindu,
+      category: 'Taman',
+    ),
+    const PopularSpot(
+      name: 'Taman Sangkareang',
+      position: LatLng(-8.5830, 116.1118),
+      icon: Icons.nature_people,
+      category: 'Taman',
+    ),
   ];
 
-  List<LatLng> _activeRoute = List.from(_defaultRoute);
-  int _idx = 0;
-  final List<LatLng> _passed = [_defaultRoute.first];
-  Timer? _moveTimer;
+  LatLng _userPosition = _fallbackPosition;
+  LatLng _pickupPoint = _fallbackPosition;
+  List<LatLng> _trail = [_fallbackPosition];
+  StreamSubscription<Position>? _posStream;
   Timer? _clockTimer;
-  bool _isPlaying = false;
+  bool _isTracking = false;
   double _speed = 0;
   MapType _mapType = MapType.standard;
   Duration _elapsed = Duration.zero;
   List<LatLng> _navigationRoute = [];
   bool _isLoadingRoute = false;
   PopularSpot? _activeSpot;
-  String _locationName = '';
+  String _locationName = 'Mendeteksi lokasi...';
   bool _isNavigating = false;
+  bool _gpsLoading = true;
+  String? _gpsError;
 
   @override
   void initState() {
     super.initState();
-    _updateLocationName(_activeRoute.first);
+    _initGps();
+  }
+
+  Future<void> _initGps() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _gpsError = 'GPS tidak aktif. Menggunakan lokasi default.';
+          _gpsLoading = false;
+        });
+        _updateLocationName(_userPosition);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _gpsError = 'Izin lokasi ditolak. Menggunakan lokasi default.';
+            _gpsLoading = false;
+          });
+          _updateLocationName(_userPosition);
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _gpsError = 'Izin lokasi ditolak permanen. Buka pengaturan.';
+          _gpsLoading = false;
+        });
+        _updateLocationName(_userPosition);
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+
+      final gpsPoint = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _userPosition = gpsPoint;
+        _pickupPoint = gpsPoint;
+        _trail = [gpsPoint];
+        _gpsLoading = false;
+        _gpsError = null;
+      });
+      _updateLocationName(gpsPoint);
+    } catch (e) {
+      setState(() {
+        _gpsError = 'Gagal mendapatkan lokasi GPS.';
+        _gpsLoading = false;
+      });
+      _updateLocationName(_userPosition);
+    }
   }
 
   Future<void> _updateLocationName(LatLng point) async {
@@ -90,65 +150,68 @@ class _MapTestScreenState extends State<MapTestScreen> {
     if (mounted) setState(() => _locationName = name);
   }
 
-  void _startSimulation() {
-    _moveTimer?.cancel();
-    _moveTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (_idx < _activeRoute.length - 1) {
-        setState(() {
-          _idx++;
-          _passed.add(_activeRoute[_idx]);
-          _speed = calculateDistance(
-                _activeRoute[_idx - 1],
-                _activeRoute[_idx],
-              ) /
-              3 *
-              3.6;
-        });
-        _updateLocationName(_activeRoute[_idx]);
-      } else {
-        _moveTimer?.cancel();
-        _clockTimer?.cancel();
-        setState(() => _isPlaying = false);
-      }
+  void _startTracking() {
+    _posStream?.cancel();
+    _clockTimer?.cancel();
+
+    setState(() {
+      _trail = [_userPosition];
+      _speed = 0;
+      _elapsed = Duration.zero;
+      _isTracking = true;
     });
 
-    _clockTimer?.cancel();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() => _elapsed += const Duration(seconds: 1));
       }
     });
 
-    setState(() => _isPlaying = true);
+    const locSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 3,
+    );
+
+    _posStream = Geolocator.getPositionStream(locationSettings: locSettings)
+        .listen((pos) {
+      if (!mounted) return;
+      final newPt = LatLng(pos.latitude, pos.longitude);
+      final prev = _userPosition;
+      final dist = calculateDistance(prev, newPt);
+      if (dist < 1.5) return;
+      final spd = pos.speed >= 0 ? pos.speed * 3.6 : (dist / 3 * 3.6);
+      setState(() {
+        _userPosition = newPt;
+        _trail.add(newPt);
+        _speed = spd;
+      });
+      _updateLocationName(newPt);
+    });
   }
 
-  void _pauseSimulation() {
-    _moveTimer?.cancel();
+  void _stopTracking() {
+    _posStream?.cancel();
     _clockTimer?.cancel();
-    setState(() => _isPlaying = false);
+    setState(() => _isTracking = false);
   }
 
-  void _resetSimulation() {
-    _moveTimer?.cancel();
+  void _resetTracking() {
+    _posStream?.cancel();
     _clockTimer?.cancel();
     setState(() {
-      _activeRoute = List.from(_defaultRoute);
-      _idx = 0;
-      _passed
-        ..clear()
-        ..add(_defaultRoute.first);
-      _isPlaying = false;
+      _trail = [_userPosition];
+      _isTracking = false;
       _speed = 0;
       _elapsed = Duration.zero;
       _navigationRoute = [];
       _activeSpot = null;
       _isNavigating = false;
     });
-    _updateLocationName(_defaultRoute.first);
+    _updateLocationName(_userPosition);
   }
 
   void _onRoutePointTap(int index, LatLng point) {
-    final distToHere = totalRouteDistance(_passed.sublist(0, index + 1));
+    final distToHere = totalRouteDistance(_trail.sublist(0, index + 1));
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -158,13 +221,13 @@ class _MapTestScreenState extends State<MapTestScreen> {
         index: index,
         point: point,
         distanceFromStart: distToHere,
-        isCurrentPosition: index == _idx,
+        isCurrentPosition: index == _trail.length - 1,
       ),
     );
   }
 
   Future<void> _onSpotTap(PopularSpot spot) async {
-    final bikePos = _activeRoute[_idx];
+    final bikePos = _userPosition;
 
     setState(() {
       _isLoadingRoute = true;
@@ -196,7 +259,7 @@ class _MapTestScreenState extends State<MapTestScreen> {
           durationSeconds: result.durationSeconds,
           onNavigate: () {
             Navigator.pop(context);
-            _startNavigation(result.points, spot);
+            _startLiveNavigation(result.points, spot);
           },
           onClearRoute: () {
             setState(() {
@@ -218,51 +281,42 @@ class _MapTestScreenState extends State<MapTestScreen> {
     }
   }
 
-  void _startNavigation(List<LatLng> routePoints, PopularSpot spot) {
-    _moveTimer?.cancel();
-    _clockTimer?.cancel();
-
-    final step = (routePoints.length / 20).ceil().clamp(1, routePoints.length);
-    final sampled = <LatLng>[routePoints.first];
-    for (int i = step; i < routePoints.length - 1; i += step) {
-      sampled.add(routePoints[i]);
-    }
-    sampled.add(routePoints.last);
-
+  void _startLiveNavigation(List<LatLng> routePoints, PopularSpot spot) {
     setState(() {
-      _activeRoute = sampled;
-      _idx = 0;
-      _passed
-        ..clear()
-        ..add(sampled.first);
-      _isPlaying = false;
-      _speed = 0;
-      _elapsed = Duration.zero;
+      _navigationRoute = routePoints;
       _isNavigating = true;
       _activeSpot = spot;
     });
-
-    _updateLocationName(sampled.first);
-    _startSimulation();
+    if (!_isTracking) _startTracking();
   }
 
   @override
   void dispose() {
-    _moveTimer?.cancel();
+    _posStream?.cancel();
     _clockTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final cur = _activeRoute[_idx];
-    final distance = totalRouteDistance(_passed);
+    final cur = _userPosition;
+    final distance = totalRouteDistance(_trail);
 
     return Scaffold(
       appBar: AppBar(
         title: _isNavigating && _activeSpot != null
             ? Text('Menuju ${_activeSpot!.name}')
-            : Text('Test Peta — Titik ${_idx + 1}/${_activeRoute.length}'),
+            : Text(_gpsLoading ? 'Mendeteksi GPS...' : (_isTracking ? 'Live Tracking Aktif' : 'Live Map')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.my_location),
+            tooltip: 'Refresh GPS',
+            onPressed: _gpsLoading ? null : () {
+              setState(() => _gpsLoading = true);
+              _initGps();
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -281,17 +335,39 @@ class _MapTestScreenState extends State<MapTestScreen> {
                   child: MapWidget(
                     latitude: cur.latitude,
                     longitude: cur.longitude,
-                    routePoints: List.from(_passed),
+                    routePoints: List.from(_trail),
                     accuracyRadius: 15,
                     mapType: _mapType,
                     pickupPoint: _pickupPoint,
                     popularSpots: _popularSpots,
-                    navigationRoute: _isNavigating ? [] : _navigationRoute,
+                    navigationRoute: _navigationRoute,
                     onRoutePointTap: _onRoutePointTap,
                     onSpotTap: _onSpotTap,
                   ),
                 ),
               ),
+              if (_gpsError != null)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xfffff7ed),
+                    border: Border.all(color: const Color(0xfffbbf24)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber, size: 16, color: Color(0xfff59e0b)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _gpsError!,
+                          style: const TextStyle(fontSize: 12, color: Color(0xff92400e)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               _InfoPanel(
                 locationName: _locationName,
                 distance: distance,
@@ -300,13 +376,12 @@ class _MapTestScreenState extends State<MapTestScreen> {
                 activeSpot: _activeSpot,
                 isNavigating: _isNavigating,
               ),
-              _ControlBar(
-                isPlaying: _isPlaying,
-                isFinished: _idx >= _activeRoute.length - 1,
+              _LiveControlBar(
+                isTracking: _isTracking,
                 isNavigating: _isNavigating,
-                onPlay: _startSimulation,
-                onPause: _pauseSimulation,
-                onReset: _resetSimulation,
+                onStart: _startTracking,
+                onStop: _stopTracking,
+                onReset: _resetTracking,
               ),
             ],
           ),
@@ -535,21 +610,19 @@ class _InfoItem extends StatelessWidget {
   }
 }
 
-class _ControlBar extends StatelessWidget {
-  const _ControlBar({
-    required this.isPlaying,
-    required this.isFinished,
+class _LiveControlBar extends StatelessWidget {
+  const _LiveControlBar({
+    required this.isTracking,
     required this.isNavigating,
-    required this.onPlay,
-    required this.onPause,
+    required this.onStart,
+    required this.onStop,
     required this.onReset,
   });
 
-  final bool isPlaying;
-  final bool isFinished;
+  final bool isTracking;
   final bool isNavigating;
-  final VoidCallback onPlay;
-  final VoidCallback onPause;
+  final VoidCallback onStart;
+  final VoidCallback onStop;
   final VoidCallback onReset;
 
   @override
@@ -560,11 +633,13 @@ class _ControlBar extends StatelessWidget {
         children: [
           Expanded(
             child: FilledButton.icon(
-              onPressed: isFinished ? null : (isPlaying ? onPause : onPlay),
-              icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-              label: Text(isPlaying ? 'Pause' : 'Play'),
+              onPressed: isTracking ? onStop : onStart,
+              icon: Icon(isTracking ? Icons.stop : Icons.gps_fixed),
+              label: Text(isTracking ? 'Stop Tracking' : 'Mulai Tracking'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xff0f766e),
+                backgroundColor: isTracking
+                    ? const Color(0xffdc2626)
+                    : const Color(0xff0f766e),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
