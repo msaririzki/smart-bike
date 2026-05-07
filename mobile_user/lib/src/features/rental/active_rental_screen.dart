@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../models/rental.dart';
 import '../../services/api_client.dart';
+import 'map_widget.dart';
 
 class ActiveRentalScreen extends StatefulWidget {
   const ActiveRentalScreen({required this.api, super.key});
@@ -24,7 +26,9 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
 
   Timer? _refreshTimer;
   Timer? _durationTimer;
+  final List<LatLng> _routePoints = [];
   Rental? _rental;
+  int? _routeRentalId;
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isFinishing = false;
@@ -72,9 +76,11 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
       if (!mounted) {
         return;
       }
+      final rental = detail == null ? null : Rental.fromJson(detail);
 
       setState(() {
-        _rental = detail == null ? null : Rental.fromJson(detail);
+        _rental = rental;
+        _syncRoutePoints(rental);
         _error = null;
       });
     } on ApiException catch (error) {
@@ -136,6 +142,31 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _syncRoutePoints(Rental? rental) {
+    if (rental == null) {
+      _routeRentalId = null;
+      _routePoints.clear();
+      return;
+    }
+
+    if (_routeRentalId != rental.id) {
+      _routeRentalId = rental.id;
+      _routePoints.clear();
+    }
+
+    final latitude = rental.bike?.latitude;
+    final longitude = rental.bike?.longitude;
+    if (latitude == null || longitude == null) {
+      return;
+    }
+
+    final nextPoint = LatLng(latitude, longitude);
+    if (_routePoints.isEmpty ||
+        calculateDistance(_routePoints.last, nextPoint) >= 1) {
+      _routePoints.add(nextPoint);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final rental = _rental;
@@ -172,6 +203,7 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                       rental: rental,
                       currency: _currency,
                       duration: _durationFor(rental),
+                      routePoints: List.unmodifiable(_routePoints),
                       isFinishing: _isFinishing,
                       onFinish: _finishRental,
                     ),
@@ -197,6 +229,7 @@ class _RentalDetail extends StatelessWidget {
     required this.rental,
     required this.currency,
     required this.duration,
+    required this.routePoints,
     required this.isFinishing,
     required this.onFinish,
   });
@@ -204,6 +237,7 @@ class _RentalDetail extends StatelessWidget {
   final Rental rental;
   final NumberFormat currency;
   final Duration duration;
+  final List<LatLng> routePoints;
   final bool isFinishing;
   final VoidCallback onFinish;
 
@@ -211,6 +245,8 @@ class _RentalDetail extends StatelessWidget {
   Widget build(BuildContext context) {
     final bike = rental.bike;
     final speed = rental.currentSpeedKmh ?? 0;
+    final latitude = bike?.latitude;
+    final longitude = bike?.longitude;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -222,6 +258,24 @@ class _RentalDetail extends StatelessWidget {
           name: bike?.name ?? 'Sepeda',
         ),
         const SizedBox(height: 16),
+        if (latitude != null && longitude != null) ...[
+          SizedBox(
+            height: 250,
+            child: MapWidget(
+              latitude: latitude,
+              longitude: longitude,
+              routePoints: routePoints,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Lokasi: ${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: const Color(0xff667085),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         _MetricGrid(
           children: [
             _MetricCard(
