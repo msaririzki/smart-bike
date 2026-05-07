@@ -91,6 +91,10 @@ class ApiClient {
     return Rental.fromJson(json['data'] as Map<String, dynamic>);
   }
 
+  Future<void> continueIdle(int rentalId) async {
+    await _post('/rentals/$rentalId/idle/continue', body: {});
+  }
+
   Future<Map<String, dynamic>> _get(String path) async {
     final response = await http.get(
       Uri.parse('$baseUrl$path'),
