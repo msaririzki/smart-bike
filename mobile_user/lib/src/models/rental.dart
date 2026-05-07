@@ -10,6 +10,7 @@ class Rental {
     required this.totalCost,
     this.startedAt,
     this.currentSpeedKmh,
+    this.latestLocationPoint,
     this.bike,
   });
 
@@ -21,12 +22,28 @@ class Rental {
   final int totalCost;
   final DateTime? startedAt;
   final double? currentSpeedKmh;
+  final RentalLocationPoint? latestLocationPoint;
   final Bike? bike;
 
   double get totalDistanceKilometers => totalDistanceMeters / 1000;
 
+  double? get latitude => bike?.latitude ?? latestLocationPoint?.latitude;
+
+  double? get longitude => bike?.longitude ?? latestLocationPoint?.longitude;
+
+  DateTime? get lastLocationUpdateAt => latestLocationPoint?.recordedAt;
+
+  String? get networkType => latestLocationPoint?.networkType;
+
+  double? get gpsAccuracyMeters => latestLocationPoint?.accuracyMeters;
+
   factory Rental.fromJson(Map<String, dynamic> json) {
     final latestPoint = json['latest_location_point'];
+    final parsedLatestPoint = latestPoint is Map
+        ? RentalLocationPoint.fromJson(
+            Map<String, dynamic>.from(latestPoint),
+          )
+        : null;
 
     return Rental(
       id: json['id'] as int,
@@ -38,12 +55,40 @@ class Rental {
       startedAt: _toDateTime(json['started_at']),
       currentSpeedKmh:
           _toDouble(json['current_speed_kmh']) ??
-          (latestPoint is Map<String, dynamic>
-              ? _toDouble(latestPoint['speed_kmh'])
-              : null),
+          parsedLatestPoint?.speedKmh,
+      latestLocationPoint: parsedLatestPoint,
       bike: json['bike'] == null
           ? null
-          : Bike.fromJson(json['bike'] as Map<String, dynamic>),
+          : Bike.fromJson(Map<String, dynamic>.from(json['bike'] as Map)),
+    );
+  }
+}
+
+class RentalLocationPoint {
+  const RentalLocationPoint({
+    this.latitude,
+    this.longitude,
+    this.speedKmh,
+    this.accuracyMeters,
+    this.networkType,
+    this.recordedAt,
+  });
+
+  final double? latitude;
+  final double? longitude;
+  final double? speedKmh;
+  final double? accuracyMeters;
+  final String? networkType;
+  final DateTime? recordedAt;
+
+  factory RentalLocationPoint.fromJson(Map<String, dynamic> json) {
+    return RentalLocationPoint(
+      latitude: _toDouble(json['latitude']),
+      longitude: _toDouble(json['longitude']),
+      speedKmh: _toDouble(json['speed_kmh']),
+      accuracyMeters: _toDouble(json['accuracy_meters']),
+      networkType: json['network_type']?.toString(),
+      recordedAt: _toDateTime(json['recorded_at']),
     );
   }
 }
