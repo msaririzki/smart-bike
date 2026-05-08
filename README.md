@@ -94,6 +94,37 @@ flutter pub get
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
 ```
 
+## Menjalankan Semua Dev Server
+
+Untuk development cepat dari root project, jalankan:
+
+```bash
+npm run dev
+```
+
+Script ini menjalankan tiga proses sekaligus:
+
+| Proses | URL / Port |
+|---|---|
+| Laravel backend | `http://localhost:8000` |
+| Flutter User App (Chrome) | `http://localhost:58770` |
+| Flutter Bike App (Chrome) | `http://localhost:58771` |
+
+Kedua Flutter app otomatis memakai:
+
+```text
+API_BASE_URL=http://127.0.0.1:8000/api
+```
+
+Script juga memantau perubahan file `.dart` di `mobile_user/lib` dan `mobile_bike/lib`, lalu mengirim perintah hot reload ke proses Flutter masing-masing.
+
+Untuk override API URL:
+
+```bash
+$env:API_BASE_URL="http://192.168.1.5:8000/api"
+npm run dev
+```
+
 ## Akun Demo
 
 | Role | Email | Password |
