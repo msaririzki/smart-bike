@@ -95,6 +95,13 @@ class ApiClient {
     await _post('/rentals/$rentalId/idle/continue', body: {});
   }
 
+  Future<List<Map<String, dynamic>>> rentalHistory() async {
+    final json = await _get('/rentals/history');
+    return (json['data'] as List<dynamic>)
+        .map((item) => item as Map<String, dynamic>)
+        .toList();
+  }
+
   Future<Map<String, dynamic>> _get(String path) async {
     final response = await http.get(
       Uri.parse('$baseUrl$path'),

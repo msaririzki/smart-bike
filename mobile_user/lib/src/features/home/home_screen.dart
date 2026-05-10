@@ -5,6 +5,7 @@ import '../../models/bike.dart';
 import '../../models/rental.dart';
 import '../../services/api_client.dart';
 import '../rental/active_rental_screen.dart';
+import '../history/history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.api, required this.onLogout, super.key});
@@ -182,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                const _BottomNavigationMock(),
+                _BottomNavigationMock(api: widget.api),
               ],
             ),
     );
@@ -717,7 +718,9 @@ class _BikeCard extends StatelessWidget {
 }
 
 class _BottomNavigationMock extends StatelessWidget {
-  const _BottomNavigationMock();
+  const _BottomNavigationMock({required this.api});
+
+  final ApiClient api;
 
   @override
   Widget build(BuildContext context) {
@@ -747,24 +750,31 @@ class _BottomNavigationMock extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _BottomNavItem(
+                    const _BottomNavItem(
                       icon: Icons.home_rounded,
                       label: 'Beranda',
                       active: true,
                     ),
-                    _BottomNavItem(
+                    const _BottomNavItem(
                       icon: Icons.location_on_outlined,
                       label: 'Peta',
                     ),
-                    SizedBox(width: 62),
+                    const SizedBox(width: 62),
                     _BottomNavItem(
                       icon: Icons.history_rounded,
                       label: 'Riwayat',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => HistoryScreen(api: api),
+                          ),
+                        );
+                      },
                     ),
-                    _BottomNavItem(
+                    const _BottomNavItem(
                       icon: Icons.person_outline,
                       label: 'Profil',
                     ),
@@ -804,33 +814,39 @@ class _BottomNavItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.active = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool active;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = active ? const Color(0xff23866f) : const Color(0xff7f8784);
 
-    return SizedBox(
-      width: 54,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 54,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
