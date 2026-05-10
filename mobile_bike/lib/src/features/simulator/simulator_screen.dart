@@ -9,6 +9,8 @@ import '../../models/bike.dart';
 import '../../services/api_client.dart';
 import '../../services/gps_service.dart';
 import '../../services/session_store.dart';
+import 'manual_gps_panel.dart';
+import 'mock_route_service.dart';
 
 class SimulatorScreen extends StatefulWidget {
   const SimulatorScreen({
@@ -50,6 +52,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   String _lastServerMsg = '—';
   bool _sending = false;
 
+  // Mock & Manual GPS state
+  final _mockService = MockRouteService();
+  Timer? _mockTimer;
+  bool _isSimulating = false;
+  String _simulationProgress = '';
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +69,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   @override
   void dispose() {
     _stopStream();
+    _stopSimulation();
     super.dispose();
   }
 
@@ -152,6 +161,90 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     if (mounted) setState(() => _streaming = false);
+  }
+
+  // ─── Mock / Manual Control ───────────────────────────────────────────────
+
+  void _sendManualCoordinate(double lat, double lng) {
+    setState(() {
+      _lat = lat;
+      _lng = lng;
+      _speedKmh = 0; // Manual static point
+      _accuracyMeters = 0;
+    });
+    
+    // We create a dummy Position object for the existing _sendLocation method
+    final pos = Position(
+      latitude: lat,
+      longitude: lng,
+      timestamp: DateTime.now(),
+      accuracy: 0,
+      altitude: 0,
+      heading: 0,
+      speed: 0,
+      speedAccuracy: 0,
+      altitudeAccuracy: 0,
+      headingAccuracy: 0,
+    );
+    
+    _sendLocation(pos);
+  }
+
+  void _toggleSimulation() {
+    if (_isSimulating) {
+      _stopSimulation();
+    } else {
+      _startSimulation();
+    }
+  }
+
+  void _startSimulation() {
+    // If streaming real GPS, stop it first
+    if (_streaming) _stopStream();
+
+    _mockService.reset();
+    setState(() {
+      _isSimulating = true;
+      _streaming = true; // Mark as streaming for the UI status badge
+      _updateSimulationProgress();
+    });
+
+    _mockTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      final point = _mockService.currentPoint;
+      _sendManualCoordinate(point.latitude, point.longitude);
+      
+      if (_mockService.hasNext) {
+        _mockService.next();
+        if (mounted) {
+          setState(() => _updateSimulationProgress());
+        }
+      } else {
+        _mockService.reset(); // Loop or stop? Instructions say "Simulasi Rute: Titik 3/10", usually implies loop or just keep going
+        if (mounted) {
+          setState(() => _updateSimulationProgress());
+        }
+      }
+    });
+
+    // Send first point immediately
+    final firstPoint = _mockService.currentPoint;
+    _sendManualCoordinate(firstPoint.latitude, firstPoint.longitude);
+  }
+
+  void _stopSimulation() {
+    _mockTimer?.cancel();
+    _mockTimer = null;
+    if (mounted) {
+      setState(() {
+        _isSimulating = false;
+        _streaming = false;
+        _simulationProgress = '';
+      });
+    }
+  }
+
+  void _updateSimulationProgress() {
+    _simulationProgress = 'Simulasi Rute: Titik ${_mockService.currentIndex + 1}/${_mockService.totalPoints}';
   }
 
   // ─── API Calls ───────────────────────────────────────────────────────────
@@ -281,6 +374,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           const SizedBox(height: 12),
           // Bike info
           _buildBikeCard(),
+          const SizedBox(height: 12),
+          // Manual & Mock Control
+          ManualGpsPanel(
+            onCoordinateSend: _sendManualCoordinate,
+            onToggleSimulation: _toggleSimulation,
+            isSimulating: _isSimulating,
+            simulationProgress: _simulationProgress,
+          ),
           const SizedBox(height: 12),
           // GPS & Sensor data
           _buildSensorCard(),
