@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/splash/splash_screen.dart';
 import 'services/api_client.dart';
 import 'services/session_store.dart';
 
@@ -27,7 +28,13 @@ class _SmartBikeUserAppState extends State<SmartBikeUserApp> {
   }
 
   Future<void> _bootstrap() async {
-    final token = await _sessionStore.token;
+    // Mengeksekusi cek token & delay 2 detik secara paralel
+    final results = await Future.wait([
+      _sessionStore.token,
+      Future.delayed(const Duration(seconds: 2)),
+    ]);
+    
+    final token = results[0];
     setState(() {
       _isLoggedIn = token != null;
       _isLoading = false;
@@ -63,19 +70,10 @@ class _SmartBikeUserAppState extends State<SmartBikeUserApp> {
         ),
       ),
       home: _isLoading
-          ? const _SplashScreen()
+          ? const SplashScreen()
           : _isLoggedIn
           ? HomeScreen(api: _api, onLogout: _handleLogout)
           : AuthScreen(api: _api, onLoggedIn: _handleLoggedIn),
     );
-  }
-}
-
-class _SplashScreen extends StatelessWidget {
-  const _SplashScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
