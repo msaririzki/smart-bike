@@ -97,7 +97,15 @@ class ApiClient {
 
   Future<List<Map<String, dynamic>>> rentalHistory() async {
     final json = await _get('/rentals/history');
-    return (json['data'] as List<dynamic>)
+    final data = json['data'];
+
+    if (data is Map && data.containsKey('data')) {
+      return (data['data'] as List<dynamic>)
+          .map((item) => item as Map<String, dynamic>)
+          .toList();
+    }
+
+    return (data as List<dynamic>)
         .map((item) => item as Map<String, dynamic>)
         .toList();
   }

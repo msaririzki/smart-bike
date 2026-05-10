@@ -36,6 +36,23 @@ class RentalHistory {
     return '${minutes}m';
   }
 
+  int get durationMinutes {
+    if (endedAt == null) return 0;
+    return endedAt!.difference(startedAt).inMinutes;
+  }
+
+  double get caloriesBurned {
+    // Basic estimation: 8 calories per minute of cycling
+    return durationMinutes * 8.0;
+  }
+
+  double get averageSpeed {
+    // km / hours
+    final durationHours = durationMinutes / 60.0;
+    if (durationHours == 0) return 0.0;
+    return totalDistanceKilometers / durationHours;
+  }
+
   factory RentalHistory.fromJson(Map<String, dynamic> json) {
     return RentalHistory(
       id: json['id'] as int,
