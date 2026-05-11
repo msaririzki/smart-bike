@@ -1,33 +1,76 @@
-@extends('layouts.admin', ['title' => 'Rentals'])
+@extends('layouts.admin', ['title' => 'Rental'])
 
 @section('content')
-    <h1>Rentals</h1>
+    <h1>Rental</h1>
+
+    <form class="card toolbar" method="get" action="{{ route('admin.rentals.index') }}">
+        <label>
+            Filter Status
+            <select name="status">
+                @foreach($filters as $option)
+                    <option value="{{ $option }}" @selected($filter === $option)>
+                        @if($option === 'all')
+                            semua
+                        @elseif($option === 'running')
+                            rental berjalan
+                        @else
+                            {{ $adminStatusLabels[$option] ?? $option }}
+                        @endif
+                    </option>
+                @endforeach
+            </select>
+        </label>
+        <div>
+            <div class="actions">
+                <button class="button" type="submit">Filter</button>
+                <a class="button secondary" href="{{ route('admin.rentals.index', ['status' => $filter]) }}">Muat Ulang</a>
+                <a class="button secondary" href="{{ route('admin.rentals.index') }}">Hapus Filter</a>
+            </div>
+        </div>
+    </form>
+
     <table>
         <thead>
             <tr>
-                <th>ID</th>
-                <th>User</th>
-                <th>Bike</th>
+                <th>No. Rental</th>
+                <th>Pengguna</th>
+                <th>Sepeda</th>
                 <th>Status</th>
-                <th>Distance</th>
-                <th>Total</th>
-                <th>Started</th>
+                <th>Durasi</th>
+                <th>Jarak</th>
+                <th>Biaya Sepeda Diam</th>
+                <th>Total Biaya</th>
+                <th>Lokasi Terakhir</th>
+                <th>Mulai</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
-            @foreach($rentals as $rental)
+            @forelse($rentals as $rental)
                 <tr>
-                    <td>{{ $rental->id }}</td>
+                    <td>#{{ $rental->id }}</td>
                     <td>{{ $rental->user->name }}</td>
                     <td>{{ $rental->bike->code }}</td>
-                    <td>{{ $rental->status }}</td>
+                    <td><span class="badge {{ $rental->status }}">{{ $adminStatusLabels[$rental->status] ?? $rental->status }}</span></td>
+                    <td>{{ $rental->started_at?->diffForHumans($rental->ended_at ?? now(), true) ?? '-' }}</td>
                     <td>{{ number_format($rental->total_distance_meters, 2) }} m</td>
+                    <td>Rp{{ number_format($rental->idle_cost, 0, ',', '.') }}</td>
                     <td>Rp{{ number_format($rental->total_cost, 0, ',', '.') }}</td>
+                    <td>
+                        @if($rental->latestLocationPoint)
+                            {{ $rental->latestLocationPoint->latitude }}, {{ $rental->latestLocationPoint->longitude }}
+                        @else
+                            -
+                        @endif
+                    </td>
                     <td>{{ $rental->started_at }}</td>
-                    <td><a href="{{ route('admin.rentals.show', $rental) }}">Detail</a></td>
+                    <td><a href="{{ route('admin.rentals.show', $rental) }}">Lihat Detail</a></td>
                 </tr>
-            @endforeach
+            @empty
+                <tr>
+                    <td colspan="11" class="muted">Tidak ada rental yang cocok.</td>
+                </tr>
+            @endforelse
         </tbody>
     </table>
     {{ $rentals->links() }}

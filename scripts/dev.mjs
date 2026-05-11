@@ -7,14 +7,16 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, '..');
 const apiBaseUrl = process.env.API_BASE_URL ?? 'http://127.0.0.1:8000/api';
+const adminOnly = process.argv.includes('--admin-only');
 
 const processes = [];
 const watchers = [];
 
 function run({ name, cwd, command, args, color }) {
-  const child = spawn(command, args, {
+  const useShell = process.platform === 'win32';
+  const child = spawn(useShell ? shellCommand(command, args) : command, useShell ? [] : args, {
     cwd: path.join(root, cwd),
-    shell: true,
+    shell: useShell,
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, FORCE_COLOR: '1' },
   });
@@ -32,6 +34,20 @@ function run({ name, cwd, command, args, color }) {
   });
 
   return child;
+}
+
+function shellCommand(command, args) {
+  return [command, ...args].map(quoteShellArg).join(' ');
+}
+
+function quoteShellArg(value) {
+  const text = String(value);
+
+  if (!/[ "'&|<>^]/.test(text)) {
+    return text;
+  }
+
+  return `"${text.replace(/"/g, '\\"')}"`;
 }
 
 function prefix(stream, name, color) {
@@ -102,36 +118,42 @@ run({
   color: '\x1b[32m',
 });
 
-const userApp = run({
-  name: 'user',
-  cwd: 'mobile_user',
-  command: 'flutter',
-  args: [
-    'run',
-    '-d',
-    'chrome',
-    '--web-port=58770',
-    `--dart-define=API_BASE_URL=${apiBaseUrl}`,
-  ],
-  color: '\x1b[34m',
-});
+log('dev', 'Admin panel: http://localhost:8000/admin/login', '\x1b[35m');
 
-const bikeApp = run({
-  name: 'bike',
-  cwd: 'mobile_bike',
-  command: 'flutter',
-  args: [
-    'run',
-    '-d',
-    'chrome',
-    '--web-port=58771',
-    `--dart-define=API_BASE_URL=${apiBaseUrl}`,
-  ],
-  color: '\x1b[33m',
-});
+if (adminOnly) {
+  log('dev', 'Admin-only mode enabled. Mobile apps are not started.', '\x1b[35m');
+} else {
+  const userApp = run({
+    name: 'user',
+    cwd: 'mobile_user',
+    command: 'flutter',
+    args: [
+      'run',
+      '-d',
+      'chrome',
+      '--web-port=58770',
+      `--dart-define=API_BASE_URL=${apiBaseUrl}`,
+    ],
+    color: '\x1b[34m',
+  });
 
-watchFlutter('user', userApp, 'mobile_user');
-watchFlutter('bike', bikeApp, 'mobile_bike');
+  const bikeApp = run({
+    name: 'bike',
+    cwd: 'mobile_bike',
+    command: 'flutter',
+    args: [
+      'run',
+      '-d',
+      'chrome',
+      '--web-port=58771',
+      `--dart-define=API_BASE_URL=${apiBaseUrl}`,
+    ],
+    color: '\x1b[33m',
+  });
 
-log('dev', 'User app: http://localhost:58770', '\x1b[35m');
-log('dev', 'Bike app: http://localhost:58771', '\x1b[35m');
+  watchFlutter('user', userApp, 'mobile_user');
+  watchFlutter('bike', bikeApp, 'mobile_bike');
+
+  log('dev', 'User app: http://localhost:58770', '\x1b[35m');
+  log('dev', 'Bike app: http://localhost:58771', '\x1b[35m');
+}

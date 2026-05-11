@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(HandleCors::class);
+        $middleware->redirectGuestsTo(fn ($request) => $request->expectsJson() ? null : route('admin.login'));
 
         $middleware->alias([
             'role' => EnsureRole::class,
