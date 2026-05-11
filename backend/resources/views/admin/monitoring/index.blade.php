@@ -76,7 +76,7 @@
                                 -
                             @endif
                         </td>
-                        <td><a href="{{ route('admin.monitoring.show', $bike) }}">Lihat Detail</a></td>
+                        <td><a href="{{ route('admin.monitoring.show', $bike) }}" class="button secondary" style="padding: 6px 12px; font-size: 13px;">Lihat Detail</a></td>
                     </tr>
                 @empty
                     <tr>

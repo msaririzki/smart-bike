@@ -20,6 +20,7 @@
                 @if($bike->battery_percent !== null)
                     @php($batteryClass = $bike->battery_percent <= 20 ? 'background: #dc2626;' : 'background: #0f766e;')
                     <div style="width: 100px; height: 8px; border-radius: 4px; background: #e2e8f0; overflow: hidden;"><div style="height: 100%; width: {{ max(0, min(100, $bike->battery_percent)) }}%; {{ $batteryClass }}"></div></div>
+                    <span class="muted" style="margin-left: 8px; font-size: 13px;">(~{{ round((max(0, $bike->battery_percent - 5) / 100) * 12) }} jam pemakaian tersisa)</span>
                 @endif
             </div>
             <p><strong>Perangkat Sepeda:</strong> <br> {{ $bike->assignedDevice?->email ?? '-' }}</p>

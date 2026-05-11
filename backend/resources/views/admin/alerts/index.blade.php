@@ -37,7 +37,7 @@
                         <td>{{ $rental->bike?->code ?? '-' }}</td>
                         <td><span class="badge {{ $rental->status }}">{{ $adminStatusLabels[$rental->status] ?? $rental->status }}</span></td>
                         <td>{{ $rental->idle_started_at ?? '-' }}</td>
-                        <td><a href="{{ route('admin.rentals.show', $rental) }}">Lihat Detail</a></td>
+                        <td><a href="{{ route('admin.rentals.show', $rental) }}" class="button secondary" style="padding: 6px 12px; font-size: 13px;">Lihat Detail</a></td>
                     </tr>
                 @empty
                     <tr><td colspan="6" class="muted">Tidak ada sepeda yang diam terlalu lama.</td></tr>

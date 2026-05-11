@@ -17,9 +17,50 @@
         nav { display: flex; flex-wrap: wrap; gap: 6px; }
         nav a { color: #ccfbf1; padding: 8px 12px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px; transition: all 0.2s ease; }
         nav a:hover, nav a.active { background: #115e59; color: white; box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); }
-        header button { color: white; padding: 8px 16px; background: #115e59; border: 1px solid #134e4a; border-radius: 6px; cursor: pointer; font: inherit; font-size: 14px; font-weight: 500; transition: all 0.2s ease; }
-        header button:hover { background: #0d9488; border-color: #ccfbf1; }
-        main { max-width: 1200px; margin: 32px auto; padding: 0 20px; }
+        header button.btn-outline { color: white; padding: 8px 16px; background: #115e59; border: 1px solid #134e4a; border-radius: 6px; cursor: pointer; font: inherit; font-size: 14px; font-weight: 500; transition: all 0.2s ease; display: flex; align-items: center; gap: 6px; }
+        header button.btn-outline:hover { background: #0d9488; border-color: #ccfbf1; }
+        header input::placeholder { color: rgba(255,255,255,0.6); }
+        header input:focus { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.4); box-shadow: none; }
+        main { max-width: 1200px; margin: 32px auto; padding: 0 20px; width: 100%; box-sizing: border-box; }
+        
+        /* Toasts */
+        #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 12px; }
+        .toast { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-left: 4px solid #0f766e; min-width: 250px; transform: translateX(150%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .toast.show { transform: translateX(0); }
+        .toast.error { border-left-color: #ef4444; }
+        .toast.warning { border-left-color: #f59e0b; }
+        .toast-title { font-weight: 600; font-size: 14px; margin: 0 0 4px; color: #0f172a; }
+        .toast-message { font-size: 13px; color: #64748b; margin: 0; }
+        /* Navbar Responsif & Glassmorphism */
+        .menu-toggle { display: none; background: transparent; border: none; color: white; cursor: pointer; padding: 6px; border-radius: 4px; box-shadow: none; margin-left: auto; }
+        .menu-toggle:hover { background: #115e59; }
+        .nav-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 40; opacity: 0; transition: opacity 0.3s ease; }
+        .nav-overlay.open { display: block; opacity: 1; }
+        .nav-close { display: none; background: transparent; border: none; color: #64748b; font-size: 28px; line-height: 1; cursor: pointer; align-self: flex-end; margin-bottom: 16px; padding: 4px; transition: color 0.2s; }
+        .nav-close:hover { color: #0f172a; }
+        
+        .nav-logout-btn { background: transparent; border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s; font: inherit; font-size: 14px; font-weight: 500; }
+        .nav-logout-btn:hover { background: rgba(255,255,255,0.1); border-color: white; }
+
+        @media (min-width: 901px) {
+            .logout-text { display: none; }
+            nav { align-items: center; }
+            header .brand { margin-right: auto; }
+        }
+        
+        @media (max-width: 900px) {
+            .menu-toggle { display: block; }
+            nav { display: flex; flex-direction: column; position: fixed; top: 0; right: 0; left: auto; width: 280px; height: 100%; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 50; padding: 24px; gap: 8px; box-shadow: -4px 0 16px rgba(0,0,0,0.1); transform: translateX(100%); transition: transform 0.3s ease, visibility 0.3s; visibility: hidden; align-items: stretch; overflow-y: auto; }
+            nav.open { transform: translateX(0); visibility: visible; }
+            nav a { color: #334155; padding: 12px 16px; border-radius: 6px; font-size: 15px; }
+            nav a.active { background: #0f766e; color: white; box-shadow: 0 2px 4px rgba(15,118,110,0.2); }
+            nav a:hover:not(.active) { background: rgba(15,118,110,0.08); color: #0f766e; }
+            .nav-close { display: block; }
+            
+            .nav-logout-btn { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 12px 16px; margin-top: 16px; }
+            .nav-logout-btn:hover { background: #fee2e2; border-color: #fca5a5; }
+            .logout-text { display: inline; }
+        }
         .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.2s ease, box-shadow 0.2s ease; }
         .card:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025); transform: translateY(-2px); }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
@@ -132,35 +173,98 @@
 </head>
 <body>
 <header>
-    <div class="header-left">
-        <div class="brand">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18c-.5 0-.9-.2-1.2-.5C3.5 17.2 3.4 16.8 3.5 16.4l2.2-9.9C5.9 5.6 6.7 5 7.6 5h8.8c.9 0 1.7.6 1.9 1.5l2.2 9.9c.1.4 0 .8-.3 1.1-.3.3-.7.5-1.2.5H5z"></path><circle cx="8" cy="18" r="2"></circle><circle cx="16" cy="18" r="2"></circle></svg>
-            Smart Bike
-        </div>
-        @auth
-            <nav>
-                <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">Dasbor</a>
-                <a href="{{ route('admin.monitoring.index') }}" class="{{ request()->routeIs('admin.monitoring.*') ? 'active' : '' }}">Monitoring Sepeda</a>
-                <a href="{{ route('admin.bikes.index') }}" class="{{ request()->routeIs('admin.bikes.*') ? 'active' : '' }}">Sepeda</a>
-                <a href="{{ route('admin.rentals.index') }}" class="{{ request()->routeIs('admin.rentals.*') && !request()->has('status') ? 'active' : '' }}">Rental</a>
-                <a href="{{ route('admin.rentals.index', ['status' => 'running']) }}" class="{{ request()->fullUrlIs('*status=running*') ? 'active' : '' }}">Rental Aktif</a>
-                <a href="{{ route('admin.users.index') }}" class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">Pengguna</a>
-                <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Laporan</a>
-                <a href="{{ route('admin.alerts.index') }}" class="{{ request()->routeIs('admin.alerts.*') ? 'active' : '' }}">Peringatan</a>
-                @if(auth()->user()->role === 'superadmin')
-                    <a href="{{ route('admin.settings.edit') }}" class="{{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">Pengaturan</a>
-                @endif
-            </nav>
-        @endauth
+    <div class="brand">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18c-.5 0-.9-.2-1.2-.5C3.5 17.2 3.4 16.8 3.5 16.4l2.2-9.9C5.9 5.6 6.7 5 7.6 5h8.8c.9 0 1.7.6 1.9 1.5l2.2 9.9c.1.4 0 .8-.3 1.1-.3.3-.7.5-1.2.5H5z"></path><circle cx="8" cy="18" r="2"></circle><circle cx="16" cy="18" r="2"></circle></svg>
+        Smart Bike
     </div>
+
     @auth
-        <form method="post" action="{{ route('admin.logout') }}" style="margin: 0;">
-            @csrf
-            <button type="submit">Keluar</button>
-        </form>
+        <div class="header-left" style="flex: 1; margin: 0 24px; max-width: 400px; display: flex;">
+            <form action="{{ route('admin.monitoring.index') }}" method="get" style="display: flex; width: 100%; position: relative;">
+                <input type="search" name="search" placeholder="Cari sepeda atau pengguna..." style="margin: 0; padding-left: 36px; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; height: 38px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 11px; opacity: 0.6;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </form>
+        </div>
+
+        <button class="menu-toggle" id="menu-btn" aria-label="Buka Menu">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+
+        <div class="nav-overlay" id="nav-overlay"></div>
+        <nav id="nav-menu">
+            <button class="nav-close" id="nav-close" aria-label="Tutup Menu">&times;</button>
+            
+            <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">Dasbor</a>
+            <a href="{{ route('admin.monitoring.index') }}" class="{{ request()->routeIs('admin.monitoring.*') ? 'active' : '' }}">Monitoring Sepeda</a>
+            <a href="{{ route('admin.bikes.index') }}" class="{{ request()->routeIs('admin.bikes.*') ? 'active' : '' }}">Sepeda</a>
+            <a href="{{ route('admin.rentals.index') }}" class="{{ request()->routeIs('admin.rentals.*') && !request()->has('status') ? 'active' : '' }}">Rental</a>
+            <a href="{{ route('admin.rentals.index', ['status' => 'running']) }}" class="{{ request()->fullUrlIs('*status=running*') ? 'active' : '' }}">Rental Aktif</a>
+            <a href="{{ route('admin.users.index') }}" class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">Pengguna</a>
+            <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Laporan</a>
+            <a href="{{ route('admin.alerts.index') }}" class="{{ request()->routeIs('admin.alerts.*') ? 'active' : '' }}">Peringatan</a>
+            @if(auth()->user()->role === 'superadmin')
+                <a href="{{ route('admin.settings.edit') }}" class="{{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">Pengaturan</a>
+            @endif
+
+            <form method="post" action="{{ route('admin.logout') }}" style="margin: 0; display: contents;">
+                @csrf
+                <button type="submit" class="nav-logout-btn" title="Keluar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    <span class="logout-text">Keluar</span>
+                </button>
+            </form>
+        </nav>
     @endauth
 </header>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const menuBtn = document.getElementById('menu-btn');
+        const closeBtn = document.getElementById('nav-close');
+        const overlay = document.getElementById('nav-overlay');
+        const nav = document.getElementById('nav-menu');
+
+        if (menuBtn && nav && overlay) {
+            const openMenu = () => {
+                nav.classList.add('open');
+                overlay.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            };
+
+            const closeMenu = () => {
+                nav.classList.remove('open');
+                overlay.classList.remove('open');
+                document.body.style.overflow = '';
+            };
+
+            menuBtn.addEventListener('click', openMenu);
+            closeBtn.addEventListener('click', closeMenu);
+            overlay.addEventListener('click', closeMenu);
+        }
+    });
+
+    // Global Toast Function
+    window.showToast = function(title, message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `<h4 class="toast-title">${title}</h4><p class="toast-message">${message}</p>`;
+        container.appendChild(toast);
+        // Animate in
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+        });
+        // Remove after 5s
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 5000);
+    }
+</script>
 <main>
+    <div id="toast-container"></div>
     @if(session('status'))
         <p class="success">{{ session('status') }}</p>
     @endif

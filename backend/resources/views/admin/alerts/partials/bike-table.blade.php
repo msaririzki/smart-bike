@@ -21,7 +21,7 @@
                     </td>
                     <td>{{ $bike->assignedDevice?->email ?? '-' }}</td>
                     <td>{{ $bike->last_seen_at ?? '-' }}</td>
-                    <td><a href="{{ route('admin.monitoring.show', $bike) }}">Lihat Detail</a></td>
+                    <td><a href="{{ route('admin.monitoring.show', $bike) }}" class="button secondary" style="padding: 6px 12px; font-size: 13px;">Lihat Detail</a></td>
                 </tr>
             @empty
                 <tr><td colspan="8" class="muted">{{ $empty }}</td></tr>
