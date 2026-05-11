@@ -156,6 +156,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   void _stopStream() {
+    if (_isSimulating) {
+      _stopSimulation();
+      return;
+    }
+
     _positionSub?.cancel();
     _positionSub = null;
     _heartbeatTimer?.cancel();
