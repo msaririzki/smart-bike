@@ -40,9 +40,7 @@ class Rental {
   factory Rental.fromJson(Map<String, dynamic> json) {
     final latestPoint = json['latest_location_point'];
     final parsedLatestPoint = latestPoint is Map
-        ? RentalLocationPoint.fromJson(
-            Map<String, dynamic>.from(latestPoint),
-          )
+        ? RentalLocationPoint.fromJson(Map<String, dynamic>.from(latestPoint))
         : null;
 
     return Rental(
@@ -54,8 +52,7 @@ class Rental {
       totalCost: _toInt(json['total_cost']),
       startedAt: _toDateTime(json['started_at']),
       currentSpeedKmh:
-          _toDouble(json['current_speed_kmh']) ??
-          parsedLatestPoint?.speedKmh,
+          _toDouble(json['current_speed_kmh']) ?? parsedLatestPoint?.speedKmh,
       latestLocationPoint: parsedLatestPoint,
       bike: json['bike'] == null
           ? null
