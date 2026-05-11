@@ -124,7 +124,7 @@ class _RideMetricsGrid extends StatelessWidget {
             children: [
               _MetricItem(
                 label: 'Jarak',
-                value: '${history.totalDistanceKilometers.toStringAsFixed(1)}',
+                value: history.totalDistanceKilometers.toStringAsFixed(1),
                 unit: 'km',
                 icon: Icons.map_rounded,
                 color: Colors.blue,
@@ -132,7 +132,7 @@ class _RideMetricsGrid extends StatelessWidget {
               Container(width: 1, height: 40, color: const Color(0xffe3ebe7)),
               _MetricItem(
                 label: 'Durasi',
-                value: '${history.durationMinutes}',
+                value: history.durationMinutes.toString(),
                 unit: 'min',
                 icon: Icons.timer_rounded,
                 color: Colors.orange,
@@ -147,7 +147,7 @@ class _RideMetricsGrid extends StatelessWidget {
             children: [
               _MetricItem(
                 label: 'Kecepatan',
-                value: '${history.averageSpeed.toStringAsFixed(1)}',
+                value: history.averageSpeed.toStringAsFixed(1),
                 unit: 'km/j',
                 icon: Icons.speed_rounded,
                 color: Colors.purple,
@@ -155,7 +155,7 @@ class _RideMetricsGrid extends StatelessWidget {
               Container(width: 1, height: 40, color: const Color(0xffe3ebe7)),
               _MetricItem(
                 label: 'Kalori',
-                value: '${history.caloriesBurned.toStringAsFixed(0)}',
+                value: history.caloriesBurned.toStringAsFixed(0),
                 unit: 'kkal',
                 icon: Icons.local_fire_department_rounded,
                 color: Colors.red,
@@ -189,7 +189,7 @@ class _MetricItem extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color.withOpacity(0.7), size: 24),
+          Icon(icon, color: color.withValues(alpha: 0.7), size: 24),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,7 +279,7 @@ class _TimelineRow extends StatelessWidget {
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: isStart ? const Color(0xff269276).withOpacity(0.1) : const Color(0xfff1f5f9),
+            color: isStart ? const Color(0xff269276).withValues(alpha: 0.1) : const Color(0xfff1f5f9),
             shape: BoxShape.circle,
             border: Border.all(
               color: isStart ? const Color(0xff269276) : const Color(0xffcbd5e1),
@@ -504,7 +504,7 @@ class _ShareSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xff269276).withOpacity(0.3),
+                    color: const Color(0xff269276).withValues(alpha: 0.3),
                     blurRadius: 30,
                     offset: const Offset(0, 15),
                   ),
@@ -539,7 +539,7 @@ class _ShareSheet extends StatelessWidget {
                     child: Container(
                       width: 160,
                       height: 160,
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), shape: BoxShape.circle),
                     ),
                   ),
                   // CONTENT
@@ -560,13 +560,13 @@ class _ShareSheet extends StatelessWidget {
                                 ),
                                 Text(
                                   dateFormat.format(history.startedAt).toUpperCase(),
-                                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 9, fontWeight: FontWeight.w600),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 9, fontWeight: FontWeight.w600),
                                 ),
                               ],
                             ),
                             Container(
                               padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
                               child: const Icon(Icons.pedal_bike, color: Colors.white, size: 18),
                             ),
                           ],
@@ -654,7 +654,7 @@ class _ShareStatPremium extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10, letterSpacing: 1),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10, letterSpacing: 1),
         ),
       ],
     );

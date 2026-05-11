@@ -132,7 +132,7 @@ class _HistorySummaryHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xff269276).withOpacity(0.2),
+            color: const Color(0xff269276).withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -143,7 +143,7 @@ class _HistorySummaryHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _StatItem(label: 'Jarak', value: '${totalKm.toStringAsFixed(1)}', unit: 'km'),
+              _StatItem(label: 'Jarak', value: totalKm.toStringAsFixed(1), unit: 'km'),
               _StatDivider(),
               _StatItem(label: 'Sewa', value: '$totalRentals', unit: 'kali'),
               _StatDivider(),
@@ -220,7 +220,7 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 9, letterSpacing: 0.5),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9, letterSpacing: 0.5),
         ),
       ],
     );
@@ -258,9 +258,9 @@ class _CompactBadge extends StatelessWidget {
       margin: const EdgeInsets.only(left: 6),
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         shape: BoxShape.circle,
-        border: Border.all(color: color.withOpacity(0.5), width: 1.2),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.2),
       ),
       child: Icon(icon, color: Colors.white, size: 14),
     );
@@ -329,7 +329,7 @@ class _HistoryCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${dateFormat.format(history.startedAt)} • ${timeFormat.format(history.startedAt)}',
+                        '${dateFormat.format(history.startedAt)} | ${timeFormat.format(history.startedAt)}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xff94a3b8),
@@ -371,25 +371,6 @@ class _HistoryCard extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StatusIndicator extends StatelessWidget {
-  const _StatusIndicator({required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    final isCompleted = status == 'completed';
-    return Container(
-      width: 8,
-      height: 8,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isCompleted ? const Color(0xff22c55e) : const Color(0xffef4444),
       ),
     );
   }
@@ -495,7 +476,7 @@ class _WeeklyBarChart extends StatelessWidget {
                 width: 12,
                 height: (heightFactor * 40).clamp(4, 40).toDouble(),
                 decoration: BoxDecoration(
-                  color: index == 6 ? Colors.white : Colors.white.withOpacity(0.3),
+                  color: index == 6 ? Colors.white : Colors.white.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
