@@ -1,0 +1,88 @@
+import 'bike.dart';
+
+class RentalHistory {
+  const RentalHistory({
+    required this.id,
+    required this.status,
+    required this.totalDistanceMeters,
+    required this.distanceCost,
+    required this.idleCost,
+    required this.totalCost,
+    required this.startedAt,
+    this.endedAt,
+    this.bike,
+  });
+
+  final int id;
+  final String status;
+  final double totalDistanceMeters;
+  final int distanceCost;
+  final int idleCost;
+  final int totalCost;
+  final DateTime startedAt;
+  final DateTime? endedAt;
+  final Bike? bike;
+
+  double get totalDistanceKilometers => totalDistanceMeters / 1000;
+
+  String get durationString {
+    if (endedAt == null) return '-';
+    final diff = endedAt!.difference(startedAt);
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes % 60;
+    if (hours > 0) {
+      return '${hours}j ${minutes}m';
+    }
+    return '${minutes}m';
+  }
+
+  int get durationMinutes {
+    if (endedAt == null) return 0;
+    return endedAt!.difference(startedAt).inMinutes;
+  }
+
+  double get caloriesBurned {
+    // Basic estimation: 8 calories per minute of cycling
+    return durationMinutes * 8.0;
+  }
+
+  double get averageSpeed {
+    // km / hours
+    final durationHours = durationMinutes / 60.0;
+    if (durationHours == 0) return 0.0;
+    return totalDistanceKilometers / durationHours;
+  }
+
+  factory RentalHistory.fromJson(Map<String, dynamic> json) {
+    return RentalHistory(
+      id: json['id'] as int,
+      status: json['status'] as String,
+      totalDistanceMeters: _toDouble(json['total_distance_meters']) ?? 0,
+      distanceCost: _toInt(json['distance_cost']),
+      idleCost: _toInt(json['idle_cost']),
+      totalCost: _toInt(json['total_cost']),
+      startedAt: _toDateTime(json['started_at']) ?? DateTime.now(),
+      endedAt: _toDateTime(json['ended_at']),
+      bike: json['bike'] == null
+          ? null
+          : Bike.fromJson(json['bike'] as Map<String, dynamic>),
+    );
+  }
+}
+
+double? _toDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString());
+}
+
+int _toInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+DateTime? _toDateTime(dynamic value) {
+  if (value == null) return null;
+  return DateTime.tryParse(value.toString())?.toLocal();
+}

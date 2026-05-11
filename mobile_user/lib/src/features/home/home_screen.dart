@@ -5,6 +5,7 @@ import '../../models/bike.dart';
 import '../../models/rental.dart';
 import '../../services/api_client.dart';
 import '../rental/active_rental_screen.dart';
+import '../history/history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.api, required this.onLogout, super.key});
@@ -119,9 +120,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -182,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                const _BottomNavigationMock(),
+                _BottomNavigationMock(api: widget.api),
               ],
             ),
     );
@@ -267,8 +268,8 @@ class _RoundAction extends StatelessWidget {
         child: Tooltip(
           message: tooltip,
           child: SizedBox(
-      width: 48,
-      height: 48,
+            width: 48,
+            height: 48,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -330,20 +331,13 @@ class _ActiveRentalCard extends StatelessWidget {
           const Positioned(
             right: -56,
             top: 26,
-            child: CircleAvatar(
-              radius: 98,
-              backgroundColor: Color(0x4dffffff),
-            ),
+            child: CircleAvatar(radius: 98, backgroundColor: Color(0x4dffffff)),
           ),
           const Positioned(right: -22, bottom: 26, child: _RentalImageSlot()),
           const Positioned(
             right: 194,
             bottom: 4,
-            child: Icon(
-              Icons.eco_outlined,
-              size: 70,
-              color: Color(0x1fffffff),
-            ),
+            child: Icon(Icons.eco_outlined, size: 70, color: Color(0x1fffffff)),
           ),
           if (rental == null)
             const _InactiveRentalContent()
@@ -390,7 +384,7 @@ class _InactiveRentalContent extends StatelessWidget {
           width: 260,
           child: Text(
             'Mulai sewa dari daftar sepeda di bawah.',
-          style: TextStyle(color: Color(0xe6ffffff), fontSize: 15),
+            style: TextStyle(color: Color(0xe6ffffff), fontSize: 15),
           ),
         ),
       ],
@@ -585,11 +579,7 @@ class _RentalImageSlot extends StatelessWidget {
         border: Border.all(color: const Color(0x33ffffff)),
       ),
       child: const Center(
-        child: Icon(
-          Icons.image_outlined,
-          color: Color(0xccffffff),
-          size: 42,
-        ),
+        child: Icon(Icons.image_outlined, color: Color(0xccffffff), size: 42),
       ),
     );
   }
@@ -717,7 +707,9 @@ class _BikeCard extends StatelessWidget {
 }
 
 class _BottomNavigationMock extends StatelessWidget {
-  const _BottomNavigationMock();
+  const _BottomNavigationMock({required this.api});
+
+  final ApiClient api;
 
   @override
   Widget build(BuildContext context) {
@@ -747,24 +739,31 @@ class _BottomNavigationMock extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _BottomNavItem(
+                    const _BottomNavItem(
                       icon: Icons.home_rounded,
                       label: 'Beranda',
                       active: true,
                     ),
-                    _BottomNavItem(
+                    const _BottomNavItem(
                       icon: Icons.location_on_outlined,
                       label: 'Peta',
                     ),
-                    SizedBox(width: 62),
+                    const SizedBox(width: 62),
                     _BottomNavItem(
                       icon: Icons.history_rounded,
                       label: 'Riwayat',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => HistoryScreen(api: api),
+                          ),
+                        );
+                      },
                     ),
-                    _BottomNavItem(
+                    const _BottomNavItem(
                       icon: Icons.person_outline,
                       label: 'Profil',
                     ),
@@ -804,33 +803,39 @@ class _BottomNavItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.active = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool active;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = active ? const Color(0xff23866f) : const Color(0xff7f8784);
 
-    return SizedBox(
-      width: 54,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 54,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
