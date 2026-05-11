@@ -120,9 +120,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -268,8 +268,8 @@ class _RoundAction extends StatelessWidget {
         child: Tooltip(
           message: tooltip,
           child: SizedBox(
-      width: 48,
-      height: 48,
+            width: 48,
+            height: 48,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -331,20 +331,13 @@ class _ActiveRentalCard extends StatelessWidget {
           const Positioned(
             right: -56,
             top: 26,
-            child: CircleAvatar(
-              radius: 98,
-              backgroundColor: Color(0x4dffffff),
-            ),
+            child: CircleAvatar(radius: 98, backgroundColor: Color(0x4dffffff)),
           ),
           const Positioned(right: -22, bottom: 26, child: _RentalImageSlot()),
           const Positioned(
             right: 194,
             bottom: 4,
-            child: Icon(
-              Icons.eco_outlined,
-              size: 70,
-              color: Color(0x1fffffff),
-            ),
+            child: Icon(Icons.eco_outlined, size: 70, color: Color(0x1fffffff)),
           ),
           if (rental == null)
             const _InactiveRentalContent()
@@ -391,7 +384,7 @@ class _InactiveRentalContent extends StatelessWidget {
           width: 260,
           child: Text(
             'Mulai sewa dari daftar sepeda di bawah.',
-          style: TextStyle(color: Color(0xe6ffffff), fontSize: 15),
+            style: TextStyle(color: Color(0xe6ffffff), fontSize: 15),
           ),
         ),
       ],
@@ -586,11 +579,7 @@ class _RentalImageSlot extends StatelessWidget {
         border: Border.all(color: const Color(0x33ffffff)),
       ),
       child: const Center(
-        child: Icon(
-          Icons.image_outlined,
-          color: Color(0xccffffff),
-          size: 42,
-        ),
+        child: Icon(Icons.image_outlined, color: Color(0xccffffff), size: 42),
       ),
     );
   }
