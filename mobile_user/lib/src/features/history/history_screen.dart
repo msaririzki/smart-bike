@@ -18,24 +18,53 @@ class _HistoryScreenState extends State<HistoryScreen> {
   bool _isLoading = true;
   String? _error;
 
+  String _statusFilter = 'All'; // All, completed, cancelled
+  String _periodFilter = 'All'; // All, 7Days, ThisMonth
+
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 1;
+  bool _hasMore = true;
+  bool _isLoadMoreLoading = false;
+
   @override
   void initState() {
     super.initState();
     _loadHistory();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (_hasMore && !_isLoadMoreLoading && !_isLoading) {
+        _loadMore();
+      }
+    }
   }
 
   Future<void> _loadHistory() async {
     setState(() {
       _isLoading = true;
       _error = null;
+      _currentPage = 1;
+      _hasMore = true;
     });
 
     try {
-      final data = await widget.api.rentalHistory();
+      final data = await widget.api.rentalHistory(page: 1);
+      final rawList = data['data'] as List<dynamic>;
+      final history = rawList.map((item) => RentalHistory.fromJson(item as Map<String, dynamic>)).toList();
+      
       if (mounted) {
         setState(() {
-          _history = data.map((e) => RentalHistory.fromJson(e)).toList();
+          _history = history;
           _isLoading = false;
+          _hasMore = data['current_page'] < data['last_page'];
         });
       }
     } on ApiException catch (e) {
@@ -50,6 +79,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
         setState(() {
           _error = 'Terjadi kesalahan saat memuat riwayat.';
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadMoreLoading || !_hasMore) return;
+
+    setState(() {
+      _isLoadMoreLoading = true;
+    });
+
+    try {
+      final nextPage = _currentPage + 1;
+      final data = await widget.api.rentalHistory(page: nextPage);
+      final rawList = data['data'] as List<dynamic>;
+      final nextHistory = rawList.map((item) => RentalHistory.fromJson(item as Map<String, dynamic>)).toList();
+
+      if (mounted) {
+        setState(() {
+          _history!.addAll(nextHistory);
+          _currentPage = nextPage;
+          _hasMore = data['current_page'] < data['last_page'];
+          _isLoadMoreLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadMoreLoading = false;
         });
       }
     }
@@ -75,35 +134,185 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const _ShimmerLoadingView()
           : _error != null
-              ? _ErrorView(message: _error!, onRetry: _loadHistory)
+              ? RefreshIndicator(
+                  onRefresh: _loadHistory,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height - 100,
+                      child: _ErrorView(message: _error!, onRetry: _loadHistory),
+                    ),
+                  ),
+                )
               : _history == null || _history!.isEmpty
-                  ? const _EmptyView()
+                  ? RefreshIndicator(
+                      onRefresh: _loadHistory,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: SizedBox(
+                          height: MediaQuery.of(context).size.height - 100,
+                          child: const _EmptyView(),
+                        ),
+                      ),
+                    )
                   : RefreshIndicator(
                       onRefresh: _loadHistory,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: _history!.length + 1,
-                        separatorBuilder: (context, index) => const SizedBox(height: 16),
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return _HistorySummaryHeader(history: _history!);
-                          }
-                          final itemIndex = index - 1;
-                          final item = _history![itemIndex];
-                          return _HistoryCard(
-                            history: item,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => RentalDetailScreen(history: item),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                      child: _buildFilteredList(),
                     ),
+    );
+  }
+
+  Widget _buildFilteredList() {
+    final filteredHistory = _history!.where((item) {
+      // Status Filter
+      if (_statusFilter != 'All' && item.status != _statusFilter) {
+        return false;
+      }
+
+      // Period Filter
+      if (_periodFilter != 'All') {
+        final now = DateTime.now();
+        if (_periodFilter == '7Days') {
+          final weekAgo = now.subtract(const Duration(days: 7));
+          if (item.startedAt.isBefore(weekAgo)) return false;
+        } else if (_periodFilter == 'ThisMonth') {
+          if (item.startedAt.month != now.month || item.startedAt.year != now.year) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    }).toList();
+
+    if (filteredHistory.isEmpty && _history!.isNotEmpty) {
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height - 100,
+          child: Column(
+            children: [
+              _HistorySummaryHeader(history: _history!),
+              _buildFilterBar(),
+              const Expanded(child: _EmptyView(message: 'Tidak ada data yang cocok dengan filter.')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(20),
+      itemCount: filteredHistory.length + 3, // Summary + Filters + Items + Loading Indicator
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return _HistorySummaryHeader(history: _history!);
+        }
+        if (index == 1) {
+          return _buildFilterBar();
+        }
+        
+        if (index == filteredHistory.length + 2) {
+          return _hasMore 
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            : const SizedBox(height: 40);
+        }
+
+        final itemIndex = index - 2;
+        final item = filteredHistory[itemIndex];
+        return _HistoryCard(
+          history: item,
+          onTap: () {
+            if (item.status == 'ACTIVE') {
+              // Jika aktif, balik ke Home biar user bisa akhiri sewa dengan cepat
+              Navigator.pop(context);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RentalDetailScreen(history: item),
+                ),
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterBar() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Filter Status',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xff64748b)),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _FilterChip(
+                label: 'Semua',
+                selected: _statusFilter == 'All',
+                onSelected: (s) => setState(() => _statusFilter = 'All'),
+              ),
+              const SizedBox(width: 8),
+              _FilterChip(
+                label: 'Selesai',
+                selected: _statusFilter == 'completed',
+                onSelected: (s) => setState(() => _statusFilter = 'completed'),
+              ),
+              const SizedBox(width: 8),
+              _FilterChip(
+                label: 'Dibatalkan',
+                selected: _statusFilter == 'cancelled',
+                onSelected: (s) => setState(() => _statusFilter = 'cancelled'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Filter Periode',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xff64748b)),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _FilterChip(
+                label: 'Semua Waktu',
+                selected: _periodFilter == 'All',
+                onSelected: (s) => setState(() => _periodFilter = 'All'),
+              ),
+              const SizedBox(width: 8),
+              _FilterChip(
+                label: '7 Hari Terakhir',
+                selected: _periodFilter == '7Days',
+                onSelected: (s) => setState(() => _periodFilter = '7Days'),
+              ),
+              const SizedBox(width: 8),
+              _FilterChip(
+                label: 'Bulan Ini',
+                selected: _periodFilter == 'ThisMonth',
+                onSelected: (s) => setState(() => _periodFilter = 'ThisMonth'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Divider(color: Color(0xffe2e8f0)),
+      ],
     );
   }
 }
@@ -147,7 +356,7 @@ class _HistorySummaryHeader extends StatelessWidget {
               _StatDivider(),
               _StatItem(label: 'Sewa', value: '$totalRentals', unit: 'kali'),
               _StatDivider(),
-              _StatItem(label: 'Saved', value: co2Text, unit: 'CO2'),
+              _StatItem(label: 'Estimasi', value: co2Text, unit: 'CO2'),
             ],
           ),
           const Padding(
@@ -299,19 +508,16 @@ class _HistoryCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                Hero(
-                  tag: 'bike-icon-${history.id}',
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xfff0fdf4),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.pedal_bike_rounded,
-                      color: Color(0xff23866f),
-                      size: 20,
-                    ),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xfff0fdf4),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.pedal_bike_rounded,
+                    color: Color(0xff23866f),
+                    size: 20,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -319,17 +525,23 @@ class _HistoryCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        history.bike?.code ?? 'SMART BIKE',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xff073f3a),
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            history.bike?.code ?? 'SMART BIKE',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xff073f3a),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildMiniStatusBadge(history.status),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${dateFormat.format(history.startedAt)} | ${timeFormat.format(history.startedAt)}',
+                        '${dateFormat.format(history.startedAt)} • ${timeFormat.format(history.startedAt)}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xff94a3b8),
@@ -374,6 +586,90 @@ class _HistoryCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildMiniStatusBadge(String status) {
+    Color color;
+    String label;
+    Color bgColor;
+
+    switch (status) {
+      case 'completed':
+        color = const Color(0xff23866f);
+        bgColor = const Color(0xffe8f7f2);
+        label = 'Selesai';
+        break;
+      case 'cancelled':
+        color = const Color(0xffd14148);
+        bgColor = const Color(0xffffecef);
+        label = 'Batal';
+        break;
+      default:
+        color = const Color(0xff2563eb);
+        bgColor = const Color(0xffdbeafe);
+        label = 'Aktif';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _ShimmerLoadingView extends StatelessWidget {
+  const _ShimmerLoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Container(
+            height: 180,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: List.generate(3, (index) => Container(
+              margin: const EdgeInsets.only(right: 8),
+              width: 80,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            )),
+          ),
+          const SizedBox(height: 24),
+          ...List.generate(5, (index) => Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            height: 100,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
 }
 
 class _ErrorView extends StatelessWidget {
@@ -410,21 +706,59 @@ class _ErrorView extends StatelessWidget {
 }
 
 class _EmptyView extends StatelessWidget {
-  const _EmptyView();
+  const _EmptyView({this.message = 'Belum ada riwayat sewa.'});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.history_rounded, size: 64, color: Color(0xffcbd5e1)),
-          SizedBox(height: 16),
+          const Icon(Icons.history_rounded, size: 64, color: Color(0xffcbd5e1)),
+          const SizedBox(height: 16),
           Text(
-            'Belum ada riwayat sewa.',
-            style: TextStyle(color: Color(0xff94a3b8), fontSize: 16),
+            message,
+            style: const TextStyle(color: Color(0xff94a3b8), fontSize: 16),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final ValueChanged<bool> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: onSelected,
+      selectedColor: const Color(0xff269276).withOpacity(0.2),
+      checkmarkColor: const Color(0xff269276),
+      labelStyle: TextStyle(
+        color: selected ? const Color(0xff18846e) : const Color(0xff64748b),
+        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 12,
+      ),
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: selected ? const Color(0xff269276) : const Color(0xffe2e8f0),
+          width: 1.5,
+        ),
       ),
     );
   }
@@ -473,18 +807,27 @@ class _WeeklyBarChart extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Container(
-                width: 12,
-                height: (heightFactor * 40).clamp(4, 40).toDouble(),
+                width: 14,
+                height: (heightFactor * 60).clamp(10, 60).toDouble(),
                 decoration: BoxDecoration(
-                  color: index == 6 ? Colors.white : Colors.white.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(4),
+                  gradient: LinearGradient(
+                    colors: index == 6 
+                      ? [Colors.white, Colors.white.withValues(alpha: 0.8)]
+                      : [Colors.white.withValues(alpha: 0.4), Colors.white.withValues(alpha: 0.1)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                  boxShadow: index == 6 ? [
+                    BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, 2))
+                  ] : null,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 dayName,
                 style: TextStyle(
-                  color: index == 6 ? Colors.white : Colors.white70,
+                  color: index == 6 ? Colors.white : Colors.white60,
                   fontSize: 10,
                   fontWeight: index == 6 ? FontWeight.bold : FontWeight.normal,
                 ),

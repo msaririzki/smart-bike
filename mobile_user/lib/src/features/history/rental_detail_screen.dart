@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../models/rental_history.dart';
 
@@ -72,16 +73,13 @@ class _BikeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Hero(
-          tag: 'bike-icon-${history.id}',
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xffe8f7f2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(Icons.pedal_bike, color: Color(0xff23866f), size: 32),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xffe8f7f2),
+            borderRadius: BorderRadius.circular(16),
           ),
+          child: const Icon(Icons.pedal_bike, color: Color(0xff23866f), size: 32),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -154,8 +152,8 @@ class _RideMetricsGrid extends StatelessWidget {
               ),
               Container(width: 1, height: 40, color: const Color(0xffe3ebe7)),
               _MetricItem(
-                label: 'Kalori',
-                value: history.caloriesBurned.toStringAsFixed(0),
+                label: 'Est. Kalori',
+                value: '${history.caloriesBurned.toStringAsFixed(0)}',
                 unit: 'kkal',
                 icon: Icons.local_fire_department_rounded,
                 color: Colors.red,
@@ -397,18 +395,23 @@ class _StatusBadge extends StatelessWidget {
     final color = isCompleted ? const Color(0xff23866f) : const Color(0xffd14148);
     final bgColor = isCompleted ? const Color(0xffe8f7f2) : const Color(0xffffecef);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: color,
+    return GestureDetector(
+      onTap: status.toLowerCase() == 'active' ? () {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          status.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
         ),
       ),
     );
@@ -443,7 +446,7 @@ class _GreenImpactCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Dampak Lingkungan',
+                  'Estimasi Dampak Lingkungan',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
@@ -481,146 +484,193 @@ class _ShareSheet extends StatelessWidget {
     final dateFormat = DateFormat('EEEE, d MMM yyyy', 'id_ID');
 
     return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 24),
-          const Text('Highlight Perjalanan', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xff073f3a))),
-          const SizedBox(height: 8),
-          const Text('Siap dibagikan ke media sosial!', style: TextStyle(color: Color(0xff8a9590))),
-          const SizedBox(height: 24),
-          // THE CARD
-          AspectRatio(
-            aspectRatio: 0.85,
-            child: Container(
-              clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 24),
+            const Text('Highlight Perjalanan', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xff073f3a))),
+            const SizedBox(height: 8),
+            const Text('Desain premium siap dibagikan!', style: TextStyle(color: Color(0xff8a9590))),
+            const SizedBox(height: 32),
+            // THE CARD (Vertical Poster Style)
+            Container(
+              width: double.infinity,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xff269276).withValues(alpha: 0.3),
-                    blurRadius: 30,
-                    offset: const Offset(0, 15),
+                    color: const Color(0xff269276).withValues(alpha: 0.2),
+                    blurRadius: 40,
+                    offset: const Offset(0, 20),
                   ),
                 ],
               ),
-              child: Stack(
-                children: [
-                  // BACKGROUND GRADIENT
-                  Positioned.fill(
-                    child: Container(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(32),
+                child: Stack(
+                  children: [
+                    // BACKGROUND: Mesh Gradient Effect (Compact)
+                    Container(
+                      height: 180,
+                      width: double.infinity,
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
                           colors: [Color(0xff064e3b), Color(0xff065f46), Color(0xff047857)],
-                          begin: Alignment.bottomLeft,
-                          end: Alignment.topRight,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
                       ),
                     ),
-                  ),
-                  // ABSTRACT DECORATION
-                  Positioned(
-                    right: -40,
-                    top: 20,
-                    child: Opacity(
-                      opacity: 0.15,
-                      child: Icon(Icons.gesture_rounded, size: 280, color: Colors.white),
+                    // DECORATION: Abstract Waves
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _MeshWavePainter(),
+                      ),
                     ),
-                  ),
-                  Positioned(
-                    left: -30,
-                    bottom: -30,
-                    child: Container(
-                      width: 160,
-                      height: 160,
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), shape: BoxShape.circle),
+                    // DECORATION: Dot Pattern
+                    Positioned.fill(
+                      child: Opacity(
+                        opacity: 0.05,
+                        child: CustomPaint(
+                          painter: _DotPatternPainter(),
+                        ),
+                      ),
                     ),
-                  ),
-                  // CONTENT
-                  Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // DECORATION: Large Bike Icon
+                    Positioned(
+                      top: -40,
+                      right: -40,
+                      child: Opacity(
+                        opacity: 0.08,
+                        child: Icon(Icons.pedal_bike, size: 220, color: Colors.white),
+                      ),
+                    ),
+                    // CONTENT
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  'SMART BIKE',
-                                  style: TextStyle(color: Color(0xff4ade80), letterSpacing: 4, fontSize: 12, fontWeight: FontWeight.w900),
+                                const Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'SMART BIKE',
+                                      style: TextStyle(color: Color(0xff4ade80), letterSpacing: 2, fontSize: 8, fontWeight: FontWeight.w900),
+                                    ),
+                                    Text(
+                                      'HIGHLIGHT',
+                                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  dateFormat.format(history.startedAt).toUpperCase(),
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 9, fontWeight: FontWeight.w600),
+                                const Icon(Icons.eco_rounded, color: Color(0xff4ade80), size: 24),
+                              ],
+                            ),
+                            const Spacer(),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _CompactStat(label: 'JARAK', value: history.totalDistanceKilometers.toStringAsFixed(1), unit: 'km'),
+                                _CompactStat(label: 'DURASI', value: history.durationMinutes.toString(), unit: 'min'),
+                                _CompactStat(label: 'KALORI', value: history.caloriesBurned.toStringAsFixed(0), unit: 'kkal'),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      dateFormat.format(history.startedAt),
+                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 8, fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      history.bike?.code ?? 'UNIT-01',
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
-                              child: const Icon(Icons.pedal_bike, color: Colors.white, size: 18),
-                            ),
                           ],
                         ),
-                        const Spacer(),
-                        const Text(
-                          'MY RIDE\nSUMMARY',
-                          style: TextStyle(color: Colors.white, fontSize: 38, height: 1.0, fontWeight: FontWeight.w900),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(color: const Color(0xff4ade80), borderRadius: BorderRadius.circular(12)),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.eco_rounded, size: 14, color: Color(0xff064e3b)),
-                              const SizedBox(width: 6),
-                              Text(
-                                'SAVED $co2Text CO2',
-                                style: const TextStyle(color: Color(0xff064e3b), fontSize: 11, fontWeight: FontWeight.w900),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _ShareStatPremium(label: 'DISTANCE', value: totalKm.toStringAsFixed(1), unit: 'km'),
-                            _ShareStatPremium(label: 'CALORIES', value: history.caloriesBurned.toStringAsFixed(0), unit: 'kcal'),
-                            _ShareStatPremium(label: 'SPEED', value: history.averageSpeed.toStringAsFixed(1), unit: 'km/h'),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
-                        const Divider(color: Colors.white24, thickness: 1),
-                        const SizedBox(height: 16),
-                        const Center(
-                          child: Text(
-                            'Ride for a better planet, one pedal at a time.',
-                            style: TextStyle(color: Colors.white38, fontSize: 10, fontStyle: FontStyle.italic),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                final summary = '''
+🚲 *Ringkasan Smart Bike* 🚲
+
+Sepeda: ${history.bike?.code ?? 'N/A'}
+Jarak: ${history.totalDistanceKilometers.toStringAsFixed(2)} km
+Durasi: ${history.durationString}
+Kalori: ${history.caloriesBurned.toStringAsFixed(0)} kkal
+Total Biaya: Rp${NumberFormat('#,###', 'id_ID').format(history.totalCost)}
+
+#SmartBike #EcoFriendly #Cycling
+''';
+                Clipboard.setData(ClipboardData(text: summary));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Ringkasan perjalanan disalin ke clipboard!'),
+                    backgroundColor: Color(0xff269276),
                   ),
-                ],
+                );
+              },
+              icon: const Icon(Icons.copy_rounded, color: Colors.white),
+              label: const Text(
+                'Salin Ringkasan',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xff269276),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
               ),
             ),
           ),
-          const SizedBox(height: 24),
           const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Tutup',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xff64748b),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
+     ),
     );
   }
 }
@@ -643,12 +693,12 @@ class _ShareStatPremium extends StatelessWidget {
           children: [
             Text(
               value,
-              style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900),
+              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900),
             ),
             const SizedBox(width: 4),
             Text(
               unit,
-              style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -659,4 +709,148 @@ class _ShareStatPremium extends StatelessWidget {
       ],
     );
   }
+}
+
+class _CompactStat extends StatelessWidget {
+  const _CompactStat({required this.label, required this.value, required this.unit});
+  final String label, value, unit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+            const SizedBox(width: 2),
+            Text(unit, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 8)),
+          ],
+        ),
+        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 7, fontWeight: FontWeight.bold, letterSpacing: 1)),
+      ],
+    );
+  }
+}
+
+class _MeshWavePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.05)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final path = Path();
+    for (int i = 0; i < 5; i++) {
+      path.moveTo(0, size.height * (0.2 + i * 0.15));
+      path.quadraticBezierTo(
+        size.width * 0.5, 
+        size.height * (0.1 + i * 0.15), 
+        size.width, 
+        size.height * (0.3 + i * 0.15)
+      );
+    }
+    canvas.drawPath(path, paint);
+    
+    // Abstract circles
+    canvas.drawCircle(Offset(size.width * 0.8, size.height * 0.2), 100, paint..style = PaintingStyle.fill..color = Colors.white.withValues(alpha: 0.02));
+    canvas.drawCircle(Offset(size.width * 0.2, size.height * 0.8), 150, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _GlassStatCard extends StatelessWidget {
+  const _GlassStatCard({required this.label, required this.value, required this.unit, required this.icon});
+  final String label, value, unit;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xff4ade80), size: 16),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                unit,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          Text(
+            label,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 8, fontWeight: FontWeight.w700, letterSpacing: 1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DotPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white;
+    const spacing = 20.0;
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 1, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _MockQrPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0xff064e3b);
+    final rand = DateTime.now().millisecondsSinceEpoch;
+    
+    for (int i = 0; i < 6; i++) {
+      for (int j = 0; j < 6; j++) {
+        if ((i + j + rand) % 3 != 0) {
+          canvas.drawRect(
+            Rect.fromLTWH(
+              i * (size.width / 6),
+              j * (size.height / 6),
+              size.width / 7,
+              size.height / 7,
+            ),
+            paint,
+          );
+        }
+      }
+    }
+    // QR squares
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width/3, size.height/3), paint..style = PaintingStyle.stroke..strokeWidth = 2);
+    canvas.drawRect(Rect.fromLTWH(size.width*2/3, 0, size.width/3, size.height/3), paint);
+    canvas.drawRect(Rect.fromLTWH(0, size.height*2/3, size.width/3, size.height/3), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
