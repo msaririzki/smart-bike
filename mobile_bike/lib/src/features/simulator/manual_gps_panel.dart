@@ -75,7 +75,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '🛠 Control Panel (Manual & Mock)',
+            '🛠 Panel Kontrol (Manual & Mock)',
             style: TextStyle(
               color: Color(0xFF94A3B8),
               fontSize: 12,
@@ -86,7 +86,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
           const SizedBox(height: 16),
           
           // Presets
-          _label('Preset Lokasi'),
+          _label('Pilihan Preset Lokasi'),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -95,7 +95,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
               child: DropdownButton<LatLng>(
                 isExpanded: true,
                 dropdownColor: const Color(0xFF1E293B),
-                hint: const Text('Pilih Preset', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
+                hint: const Text('Pilih Titik Lokasi', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
                 style: const TextStyle(color: Colors.white, fontSize: 14),
                 items: MockRouteService.locationPresets.entries.map((e) {
                   return DropdownMenuItem(
@@ -110,7 +110,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
           const SizedBox(height: 16),
 
           // Manual Input
-          _label('Koordinat Manual'),
+          _label('Koordinat Manual (Debug)'),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -119,7 +119,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                   controller: _latController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: _inputDeco('Latitude'),
+                  decoration: _inputDeco('Lintang (Lat)'),
                 ),
               ),
               const SizedBox(width: 8),
@@ -128,7 +128,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                   controller: _lngController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: _inputDeco('Longitude'),
+                  decoration: _inputDeco('Bujur (Lng)'),
                 ),
               ),
             ],
@@ -154,7 +154,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
           ),
           
           // Mock Route Simulation Settings
-          _label('Pengaturan Simulasi'),
+          _label('Konfigurasi Simulasi Rute'),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -162,7 +162,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Interval', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                    const Text('Jeda (Detik)', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -173,7 +173,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                           dropdownColor: const Color(0xFF1E293B),
                           style: const TextStyle(color: Colors.white, fontSize: 13),
                           items: [3, 5, 10].map((s) {
-                            return DropdownMenuItem(value: s, child: Text('${s}s'));
+                            return DropdownMenuItem(value: s, child: Text('$s Detik'));
                           }).toList(),
                           onChanged: (v) => v != null ? widget.onIntervalChanged(v) : null,
                         ),
@@ -187,7 +187,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Mode', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                    const Text('Mode Putar', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -199,9 +199,15 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                           dropdownColor: const Color(0xFF1E293B),
                           style: const TextStyle(color: Colors.white, fontSize: 13),
                           items: SimulationMode.values.map((m) {
+                            String label = '';
+                            switch(m) {
+                              case SimulationMode.loop: label = 'Berulang'; break;
+                              case SimulationMode.stopAtEnd: label = 'Berhenti'; break;
+                              case SimulationMode.reset: label = 'Reset'; break;
+                            }
                             return DropdownMenuItem(
                               value: m, 
-                              child: Text(m.name.toUpperCase()),
+                              child: Text(label),
                             );
                           }).toList(),
                           onChanged: (v) => v != null ? widget.onModeChanged(v) : null,
@@ -223,7 +229,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Simulasi Rute Otomatis',
+                      'Simulasi Pergerakan Otomatis',
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     if (widget.isSimulating)

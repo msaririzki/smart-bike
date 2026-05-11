@@ -130,7 +130,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     if (!granted) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Izin GPS diperlukan untuk streaming.')),
+          const SnackBar(content: Text('Izin lokasi diperlukan untuk mengirim data.')),
         );
       }
       return;
@@ -328,12 +328,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadBike,
-            tooltip: 'Refresh Assignment',
+            tooltip: 'Perbarui Tugas',
           ),
           IconButton(
             icon: const Icon(Icons.logout_rounded),
             onPressed: _logout,
-            tooltip: 'Logout',
+            tooltip: 'Keluar',
           ),
         ],
       ),
@@ -441,7 +441,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           _AnimatedDot(active: _streaming),
           const SizedBox(width: 12),
           Text(
-            _streaming ? 'STREAMING AKTIF' : 'STREAM BERHENTI',
+            _streaming ? 'PENGIRIMAN AKTIF' : 'PENGIRIMAN BERHENTI',
             style: TextStyle(
               color: _streaming
                   ? const Color(0xFF22C55E)
@@ -602,7 +602,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 ? Icons.stop_circle_rounded
                 : Icons.play_circle_filled_rounded),
             label: Text(
-              _streaming ? 'Stop Stream' : 'Mulai Stream GPS',
+              _streaming ? 'Hentikan Pengiriman' : 'Mulai Kirim Lokasi',
               style: const TextStyle(
                   fontSize: 16, fontWeight: FontWeight.bold),
             ),
