@@ -30,6 +30,7 @@ Route::middleware(['auth:sanctum', 'role:user'])->group(function (): void {
 
 Route::middleware(['auth:sanctum', 'role:device'])->prefix('device')->group(function (): void {
     Route::get('/current-assignment', [DeviceController::class, 'currentAssignment']);
+    Route::get('/active-rental-summary', [DeviceController::class, 'activeRentalSummary']);
     Route::post('/location-update', [DeviceController::class, 'locationUpdate']);
     Route::post('/heartbeat', [DeviceController::class, 'heartbeat']);
 });

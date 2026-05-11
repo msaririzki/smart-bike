@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'mock_route_service.dart';
 
 class ManualGpsPanel extends StatefulWidget {
@@ -45,13 +46,14 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
     if (lat != null && lng != null) {
       widget.onCoordinateSend(lat, lng);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Koordinat manual dikirim!')),
+        const SnackBar(content: Text('Koordinat manual dikirim.')),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Masukkan koordinat yang valid.')),
-      );
+      return;
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Masukkan koordinat yang valid.')),
+    );
   }
 
   void _selectPreset(LatLng? pos) {
@@ -68,24 +70,34 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF334155)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Row(
+            children: [
+              Icon(Icons.build_circle_outlined, color: Color(0xFF38BDF8)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Panel Kontrol Manual & Mock Route',
+                  style: TextStyle(
+                    color: Color(0xFFE2E8F0),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
           const Text(
-            '🛠 Panel Kontrol (Manual & Mock)',
-            style: TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
+            'Gunakan bagian ini hanya saat demo atau debug koordinat.',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
           ),
           const SizedBox(height: 16),
-
-          // Presets
           _label('Pilihan Preset Lokasi'),
           const SizedBox(height: 8),
           Container(
@@ -95,12 +107,15 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
               child: DropdownButton<LatLng>(
                 isExpanded: true,
                 dropdownColor: const Color(0xFF1E293B),
-                hint: const Text('Pilih Titik Lokasi', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
+                hint: const Text(
+                  'Pilih Titik Lokasi',
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                ),
                 style: const TextStyle(color: Colors.white, fontSize: 14),
-                items: MockRouteService.locationPresets.entries.map((e) {
+                items: MockRouteService.locationPresets.entries.map((entry) {
                   return DropdownMenuItem(
-                    value: e.value,
-                    child: Text(e.key),
+                    value: entry.value,
+                    child: Text(entry.key),
                   );
                 }).toList(),
                 onChanged: _selectPreset,
@@ -108,16 +123,16 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Manual Input
-          _label('Koordinat Manual (Debug)'),
+          _label('Koordinat Manual'),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _latController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: _inputDeco('Lintang (Lat)'),
                 ),
@@ -126,7 +141,9 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
               Expanded(
                 child: TextField(
                   controller: _lngController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: _inputDeco('Bujur (Lng)'),
                 ),
@@ -141,19 +158,18 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
               icon: const Icon(Icons.send_rounded, size: 18),
               label: const Text('Kirim Koordinat Ini'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3B82F6),
+                backgroundColor: const Color(0xFF2563EB),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ),
-
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Divider(color: Color(0xFF334155), height: 1),
           ),
-
-          // Mock Route Simulation Settings
           _label('Konfigurasi Simulasi Rute'),
           const SizedBox(height: 12),
           Row(
@@ -162,7 +178,13 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Jeda (Detik)', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                    const Text(
+                      'Jeda',
+                      style: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -170,12 +192,21 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<int>(
                           value: widget.currentInterval,
+                          isExpanded: true,
                           dropdownColor: const Color(0xFF1E293B),
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                          items: [3, 5, 10].map((s) {
-                            return DropdownMenuItem(value: s, child: Text('$s Detik'));
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                          items: [3, 5, 10].map((seconds) {
+                            return DropdownMenuItem(
+                              value: seconds,
+                              child: Text('$seconds detik'),
+                            );
                           }).toList(),
-                          onChanged: (v) => v != null ? widget.onIntervalChanged(v) : null,
+                          onChanged: (value) {
+                            if (value != null) widget.onIntervalChanged(value);
+                          },
                         ),
                       ),
                     ),
@@ -187,7 +218,13 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Mode Putar', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                    const Text(
+                      'Mode',
+                      style: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -197,20 +234,19 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                           value: widget.currentMode,
                           isExpanded: true,
                           dropdownColor: const Color(0xFF1E293B),
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                          items: SimulationMode.values.map((m) {
-                            String label = '';
-                            switch(m) {
-                              case SimulationMode.loop: label = 'Berulang'; break;
-                              case SimulationMode.stopAtEnd: label = 'Berhenti'; break;
-                              case SimulationMode.reset: label = 'Reset'; break;
-                            }
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                          items: SimulationMode.values.map((mode) {
                             return DropdownMenuItem(
-                              value: m,
-                              child: Text(label),
+                              value: mode,
+                              child: Text(_modeLabel(mode)),
                             );
                           }).toList(),
-                          onChanged: (v) => v != null ? widget.onModeChanged(v) : null,
+                          onChanged: (value) {
+                            if (value != null) widget.onModeChanged(value);
+                          },
                         ),
                       ),
                     ),
@@ -220,8 +256,6 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
             ],
           ),
           const SizedBox(height: 16),
-
-          // Mock Toggle
           Row(
             children: [
               Expanded(
@@ -230,18 +264,23 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                   children: [
                     const Text(
                       'Simulasi Pergerakan Otomatis',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    if (widget.isSimulating)
-                      Text(
-                        widget.simulationProgress,
-                        style: const TextStyle(color: Color(0xFF22C55E), fontSize: 12),
-                      )
-                    else
-                      const Text(
-                        'Status: Berhenti',
-                        style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.isSimulating
+                          ? widget.simulationProgress
+                          : 'Status: berhenti',
+                      style: TextStyle(
+                        color: widget.isSimulating
+                            ? const Color(0xFF22C55E)
+                            : const Color(0xFF64748B),
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -258,19 +297,23 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
   }
 
   Widget _label(String text) => Text(
-    text,
-    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-  );
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      );
 
   BoxDecoration _dropdownDeco() => BoxDecoration(
-    color: const Color(0xFF0F172A),
-    borderRadius: BorderRadius.circular(8),
-    border: Border.all(color: const Color(0xFF334155)),
-  );
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF334155)),
+      );
 
   InputDecoration _inputDeco(String hint) => InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF475569)),
+        hintStyle: const TextStyle(color: Color(0xFF64748B)),
         filled: true,
         fillColor: const Color(0xFF0F172A),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -282,5 +325,17 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFF334155)),
         ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF38BDF8)),
+        ),
       );
+}
+
+String _modeLabel(SimulationMode mode) {
+  return switch (mode) {
+    SimulationMode.loop => 'Berulang',
+    SimulationMode.stopAtEnd => 'Berhenti',
+    SimulationMode.reset => 'Reset',
+  };
 }

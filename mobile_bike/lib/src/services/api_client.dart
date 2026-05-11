@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/bike.dart';
+import '../models/device_rental_summary.dart';
 import 'session_store.dart';
 
 class ApiException implements Exception {
@@ -50,6 +51,13 @@ class ApiClient {
     final data = json['data'];
     if (data == null) return null;
     return Bike.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<DeviceRentalSummary> activeRentalSummary() async {
+    final json = await _get('/device/active-rental-summary');
+    final data = json['data'];
+    if (data is! Map) return const DeviceRentalSummary();
+    return DeviceRentalSummary.fromJson(Map<String, dynamic>.from(data));
   }
 
   Future<Map<String, dynamic>> sendHeartbeat({

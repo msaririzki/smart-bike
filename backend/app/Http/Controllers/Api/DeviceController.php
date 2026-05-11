@@ -25,6 +25,71 @@ class DeviceController extends Controller
         return response()->json(['data' => $bike]);
     }
 
+    public function activeRentalSummary(Request $request): JsonResponse
+    {
+        $bike = Bike::query()
+            ->with([
+                'latestHeartbeat',
+                'activeRental.user:id,name,email',
+                'activeRental.latestLocationPoint',
+            ])
+            ->where('assigned_device_user_id', $request->user()->id)
+            ->first();
+
+        if (! $bike) {
+            return response()->json([
+                'data' => [
+                    'bike' => null,
+                    'rental' => null,
+                ],
+            ]);
+        }
+
+        $rental = $bike->activeRental;
+        $latestPoint = $rental?->latestLocationPoint;
+
+        return response()->json([
+            'data' => [
+                'bike' => [
+                    'id' => $bike->id,
+                    'code' => $bike->code,
+                    'name' => $bike->name,
+                    'status' => $bike->status,
+                    'is_online' => $bike->is_online,
+                    'battery_percent' => $bike->battery_percent,
+                    'current_latitude' => $bike->current_latitude,
+                    'current_longitude' => $bike->current_longitude,
+                    'last_accuracy' => $bike->last_accuracy,
+                    'last_seen_at' => $bike->last_seen_at?->toISOString(),
+                    'network_type' => $bike->latestHeartbeat?->network_type,
+                ],
+                'rental' => $rental ? [
+                    'id' => $rental->id,
+                    'status' => $rental->status,
+                    'started_at' => $rental->started_at?->toISOString(),
+                    'total_distance_meters' => (float) $rental->total_distance_meters,
+                    'distance_cost' => (int) $rental->distance_cost,
+                    'idle_cost' => (int) $rental->idle_cost,
+                    'total_cost' => (int) $rental->total_cost,
+                    'current_speed_kmh' => $latestPoint?->speed_kmh !== null ? (float) $latestPoint->speed_kmh : null,
+                    'user' => $rental->user ? [
+                        'id' => $rental->user->id,
+                        'name' => $rental->user->name,
+                        'email' => $rental->user->email,
+                    ] : null,
+                    'latest_location_point' => $latestPoint ? [
+                        'latitude' => (float) $latestPoint->latitude,
+                        'longitude' => (float) $latestPoint->longitude,
+                        'speed_kmh' => $latestPoint->speed_kmh !== null ? (float) $latestPoint->speed_kmh : null,
+                        'accuracy_meters' => $latestPoint->accuracy_meters !== null ? (float) $latestPoint->accuracy_meters : null,
+                        'network_type' => $latestPoint->network_type,
+                        'recorded_at' => $latestPoint->recorded_at?->toISOString(),
+                    ] : null,
+                ] : null,
+            ],
+        ]);
+    }
+
     public function heartbeat(Request $request): JsonResponse
     {
         $data = $request->validate([

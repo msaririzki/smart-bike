@@ -13,7 +13,7 @@ class GpsService {
     try {
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
+          accuracy: LocationAccuracy.bestForNavigation,
         ),
       );
     } catch (_) {
@@ -25,8 +25,8 @@ class GpsService {
   Stream<Position> positionStream({int intervalSeconds = 5}) {
     return Geolocator.getPositionStream(
       locationSettings: LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 0,
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 1,
         timeLimit: Duration(seconds: intervalSeconds * 4),
       ),
     );

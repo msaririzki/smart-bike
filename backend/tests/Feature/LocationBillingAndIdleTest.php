@@ -120,6 +120,29 @@ class LocationBillingAndIdleTest extends TestCase
         ]);
     }
 
+    public function test_device_can_read_active_rental_dashboard_summary_for_assigned_bike(): void
+    {
+        Sanctum::actingAs($this->device);
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -5.147665,
+            'longitude' => 119.432732,
+            'speed_kmh' => 12.5,
+            'accuracy_meters' => 5,
+            'network_type' => 'wifi',
+            'recorded_at' => now()->subMinute()->toISOString(),
+        ])->assertOk();
+
+        $this->getJson('/api/device/active-rental-summary')
+            ->assertOk()
+            ->assertJsonPath('data.bike.code', 'BIKE-GPS')
+            ->assertJsonPath('data.rental.id', $this->rental->id)
+            ->assertJsonPath('data.rental.status', Rental::STATUS_ACTIVE)
+            ->assertJsonPath('data.rental.user.name', 'User')
+            ->assertJsonPath('data.rental.latest_location_point.network_type', 'wifi')
+            ->assertJsonPath('data.rental.current_speed_kmh', 12.5);
+    }
+
     public function test_idle_warning_idle_billing_and_resume_after_valid_movement(): void
     {
         $this->rental->update(['last_movement_at' => now()->subSeconds(301)]);
