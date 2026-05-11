@@ -1,7 +1,7 @@
 # Tugas Lanjutan Setelah Merge
 
-Tanggal: 11 Mei 2026  
-Target branch utama: `main`  
+Tanggal: 11 Mei 2026
+Target branch utama: `main`
 Anggota terkait:
 
 - Ahmad Jul Hadi - `feature/simulator-enhancement`
@@ -19,7 +19,7 @@ Status saat ini:
 
 ### Area Tanggung Jawab
 
-App: `mobile_bike`  
+App: `mobile_bike`
 Fokus: simulator perangkat sepeda yang mengirim lokasi GPS ke backend.
 
 File utama:
@@ -187,7 +187,7 @@ Jul Hadi perlu melaporkan:
 
 ### Area Tanggung Jawab
 
-App: `mobile_user`  
+App: `mobile_user`
 Fokus: riwayat rental user dan detail biaya perjalanan.
 
 File utama:
@@ -416,4 +416,3 @@ Jul Hadi dan Endah perlu melakukan satu test bersama:
 
 - Jul Hadi membuat data rental dari simulator.
 - Endah memastikan rental tersebut muncul di history setelah selesai.
-

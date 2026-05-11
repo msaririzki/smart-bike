@@ -84,7 +84,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Presets
           _label('Pilihan Preset Lokasi'),
           const SizedBox(height: 8),
@@ -147,12 +147,12 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
               ),
             ),
           ),
-          
+
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Divider(color: Color(0xFF334155), height: 1),
           ),
-          
+
           // Mock Route Simulation Settings
           _label('Konfigurasi Simulasi Rute'),
           const SizedBox(height: 12),
@@ -206,7 +206,7 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
                               case SimulationMode.reset: label = 'Reset'; break;
                             }
                             return DropdownMenuItem(
-                              value: m, 
+                              value: m,
                               child: Text(label),
                             );
                           }).toList(),
