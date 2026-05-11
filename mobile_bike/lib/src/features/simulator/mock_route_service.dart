@@ -5,7 +5,17 @@ class LatLng {
   const LatLng(this.latitude, this.longitude);
 }
 
+enum SimulationMode { loop, stopAtEnd, reset }
+
 class MockRouteService {
+  static const Map<String, LatLng> locationPresets = {
+    'Kampus': LatLng(-8.5830, 116.1160),
+    'Parkiran': LatLng(-8.5840, 116.1170),
+    'Gerbang': LatLng(-8.5850, 116.1180),
+    'Titik Demo 1': LatLng(-8.5860, 116.1190),
+    'Titik Demo 2': LatLng(-8.5875, 116.1205),
+  };
+
   static const List<LatLng> mockRoute = [
     LatLng(-8.5830, 116.1160), // Dekat Kampus 
     LatLng(-8.5835, 116.1165),
@@ -27,11 +37,17 @@ class MockRouteService {
 
   bool get hasNext => _currentIndex < mockRoute.length - 1;
 
-  void next() {
+  void next({SimulationMode mode = SimulationMode.loop}) {
     if (hasNext) {
       _currentIndex++;
     } else {
-      _currentIndex = 0; // Loop back or stop
+      if (mode == SimulationMode.loop) {
+        _currentIndex = 0;
+      } else if (mode == SimulationMode.reset) {
+        _currentIndex = 0;
+        // The caller should stop the timer when it sees currentIndex reset if they want it to stop
+      }
+      // stopAtEnd: do nothing, just stay at current index
     }
   }
 
