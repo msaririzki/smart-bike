@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'mock_route_service.dart';
 
 class ManualGpsPanel extends StatefulWidget {
   const ManualGpsPanel({
@@ -6,6 +7,10 @@ class ManualGpsPanel extends StatefulWidget {
     required this.onToggleSimulation,
     required this.isSimulating,
     required this.simulationProgress,
+    required this.onIntervalChanged,
+    required this.onModeChanged,
+    required this.currentInterval,
+    required this.currentMode,
     super.key,
   });
 
@@ -13,6 +18,10 @@ class ManualGpsPanel extends StatefulWidget {
   final VoidCallback onToggleSimulation;
   final bool isSimulating;
   final String simulationProgress;
+  final Function(int seconds) onIntervalChanged;
+  final Function(SimulationMode mode) onModeChanged;
+  final int currentInterval;
+  final SimulationMode currentMode;
 
   @override
   State<ManualGpsPanel> createState() => _ManualGpsPanelState();
@@ -45,6 +54,14 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
     }
   }
 
+  void _selectPreset(LatLng? pos) {
+    if (pos == null) return;
+    setState(() {
+      _latController.text = pos.latitude.toString();
+      _lngController.text = pos.longitude.toString();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -68,7 +85,33 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
           ),
           const SizedBox(height: 16),
           
+          // Presets
+          _label('Preset Lokasi'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: _dropdownDeco(),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<LatLng>(
+                isExpanded: true,
+                dropdownColor: const Color(0xFF1E293B),
+                hint: const Text('Pilih Preset', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                items: MockRouteService.locationPresets.entries.map((e) {
+                  return DropdownMenuItem(
+                    value: e.value,
+                    child: Text(e.key),
+                  );
+                }).toList(),
+                onChanged: _selectPreset,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // Manual Input
+          _label('Koordinat Manual'),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
@@ -110,7 +153,69 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
             child: Divider(color: Color(0xFF334155), height: 1),
           ),
           
-          // Mock Route Simulation
+          // Mock Route Simulation Settings
+          _label('Pengaturan Simulasi'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Interval', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: _dropdownDeco(),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<int>(
+                          value: widget.currentInterval,
+                          dropdownColor: const Color(0xFF1E293B),
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          items: [3, 5, 10].map((s) {
+                            return DropdownMenuItem(value: s, child: Text('${s}s'));
+                          }).toList(),
+                          onChanged: (v) => v != null ? widget.onIntervalChanged(v) : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Mode', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: _dropdownDeco(),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<SimulationMode>(
+                          value: widget.currentMode,
+                          isExpanded: true,
+                          dropdownColor: const Color(0xFF1E293B),
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          items: SimulationMode.values.map((m) {
+                            return DropdownMenuItem(
+                              value: m, 
+                              child: Text(m.name.toUpperCase()),
+                            );
+                          }).toList(),
+                          onChanged: (v) => v != null ? widget.onModeChanged(v) : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Mock Toggle
           Row(
             children: [
               Expanded(
@@ -141,15 +246,21 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Interval: 5 detik per titik. Gunakan untuk test pergerakan tanpa GPS fisik.',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
-          ),
         ],
       ),
     );
   }
+
+  Widget _label(String text) => Text(
+    text,
+    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+  );
+
+  BoxDecoration _dropdownDeco() => BoxDecoration(
+    color: const Color(0xFF0F172A),
+    borderRadius: BorderRadius.circular(8),
+    border: Border.all(color: const Color(0xFF334155)),
+  );
 
   InputDecoration _inputDeco(String hint) => InputDecoration(
         hintText: hint,

@@ -57,6 +57,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   Timer? _mockTimer;
   bool _isSimulating = false;
   String _simulationProgress = '';
+  int _currentInterval = 5;
+  SimulationMode _currentMode = SimulationMode.loop;
+  String _locationMode = 'None';
 
   @override
   void initState() {
@@ -143,6 +146,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         _lng = pos.longitude;
         _speedKmh = pos.speed * 3.6; // m/s → km/h
         _accuracyMeters = pos.accuracy;
+        _locationMode = 'Real GPS';
       });
       _sendLocation(pos);
     });
@@ -176,6 +180,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _lng = lng;
       _speedKmh = 0; // Manual static point
       _accuracyMeters = 0;
+      _locationMode = 'Manual GPS';
     });
     
     // We create a dummy Position object for the existing _sendLocation method
@@ -214,19 +219,28 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _updateSimulationProgress();
     });
 
-    _mockTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _mockTimer = Timer.periodic(Duration(seconds: _currentInterval), (_) {
       final point = _mockService.currentPoint;
       _sendManualCoordinate(point.latitude, point.longitude);
+      setState(() => _locationMode = 'Mock Route');
       
       if (_mockService.hasNext) {
-        _mockService.next();
+        _mockService.next(mode: _currentMode);
         if (mounted) {
           setState(() => _updateSimulationProgress());
         }
       } else {
-        _mockService.reset(); // Loop or stop? Instructions say "Simulasi Rute: Titik 3/10", usually implies loop or just keep going
-        if (mounted) {
-          setState(() => _updateSimulationProgress());
+        if (_currentMode == SimulationMode.stopAtEnd) {
+          _stopSimulation();
+        } else if (_currentMode == SimulationMode.reset) {
+          _mockService.reset();
+          _stopSimulation();
+        } else {
+          // Loop
+          _mockService.next(mode: _currentMode);
+          if (mounted) {
+            setState(() => _updateSimulationProgress());
+          }
         }
       }
     });
@@ -244,6 +258,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         _isSimulating = false;
         _streaming = false;
         _simulationProgress = '';
+        _locationMode = 'None';
       });
     }
   }
@@ -386,6 +401,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             onToggleSimulation: _toggleSimulation,
             isSimulating: _isSimulating,
             simulationProgress: _simulationProgress,
+            currentInterval: _currentInterval,
+            currentMode: _currentMode,
+            onIntervalChanged: (v) => setState(() => _currentInterval = v),
+            onModeChanged: (v) => setState(() => _currentMode = v),
           ),
           const SizedBox(height: 12),
           // GPS & Sensor data
@@ -433,6 +452,19 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             ),
           ),
           const Spacer(),
+          if (_locationMode != 'None')
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'Mode: $_locationMode',
+                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ),
           if (_sending)
             const SizedBox(
               width: 16,
