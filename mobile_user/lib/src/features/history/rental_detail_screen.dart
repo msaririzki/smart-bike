@@ -153,7 +153,7 @@ class _RideMetricsGrid extends StatelessWidget {
               Container(width: 1, height: 40, color: const Color(0xffe3ebe7)),
               _MetricItem(
                 label: 'Est. Kalori',
-                value: '${history.caloriesBurned.toStringAsFixed(0)}',
+                value: history.caloriesBurned.toStringAsFixed(0),
                 unit: 'kkal',
                 icon: Icons.local_fire_department_rounded,
                 color: Colors.red,
@@ -478,9 +478,6 @@ class _ShareSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalKm = history.totalDistanceKilometers;
-    final totalCo2Gram = totalKm * 120;
-    final co2Text = totalCo2Gram >= 1000 ? '${(totalCo2Gram / 1000).toStringAsFixed(1)}kg' : '${totalCo2Gram.toStringAsFixed(0)}g';
     final dateFormat = DateFormat('EEEE, d MMM yyyy', 'id_ID');
 
     return Container(
@@ -675,42 +672,6 @@ Total Biaya: Rp${NumberFormat('#,###', 'id_ID').format(history.totalCost)}
   }
 }
 
-class _ShareStatPremium extends StatelessWidget {
-  const _ShareStatPremium({required this.label, required this.value, required this.unit});
-
-  final String label;
-  final String value;
-  final String unit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              unit,
-              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        Text(
-          label,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10, letterSpacing: 1),
-        ),
-      ],
-    );
-  }
-}
-
 class _CompactStat extends StatelessWidget {
   const _CompactStat({required this.label, required this.value, required this.unit});
   final String label, value, unit;
@@ -763,51 +724,6 @@ class _MeshWavePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-class _GlassStatCard extends StatelessWidget {
-  const _GlassStatCard({required this.label, required this.value, required this.unit, required this.icon});
-  final String label, value, unit;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: const Color(0xff4ade80), size: 16),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                unit,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          Text(
-            label,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 8, fontWeight: FontWeight.w700, letterSpacing: 1),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _DotPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -818,37 +734,6 @@ class _DotPatternPainter extends CustomPainter {
         canvas.drawCircle(Offset(x, y), 1, paint);
       }
     }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _MockQrPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xff064e3b);
-    final rand = DateTime.now().millisecondsSinceEpoch;
-    
-    for (int i = 0; i < 6; i++) {
-      for (int j = 0; j < 6; j++) {
-        if ((i + j + rand) % 3 != 0) {
-          canvas.drawRect(
-            Rect.fromLTWH(
-              i * (size.width / 6),
-              j * (size.height / 6),
-              size.width / 7,
-              size.height / 7,
-            ),
-            paint,
-          );
-        }
-      }
-    }
-    // QR squares
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width/3, size.height/3), paint..style = PaintingStyle.stroke..strokeWidth = 2);
-    canvas.drawRect(Rect.fromLTWH(size.width*2/3, 0, size.width/3, size.height/3), paint);
-    canvas.drawRect(Rect.fromLTWH(0, size.height*2/3, size.width/3, size.height/3), paint);
   }
 
   @override

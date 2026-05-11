@@ -745,7 +745,7 @@ class _FilterChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: onSelected,
-      selectedColor: const Color(0xff269276).withOpacity(0.2),
+      selectedColor: const Color(0xff269276).withValues(alpha: 0.2),
       checkmarkColor: const Color(0xff269276),
       labelStyle: TextStyle(
         color: selected ? const Color(0xff18846e) : const Color(0xff64748b),
