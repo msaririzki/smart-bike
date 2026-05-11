@@ -10,6 +10,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Smart Bike Rental'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.pump();
+
     expect(find.text('Login'), findsOneWidget);
   });
 }
