@@ -1,18 +1,30 @@
 @extends('layouts.admin', ['title' => 'Dasbor'])
 
 @section('content')
-    <h1>Dasbor</h1>
+    <style>
+        .stat-card { position: relative; overflow: hidden; border-left: 4px solid #0f766e; }
+        .stat-card h2 { margin: 8px 0 0; color: #0f766e; font-size: 28px; }
+        .stat-card .muted { font-weight: 500; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .map-panel { padding: 0; overflow: hidden; }
+        .map-header { padding: 24px 24px 16px; margin: 0; }
+        .map-header h2 { margin: 0 0 4px; color: #0f766e; }
+        .map-canvas, .map-empty { border: 0; border-radius: 0; border-top: 1px solid #e2e8f0; }
+        .map-canvas { height: 420px; min-height: 420px; }
+    </style>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h1 style="margin: 0; color: #0f766e;">Dasbor</h1>
+    </div>
 
     <div class="grid">
-        <div class="card"><span class="muted">Total Sepeda</span><h2>{{ $totalBikes }}</h2></div>
-        <div class="card"><span class="muted">Sepeda Tersedia</span><h2>{{ $availableBikes }}</h2></div>
-        <div class="card"><span class="muted">Sepeda Dipakai</span><h2>{{ $inUseBikes }}</h2></div>
-        <div class="card"><span class="muted">Sepeda Offline</span><h2>{{ $offlineBikes }}</h2></div>
-        <div class="card"><span class="muted">Rental Aktif</span><h2>{{ $activeRentals }}</h2></div>
-        <div class="card"><span class="muted">Rental Selesai Hari Ini</span><h2>{{ $completedRentalsToday }}</h2></div>
-        <div class="card"><span class="muted">Estimasi Pendapatan</span><h2>Rp{{ number_format($totalRevenue, 0, ',', '.') }}</h2></div>
-        <div class="card"><span class="muted">Total Jarak Tempuh</span><h2>{{ number_format($totalDistanceMeters / 1000, 2) }} km</h2></div>
-        <div class="card"><span class="muted">Pengguna</span><h2>{{ $users }}</h2></div>
+        <div class="card stat-card"><span class="muted">Total Sepeda</span><h2>{{ $totalBikes }}</h2></div>
+        <div class="card stat-card"><span class="muted">Sepeda Tersedia</span><h2>{{ $availableBikes }}</h2></div>
+        <div class="card stat-card"><span class="muted">Sepeda Dipakai</span><h2>{{ $inUseBikes }}</h2></div>
+        <div class="card stat-card"><span class="muted">Sepeda Offline</span><h2>{{ $offlineBikes }}</h2></div>
+        <div class="card stat-card"><span class="muted">Rental Aktif</span><h2>{{ $activeRentals }}</h2></div>
+        <div class="card stat-card"><span class="muted">Rental Selesai Hari Ini</span><h2>{{ $completedRentalsToday }}</h2></div>
+        <div class="card stat-card"><span class="muted">Estimasi Pendapatan</span><h2>Rp{{ number_format($totalRevenue, 0, ',', '.') }}</h2></div>
+        <div class="card stat-card"><span class="muted">Total Jarak Tempuh</span><h2>{{ number_format($totalDistanceMeters / 1000, 2) }} km</h2></div>
+        <div class="card stat-card"><span class="muted">Pengguna</span><h2>{{ $users }}</h2></div>
     </div>
 
     <div class="card map-panel">

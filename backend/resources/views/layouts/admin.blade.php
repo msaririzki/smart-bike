@@ -4,37 +4,65 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'Admin Smart Bike' }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIINfQouMjQkGOpJnIubd9F3PNP6EGGoB1Q=" crossorigin="">
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #f6f7f9; color: #20242a; }
-        header { background: #164e63; color: white; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
-        nav a, header button { color: white; margin-right: 16px; background: transparent; border: 0; cursor: pointer; font: inherit; text-decoration: none; }
-        main { max-width: 1120px; margin: 24px auto; padding: 0 16px; }
-        .card { background: white; border: 1px solid #dde3ea; border-radius: 8px; padding: 18px; margin-bottom: 16px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { padding: 10px; border-bottom: 1px solid #e6ebf0; text-align: left; font-size: 14px; }
-        label { display: block; margin-top: 12px; font-weight: 600; }
-        input, select { width: 100%; box-sizing: border-box; padding: 9px; border: 1px solid #cfd8e3; border-radius: 6px; margin-top: 5px; }
-        .button { display: inline-block; background: #0f766e; color: white; padding: 9px 12px; border-radius: 6px; border: 0; text-decoration: none; cursor: pointer; }
-        .button.secondary { background: #475467; }
-        .button:disabled { opacity: .55; cursor: not-allowed; }
+        body { margin: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f6f7f9; color: #1e293b; line-height: 1.5; }
+        header { background: #0f766e; color: white; padding: 16px 24px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        header .brand { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; margin-right: 24px; display: flex; align-items: center; gap: 8px; }
+        header .header-left { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+        nav { display: flex; flex-wrap: wrap; gap: 6px; }
+        nav a { color: #ccfbf1; padding: 8px 12px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px; transition: all 0.2s ease; }
+        nav a:hover, nav a.active { background: #115e59; color: white; box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); }
+        header button { color: white; padding: 8px 16px; background: #115e59; border: 1px solid #134e4a; border-radius: 6px; cursor: pointer; font: inherit; font-size: 14px; font-weight: 500; transition: all 0.2s ease; }
+        header button:hover { background: #0d9488; border-color: #ccfbf1; }
+        main { max-width: 1200px; margin: 32px auto; padding: 0 20px; }
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .card:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025); transform: translateY(-2px); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -24px; padding: 0 24px; }
+        table { width: 100%; border-collapse: collapse; background: white; white-space: nowrap; }
+        th { padding: 12px 16px; border-bottom: 2px solid #e2e8f0; text-align: left; font-size: 13px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; text-align: left; font-size: 14px; color: #334155; }
+        tr:hover td { background-color: #f8fafc; }
+        label { display: block; margin-top: 16px; font-weight: 600; font-size: 14px; color: #334155; }
+        input, select, textarea { width: 100%; box-sizing: border-box; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 6px; margin-top: 6px; font-family: inherit; font-size: 14px; transition: border-color 0.2s, box-shadow 0.2s; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #0f766e; box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1); }
+        .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #0f766e; color: white; padding: 10px 16px; border-radius: 6px; border: none; font-weight: 500; font-size: 14px; text-decoration: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        .button:hover { background: #0d9488; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); transform: translateY(-1px); }
+        .button.secondary { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; box-shadow: none; }
+        .button.secondary:hover { background: #e2e8f0; color: #0f172a; }
+        .button:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
         .toolbar { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-bottom: 16px; }
         .toolbar label { margin-top: 0; min-width: 180px; }
         .toolbar .actions { display: flex; gap: 8px; margin-top: 5px; }
         .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1; }
-        .badge.available { color: #027a48; background: #ecfdf3; }
-        .badge.in_use, .badge.idle { color: #175cd3; background: #eff8ff; }
-        .badge.active, .badge.idle_warning, .badge.idle_billing { color: #175cd3; background: #eff8ff; }
-        .badge.completed { color: #027a48; background: #ecfdf3; }
-        .badge.cancelled { color: #b42318; background: #fef3f2; }
-        .badge.user, .badge.device { color: #344054; background: #f2f4f7; }
-        .badge.admin, .badge.superadmin { color: #175cd3; background: #eff8ff; }
-        .badge.offline { color: #344054; background: #f2f4f7; }
-        .badge.maintenance { color: #b42318; background: #fef3f2; }
-        .badge.reserved { color: #b54708; background: #fffaeb; }
-        .map-panel { overflow: hidden; }
+        .badge.available { color: #047857; background: #d1fae5; }
+        .badge.in_use, .badge.idle { color: #1d4ed8; background: #dbeafe; }
+        .badge.active, .badge.idle_warning, .badge.idle_billing { color: #1d4ed8; background: #dbeafe; }
+        .badge.completed { color: #047857; background: #d1fae5; }
+        .badge.cancelled { color: #b91c1c; background: #fee2e2; }
+        .badge.user { color: #0f766e; background: #ccfbf1; }
+        .badge.device { color: #475569; background: #f1f5f9; }
+        .badge.admin { color: #4338ca; background: #e0e7ff; }
+        .badge.superadmin { color: #991b1b; background: #fee2e2; }
+        .badge.offline { color: #475569; background: #f1f5f9; }
+        .badge.maintenance { color: #b91c1c; background: #fee2e2; }
+        .badge.reserved { color: #b45309; background: #fef3c7; }
+        
+        .stat-card { position: relative; overflow: hidden; border-left: 4px solid #0f766e; }
+        .stat-card h2 { margin: 8px 0 0; color: #0f766e; font-size: 28px; }
+        .stat-card .muted { font-weight: 500; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .alert-card { border-left: 4px solid #dc2626; background: #fef2f2; padding: 24px; border-radius: 8px; position: relative; overflow: hidden; }
+        .alert-card.warning { border-left-color: #f59e0b; background: #fffbeb; }
+        .alert-card h2 { margin: 8px 0 0; color: #991b1b; font-size: 28px; }
+        .alert-card.warning h2 { color: #b45309; }
+        .alert-card .muted { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #b91c1c; display: block; }
+        .alert-card.warning .muted { color: #d97706; }
         .map-header { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
         .map-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .map-canvas { width: 100%; height: 360px; min-height: 360px; border-radius: 8px; border: 1px solid #dde3ea; background: #eef2f6; position: relative; overflow: hidden; box-sizing: border-box; }
@@ -104,26 +132,29 @@
 </head>
 <body>
 <header>
-    <div>
-        <strong>Smart Bike Rental</strong>
+    <div class="header-left">
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18c-.5 0-.9-.2-1.2-.5C3.5 17.2 3.4 16.8 3.5 16.4l2.2-9.9C5.9 5.6 6.7 5 7.6 5h8.8c.9 0 1.7.6 1.9 1.5l2.2 9.9c.1.4 0 .8-.3 1.1-.3.3-.7.5-1.2.5H5z"></path><circle cx="8" cy="18" r="2"></circle><circle cx="16" cy="18" r="2"></circle></svg>
+            Smart Bike
+        </div>
         @auth
-            <nav style="display:inline">
-                <a href="{{ route('admin.dashboard') }}">Dasbor</a>
-                <a href="{{ route('admin.monitoring.index') }}">Monitoring Sepeda</a>
-                <a href="{{ route('admin.bikes.index') }}">Sepeda</a>
-                <a href="{{ route('admin.rentals.index') }}">Rental</a>
-                <a href="{{ route('admin.rentals.index', ['status' => 'running']) }}">Rental Aktif</a>
-                <a href="{{ route('admin.users.index') }}">Pengguna</a>
-                <a href="{{ route('admin.reports.index') }}">Laporan</a>
-                <a href="{{ route('admin.alerts.index') }}">Peringatan</a>
+            <nav>
+                <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">Dasbor</a>
+                <a href="{{ route('admin.monitoring.index') }}" class="{{ request()->routeIs('admin.monitoring.*') ? 'active' : '' }}">Monitoring Sepeda</a>
+                <a href="{{ route('admin.bikes.index') }}" class="{{ request()->routeIs('admin.bikes.*') ? 'active' : '' }}">Sepeda</a>
+                <a href="{{ route('admin.rentals.index') }}" class="{{ request()->routeIs('admin.rentals.*') && !request()->has('status') ? 'active' : '' }}">Rental</a>
+                <a href="{{ route('admin.rentals.index', ['status' => 'running']) }}" class="{{ request()->fullUrlIs('*status=running*') ? 'active' : '' }}">Rental Aktif</a>
+                <a href="{{ route('admin.users.index') }}" class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">Pengguna</a>
+                <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Laporan</a>
+                <a href="{{ route('admin.alerts.index') }}" class="{{ request()->routeIs('admin.alerts.*') ? 'active' : '' }}">Peringatan</a>
                 @if(auth()->user()->role === 'superadmin')
-                    <a href="{{ route('admin.settings.edit') }}">Pengaturan</a>
+                    <a href="{{ route('admin.settings.edit') }}" class="{{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">Pengaturan</a>
                 @endif
             </nav>
         @endauth
     </div>
     @auth
-        <form method="post" action="{{ route('admin.logout') }}">
+        <form method="post" action="{{ route('admin.logout') }}" style="margin: 0;">
             @csrf
             <button type="submit">Keluar</button>
         </form>
