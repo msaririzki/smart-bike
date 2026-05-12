@@ -32,7 +32,7 @@ class ActiveRentalDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bike = rental.bike;
-    final speed = rental.currentSpeedKmh ?? 0;
+    final speed = rental.currentSpeedKmh;
     final latitude = rental.latitude;
     final longitude = rental.longitude;
     final screenSize = MediaQuery.sizeOf(context);
