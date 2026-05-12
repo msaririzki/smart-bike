@@ -287,7 +287,12 @@ class _ManualGpsPanelState extends State<ManualGpsPanel> {
               Switch(
                 value: widget.isSimulating,
                 onChanged: (_) => widget.onToggleSimulation(),
-                activeColor: const Color(0xFF22C55E),
+                thumbColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const Color(0xFF22C55E);
+                  }
+                  return null;
+                }),
               ),
             ],
           ),
