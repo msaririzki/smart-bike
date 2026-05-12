@@ -29,11 +29,11 @@
 
     <div class="login-card">
         <div class="login-header">
-            <div class="login-logo">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18c-.5 0-.9-.2-1.2-.5C3.5 17.2 3.4 16.8 3.5 16.4l2.2-9.9C5.9 5.6 6.7 5 7.6 5h8.8c.9 0 1.7.6 1.9 1.5l2.2 9.9c.1.4 0 .8-.3 1.1-.3.3-.7.5-1.2.5H5z"></path><circle cx="8" cy="18" r="2"></circle><circle cx="16" cy="18" r="2"></circle></svg>
+            <div class="login-logo" style="width: 100%;">
+                <img src="{{ asset('images/flowbike-logo-landscape.png') }}" alt="FlowBike" style="max-width: 80%; height: auto;">
             </div>
             <h1 class="login-title">Masuk ke Akun</h1>
-            <p class="login-subtitle">Demo: superadmin@smartbike.test / password</p>
+            <p class="login-subtitle">Demo: superadmin@flowbike.test / password</p>
         </div>
 
         <form method="post" action="{{ route('admin.login.store') }}">

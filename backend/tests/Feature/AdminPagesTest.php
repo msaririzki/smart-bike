@@ -51,10 +51,11 @@ class AdminPagesTest extends TestCase
         ]);
 
         $this->actingAs($admin);
+        $this->withoutExceptionHandling();
 
         $this->get('/admin')->assertOk()->assertSee('Sepeda Tersedia');
         $this->get('/admin/dashboard/map-data')->assertOk()->assertJsonPath('data.0.code', 'BIKE-ADMIN-1');
-        $this->get('/admin/rentals?status=running')->assertOk()->assertSee('Rental Aktif');
+        $this->get('/admin/rentals?status=running')->assertOk()->assertSee('rental berjalan');
         $this->get("/admin/rentals/{$rental->id}/route-map-data")->assertOk()->assertJsonPath('data.0.latitude', -5.147665);
         $this->get('/admin/users')->assertOk()->assertSee('Manajemen Pengguna');
         $this->get("/admin/users/{$user->id}")->assertOk()->assertSee('Histori Rental Pengguna');
