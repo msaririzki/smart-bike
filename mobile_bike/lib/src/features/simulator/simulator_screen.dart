@@ -43,7 +43,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   Bike? _bike;
   DeviceRentalSummary? _summary;
   bool _loadingBike = true;
-  bool _loadingSummary = true;
 
   bool _streaming = false;
   bool _isSimulating = false;
@@ -57,8 +56,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   Timer? _mockTimer;
   Timer? _realGpsRefreshTimer;
 
-  double? _lat;
-  double? _lng;
   double? _speedKmh;
   double? _accuracyMeters;
   String _networkType = 'unknown';
@@ -125,7 +122,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   Future<void> _loadRentalSummary({bool silent = false}) async {
-    if (!silent && mounted) setState(() => _loadingSummary = true);
     try {
       final summary = await widget.api.activeRentalSummary();
       if (!mounted) return;
@@ -140,8 +136,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       });
     } catch (e) {
       if (!silent) _showMessage('Gagal memuat ringkasan rental: $e');
-    } finally {
-      if (!silent && mounted) setState(() => _loadingSummary = false);
     }
   }
 
@@ -299,8 +293,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final speedKmh = _hasActiveRental ? _calculateDisplaySpeedKmh(pos) : 0.0;
 
     setState(() {
-      _lat = pos.latitude;
-      _lng = pos.longitude;
       _speedKmh = speedKmh;
       _accuracyMeters = pos.accuracy;
       _lastGpsReadAt = pos.timestamp.toLocal();
@@ -445,8 +437,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     required String mode,
   }) {
     setState(() {
-      _lat = latitude;
-      _lng = longitude;
       _speedKmh = speedKmh;
       _accuracyMeters = accuracyMeters;
       _lastGpsReadAt = DateTime.now();
@@ -1717,45 +1707,6 @@ class _Badge extends StatelessWidget {
   }
 }
 
-class _InfoPill extends StatelessWidget {
-  const _InfoPill({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F7),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: const Color(0xFF475467)),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF475467),
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StatusDot extends StatefulWidget {
   const _StatusDot({required this.active});
 
@@ -1808,26 +1759,6 @@ class _StatusDotState extends State<_StatusDot>
   }
 }
 
-String _formatDuration(Duration duration) {
-  final safeDuration = duration.isNegative ? Duration.zero : duration;
-  final hours = safeDuration.inHours;
-  final minutes = safeDuration.inMinutes.remainder(60);
-  final seconds = safeDuration.inSeconds.remainder(60);
-
-  if (hours > 0) {
-    return [
-      hours.toString().padLeft(2, '0'),
-      minutes.toString().padLeft(2, '0'),
-      seconds.toString().padLeft(2, '0'),
-    ].join(':');
-  }
-
-  return [
-    minutes.toString().padLeft(2, '0'),
-    seconds.toString().padLeft(2, '0'),
-  ].join(':');
-}
-
 String _formatRupiah(int value) {
   final raw = value.abs().toString();
   final buffer = StringBuffer();
@@ -1860,14 +1791,6 @@ bool _isFresh(DateTime? dt, Duration maxAge) {
   return !age.isNegative && age <= maxAge;
 }
 
-String _gpsQualityLabel(double? accuracyMeters) {
-  if (accuracyMeters == null) return 'GPS belum tersedia';
-  if (accuracyMeters <= 10) return 'GPS sangat akurat';
-  if (accuracyMeters <= 25) return 'GPS akurat';
-  if (accuracyMeters <= 50) return 'GPS sedang';
-  return 'GPS kurang akurat';
-}
-
 double _haversineMeters(
   double lat1,
   double lon1,
@@ -1890,18 +1813,6 @@ double _haversineMeters(
 }
 
 double _toRadians(double degrees) => degrees * (math.pi / 180);
-
-String _statusLabel(String status) {
-  return switch (status) {
-    'available' => 'Tersedia',
-    'reserved' => 'Dipesan',
-    'in_use' => 'Dipakai',
-    'idle' => 'Diam',
-    'offline' => 'Offline',
-    'maintenance' => 'Perawatan',
-    _ => status,
-  };
-}
 
 String _rentalStatusLabel(String status) {
   return switch (status) {
