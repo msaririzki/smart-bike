@@ -66,11 +66,15 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   DateTime? _lastSentAt;
   int? _activeRentalId;
   DateTime _now = DateTime.now();
-  String _lastServerMsg = '-';
+  String _lastServerMsg = 'Belum ada pengiriman';
   String _simulationProgress = '';
   int _currentInterval = 5;
   SimulationMode _currentMode = SimulationMode.loop;
-  String _locationMode = 'None';
+  String _locationMode = 'Belum aktif';
+  bool _checkingLocationAccess = true;
+  bool _locationAccessGranted = false;
+  LocationAccessStatus _locationAccessStatus = LocationAccessStatus.denied;
+  String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
   final List<_RoutePoint> _routePoints = [];
 
   @override
@@ -78,6 +82,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     super.initState();
     _loadBike();
     _loadRentalSummary();
+    _ensureLocationReady(requestIfDenied: true, showMessage: false);
     _listenNetwork();
     _loadBattery();
     _summaryTimer = Timer.periodic(
@@ -164,12 +169,60 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     return 'Offline';
   }
 
+  Future<bool> _ensureLocationReady({
+    required bool requestIfDenied,
+    bool showMessage = true,
+  }) async {
+    if (mounted) setState(() => _checkingLocationAccess = true);
+
+    final access = await _gps.ensureLocationAccess(
+      requestIfDenied: requestIfDenied,
+    );
+    final message = _locationAccessText(access.status);
+
+    if (!mounted) return access.granted;
+    setState(() {
+      _checkingLocationAccess = false;
+      _locationAccessGranted = access.granted;
+      _locationAccessStatus = access.status;
+      _locationAccessMessage = message;
+    });
+
+    if (!access.granted && showMessage) {
+      _showMessage(message);
+    }
+
+    return access.granted;
+  }
+
+  Future<void> _openLocationSettings() async {
+    if (_locationAccessStatus == LocationAccessStatus.deniedForever) {
+      await Geolocator.openAppSettings();
+    } else {
+      await Geolocator.openLocationSettings();
+    }
+
+    await _ensureLocationReady(requestIfDenied: false, showMessage: false);
+  }
+
+  String _locationAccessText(LocationAccessStatus status) {
+    return switch (status) {
+      LocationAccessStatus.granted =>
+        'Akses lokasi aktif. GPS real siap dikirim ke server.',
+      LocationAccessStatus.serviceDisabled =>
+        'GPS perangkat belum aktif. Nyalakan Lokasi/GPS di pengaturan HP.',
+      LocationAccessStatus.denied =>
+        'Izin lokasi ditolak. Berikan izin lokasi agar sepeda bisa mengirim GPS real.',
+      LocationAccessStatus.deniedForever =>
+        'Izin lokasi diblokir permanen. Buka pengaturan aplikasi lalu izinkan Lokasi.',
+    };
+  }
+
   Future<void> _startStream() async {
     if (_isSimulating) _stopSimulation();
 
-    final granted = await _gps.requestPermission();
+    final granted = await _ensureLocationReady(requestIfDenied: true);
     if (!granted) {
-      _showMessage('Izin lokasi diperlukan untuk mengirim data GPS real.');
       return;
     }
 
@@ -179,26 +232,43 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _locationMode = 'Real GPS';
     });
 
-    _positionSub = _gps.positionStream(intervalSeconds: 5).listen((pos) {
+    final currentPosition = await _gps.getCurrentPosition();
+    if (currentPosition != null && _shouldAcceptGpsPosition(currentPosition)) {
+      _handleRealGpsPosition(currentPosition);
+    }
+
+    _positionSub = _gps.positionStream().listen((pos) {
       if (!mounted) return;
       if (!_shouldAcceptGpsPosition(pos)) return;
+      _handleRealGpsPosition(pos);
+    }, onError: (Object error) {
+      if (!mounted) return;
       setState(() {
-        _lat = pos.latitude;
-        _lng = pos.longitude;
-        _speedKmh = pos.speed * 3.6;
-        _accuracyMeters = pos.accuracy;
-        _locationMode = 'Real GPS';
-        _addRoutePoint(
-          latitude: pos.latitude,
-          longitude: pos.longitude,
-          accuracyMeters: pos.accuracy,
-          source: 'Real GPS',
-        );
+        _streaming = false;
+        _locationMode = 'GPS error';
+        _lastServerMsg = 'GPS gagal: $error';
       });
-      _sendLocation(pos);
+      _showMessage('Stream GPS berhenti: $error');
     });
 
     _startHeartbeat();
+  }
+
+  void _handleRealGpsPosition(Position pos) {
+    setState(() {
+      _lat = pos.latitude;
+      _lng = pos.longitude;
+      _speedKmh = pos.speed * 3.6;
+      _accuracyMeters = pos.accuracy;
+      _locationMode = 'Real GPS';
+      _addRoutePoint(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        accuracyMeters: pos.accuracy,
+        source: 'Real GPS',
+      );
+    });
+    _sendLocation(pos);
   }
 
   void _stopStream() {
@@ -208,7 +278,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     if (mounted) {
       setState(() {
         _streaming = false;
-        _locationMode = 'None';
+        _locationMode = 'Belum aktif';
       });
     }
   }
@@ -562,6 +632,18 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             sending: _sending,
             serverMessage: _lastServerMsg,
           ),
+          if (_checkingLocationAccess || !_locationAccessGranted) ...[
+            const SizedBox(height: 12),
+            _LocationAccessBanner(
+              checking: _checkingLocationAccess,
+              status: _locationAccessStatus,
+              message: _locationAccessMessage,
+              onRequestPermission: () => _ensureLocationReady(
+                requestIfDenied: true,
+              ),
+              onOpenSettings: _openLocationSettings,
+            ),
+          ],
           const SizedBox(height: 12),
           _BikeHeader(bike: bike),
           const SizedBox(height: 12),
@@ -703,6 +785,81 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             onIntervalChanged: (v) => setState(() => _currentInterval = v),
             onModeChanged: (v) => setState(() => _currentMode = v),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationAccessBanner extends StatelessWidget {
+  const _LocationAccessBanner({
+    required this.checking,
+    required this.status,
+    required this.message,
+    required this.onRequestPermission,
+    required this.onOpenSettings,
+  });
+
+  final bool checking;
+  final LocationAccessStatus status;
+  final String message;
+  final VoidCallback onRequestPermission;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final needsAppSettings = status == LocationAccessStatus.deniedForever;
+    final needsLocationSettings =
+        status == LocationAccessStatus.serviceDisabled || needsAppSettings;
+
+    return _Panel(
+      borderColor: const Color(0xFFFDB022),
+      backgroundColor: const Color(0xFFFFFCF5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.location_off_rounded,
+                color: Color(0xFFB54708),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  checking ? 'Mengecek akses lokasi...' : message,
+                  style: const TextStyle(
+                    color: Color(0xFF7A2E0E),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!checking) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onRequestPermission,
+                  icon: const Icon(Icons.gps_fixed_rounded, size: 18),
+                  label: const Text('Minta Izin Lokasi'),
+                ),
+                if (needsLocationSettings)
+                  TextButton.icon(
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.settings_rounded, size: 18),
+                    label: Text(
+                      needsAppSettings
+                          ? 'Buka Pengaturan Aplikasi'
+                          : 'Aktifkan GPS',
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
