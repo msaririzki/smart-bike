@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class IdleWarningDialog extends StatelessWidget {
   const IdleWarningDialog({
@@ -6,6 +7,10 @@ class IdleWarningDialog extends StatelessWidget {
     required this.onContinue,
     required this.onFinish,
     this.isLoading = false,
+    this.idleWarningSeconds,
+    this.idleBillingAmount,
+    this.idleBillingIntervalSeconds,
+    this.errorMessage,
   });
 
   /// Callback saat user pilih "Lanjutkan Sewa"
@@ -16,6 +21,58 @@ class IdleWarningDialog extends StatelessWidget {
 
   /// True saat sedang mengirim request ke server
   final bool isLoading;
+
+  /// Durasi idle sebelum warning (detik), dari backend setting
+  final int? idleWarningSeconds;
+
+  /// Biaya idle per interval (rupiah), dari backend setting
+  final int? idleBillingAmount;
+
+  /// Interval penagihan idle (detik), dari backend setting
+  final int? idleBillingIntervalSeconds;
+
+  /// Pesan error yang ditampilkan jika ada kegagalan
+  final String? errorMessage;
+
+  String get _idleDurationText {
+    final seconds = idleWarningSeconds;
+    if (seconds == null || seconds <= 0) {
+      return 'beberapa waktu';
+    }
+    if (seconds >= 3600) {
+      final hours = seconds ~/ 3600;
+      return '$hours jam';
+    }
+    if (seconds >= 60) {
+      final minutes = seconds ~/ 60;
+      return '$minutes menit';
+    }
+    return '$seconds detik';
+  }
+
+  String? get _idleCostText {
+    final amount = idleBillingAmount;
+    final interval = idleBillingIntervalSeconds;
+    if (amount == null || amount <= 0) {
+      return null;
+    }
+
+    final currency = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp',
+      decimalDigits: 0,
+    );
+
+    final formatted = currency.format(amount);
+
+    if (interval != null && interval > 0) {
+      final intervalMin = interval >= 60
+          ? '${interval ~/ 60} menit'
+          : '$interval detik';
+      return '$formatted per $intervalMin';
+    }
+    return '$formatted per interval';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +85,7 @@ class IdleWarningDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Animated warning icon ──
+            // Animated warning icon.
             Container(
               width: 80,
               height: 80,
@@ -59,21 +116,21 @@ class IdleWarningDialog extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // ── Title ──
+            // Title.
             const Text(
               'Sepeda Diam!',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
                 color: Color(0xff1e293b),
-                letterSpacing: -0.5,
+                letterSpacing: 0,
               ),
             ),
             const SizedBox(height: 8),
 
-            // ── Subtitle ──
+            // Subtitle dinamis.
             Text(
-              'Sepeda Anda tidak bergerak selama 5 menit terakhir.',
+              'Sepeda Anda tidak bergerak selama $_idleDurationText terakhir.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -83,7 +140,7 @@ class IdleWarningDialog extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // ── Info card ──
+            // Info card.
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -98,37 +155,106 @@ class IdleWarningDialog extends StatelessWidget {
                   color: Colors.orange.shade200.withValues(alpha: 0.6),
                 ),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.info_outline_rounded,
-                      size: 18,
-                      color: Colors.orange.shade700,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.info_outline_rounded,
+                          size: 18,
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Jika Anda memilih Lanjutkan, biaya idle akan dikenakan selama sepeda masih diam.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange.shade900,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Jika Anda memilih Lanjutkan, biaya idle akan dikenakan selama sepeda masih diam.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.orange.shade900,
-                        height: 1.4,
+                  // Biaya idle per interval.
+                  if (_idleCostText != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.attach_money,
+                            size: 18,
+                            color: Colors.orange.shade800,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Tarif idle: $_idleCostText',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.orange.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
+
+            // Error message.
+            if (errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline,
+                        size: 18, color: Colors.red.shade600),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        errorMessage!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 24),
 
-            // ── Action buttons ──
+            // Action buttons.
             if (isLoading)
               Container(
                 padding: const EdgeInsets.all(16),
