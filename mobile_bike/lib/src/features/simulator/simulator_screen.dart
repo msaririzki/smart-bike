@@ -55,6 +55,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   Timer? _summaryTimer;
   Timer? _clockTimer;
   Timer? _mockTimer;
+  Timer? _realGpsRefreshTimer;
 
   double? _lat;
   double? _lng;
@@ -73,6 +74,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   String _locationMode = 'Belum aktif';
   bool _checkingLocationAccess = true;
   bool _locationAccessGranted = false;
+  bool _autoStartAttempted = false;
   LocationAccessStatus _locationAccessStatus = LocationAccessStatus.denied;
   String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
   final List<_RoutePoint> _routePoints = [];
@@ -111,6 +113,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     try {
       final bike = await widget.api.currentAssignment();
       if (mounted) setState(() => _bike = bike);
+      _autoStartRealGpsIfReady();
     } catch (e) {
       _showMessage('Gagal memuat sepeda: $e');
     } finally {
@@ -192,7 +195,21 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _showMessage(message);
     }
 
+    if (access.granted) {
+      _autoStartRealGpsIfReady();
+    }
+
     return access.granted;
+  }
+
+  void _autoStartRealGpsIfReady() {
+    if (_autoStartAttempted || _bike == null || !_locationAccessGranted) {
+      return;
+    }
+    if (_streaming || _isSimulating) return;
+
+    _autoStartAttempted = true;
+    _startStream(requestPermission: false);
   }
 
   Future<void> _openLocationSettings() async {
@@ -218,10 +235,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     };
   }
 
-  Future<void> _startStream() async {
+  Future<void> _startStream({bool requestPermission = true}) async {
     if (_isSimulating) _stopSimulation();
 
-    final granted = await _ensureLocationReady(requestIfDenied: true);
+    final granted = requestPermission
+        ? await _ensureLocationReady(requestIfDenied: true)
+        : _locationAccessGranted;
     if (!granted) {
       return;
     }
@@ -251,14 +270,35 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _showMessage('Stream GPS berhenti: $error');
     });
 
+    _startRealGpsRefresh();
     _startHeartbeat();
   }
 
+  void _startRealGpsRefresh() {
+    _realGpsRefreshTimer?.cancel();
+    _realGpsRefreshTimer = Timer.periodic(
+      Duration(seconds: _currentInterval),
+      (_) => _refreshRealGpsPosition(),
+    );
+  }
+
+  Future<void> _refreshRealGpsPosition() async {
+    if (!_streaming || _isSimulating || _sending) return;
+
+    final currentPosition = await _gps.getCurrentPosition();
+    if (!mounted || currentPosition == null) return;
+    if (!_shouldAcceptGpsPosition(currentPosition)) return;
+
+    _handleRealGpsPosition(currentPosition);
+  }
+
   void _handleRealGpsPosition(Position pos) {
+    final speedKmh = _calculateDisplaySpeedKmh(pos);
+
     setState(() {
       _lat = pos.latitude;
       _lng = pos.longitude;
-      _speedKmh = pos.speed * 3.6;
+      _speedKmh = speedKmh;
       _accuracyMeters = pos.accuracy;
       _locationMode = 'Real GPS';
       _addRoutePoint(
@@ -268,7 +308,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         source: 'Real GPS',
       );
     });
-    _sendLocation(pos);
+    _sendLocation(pos, speedKmh: speedKmh);
   }
 
   void _stopStream() {
@@ -286,6 +326,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   void _stopRealGps() {
     _positionSub?.cancel();
     _positionSub = null;
+    _realGpsRefreshTimer?.cancel();
+    _realGpsRefreshTimer = null;
   }
 
   void _startHeartbeat() {
@@ -426,14 +468,42 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _sendLocation(pos);
   }
 
-  Future<void> _sendLocation(Position pos) async {
+  double _calculateDisplaySpeedKmh(Position pos) {
+    final gpsSpeedKmh =
+        pos.speed.isFinite && pos.speed > 0 ? pos.speed * 3.6 : 0.0;
+    final derivedSpeedKmh = _deriveSpeedFromLastRoutePoint(pos);
+
+    if (gpsSpeedKmh >= 1) return gpsSpeedKmh;
+    if (derivedSpeedKmh >= 1) return derivedSpeedKmh;
+
+    return math.max(gpsSpeedKmh, derivedSpeedKmh);
+  }
+
+  double _deriveSpeedFromLastRoutePoint(Position pos) {
+    if (_routePoints.isEmpty) return 0;
+
+    final last = _routePoints.last;
+    final distance = _haversineMeters(
+      last.latitude,
+      last.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+    final seconds = DateTime.now().difference(last.recordedAt).inMilliseconds /
+        Duration.millisecondsPerSecond;
+    if (seconds <= 0 || distance < _minRouteDistanceMeters) return 0;
+
+    return (distance / seconds) * 3.6;
+  }
+
+  Future<void> _sendLocation(Position pos, {double? speedKmh}) async {
     if (_sending) return;
     setState(() => _sending = true);
     try {
       final res = await widget.api.sendLocationUpdate(
         latitude: pos.latitude,
         longitude: pos.longitude,
-        speedKmh: pos.speed * 3.6,
+        speedKmh: speedKmh ?? (pos.speed * 3.6),
         accuracyMeters: pos.accuracy,
         networkType: _networkType,
       );
