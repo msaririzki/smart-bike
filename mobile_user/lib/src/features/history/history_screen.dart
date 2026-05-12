@@ -66,7 +66,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final data = await widget.api.rentalHistory(page: 1);
       final rawList = data['data'] as List<dynamic>;
       final history = rawList.map((item) => RentalHistory.fromJson(item as Map<String, dynamic>)).toList();
-      
+
       if (mounted) {
         setState(() {
           _history = history;
@@ -146,10 +146,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _deleteSelected() async {
     if (_selectedIds.isEmpty) return;
-    
+
     final toDelete = _history!.where((e) => _selectedIds.contains(e.id)).toList();
     final originalList = List<RentalHistory>.from(_history ?? []);
-    
+
     setState(() {
       _history?.removeWhere((e) => _selectedIds.contains(e.id));
       _isSelectionMode = false;
@@ -168,9 +168,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() {
         _history = originalList;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghapus: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menghapus: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -349,9 +351,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         if (index == 1) {
           return _buildFilterBar();
         }
-        
+
         if (index == filteredHistory.length + 2) {
-          return _hasMore 
+          return _hasMore
             ? const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -468,10 +470,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     icon: Icon(
-                      _selectedIds.length == filteredHistory.length 
-                          ? Icons.check_box_rounded 
+                      _selectedIds.length == filteredHistory.length
+                          ? Icons.check_box_rounded
                           : Icons.check_box_outline_blank_rounded,
-                      size: 20, 
+                      size: 20,
                       color: const Color(0xff269276)
                     ),
                     onPressed: () => _selectAll(filteredHistory),
@@ -495,8 +497,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   icon: Icon(
-                    Icons.delete_outline_rounded, 
-                    size: 18, 
+                    Icons.delete_outline_rounded,
+                    size: 18,
                     color: _isSelectionMode ? const Color(0xffef4444) : const Color(0xff94a3b8)
                   ),
                   onPressed: () {
@@ -505,7 +507,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       return;
                     }
                     if (_selectedIds.isEmpty) return;
-                    
+
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -621,7 +623,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      _sortBy == 'latest' ? 'Terbaru' : 
+                      _sortBy == 'latest' ? 'Terbaru' :
                       _sortBy == 'oldest' ? 'Terlama' :
                       _sortBy == 'distance' ? 'Terjauh' : 'Termahal',
                       style: const TextStyle(color: Color(0xff073f3a), fontSize: 11, fontWeight: FontWeight.bold),
@@ -769,7 +771,7 @@ class _GoalTracker extends StatelessWidget {
     final monthlyKm = history
         .where((e) => e.startedAt.month == now.month && e.startedAt.year == now.year)
         .fold(0.0, (sum, e) => sum + e.totalDistanceKilometers);
-    
+
     const goalKm = 50.0;
     final progress = (monthlyKm / goalKm).clamp(0.0, 1.0);
     final percent = (progress * 100).toInt();
@@ -795,8 +797,8 @@ class _GoalTracker extends StatelessWidget {
                   Text(
                     '$percent%',
                     style: const TextStyle(
-                      color: Colors.white, 
-                      fontSize: 16, 
+                      color: Colors.white,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
                     ),
@@ -888,7 +890,7 @@ class _AchievementBadgesCompact extends StatelessWidget {
   Widget build(BuildContext context) {
     final totalKm = history.fold(0.0, (sum, e) => sum + e.totalDistanceKilometers);
     final totalRentals = history.length;
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -922,7 +924,7 @@ class _CompactBadge extends StatelessWidget {
 
 class _HistoryCard extends StatelessWidget {
   const _HistoryCard({
-    required this.history, 
+    required this.history,
     required this.onTap,
     this.isSelected = false,
     this.isSelectionMode = false,
@@ -1241,12 +1243,12 @@ class _WeeklyBarChart extends StatelessWidget {
     final now = DateTime.now();
     final dayData = List.generate(7, (index) {
       final date = now.subtract(Duration(days: 6 - index));
-      final dayRentals = history.where((e) => 
-        e.startedAt.year == date.year && 
-        e.startedAt.month == date.month && 
+      final dayRentals = history.where((e) =>
+        e.startedAt.year == date.year &&
+        e.startedAt.month == date.month &&
         e.startedAt.day == date.day
       );
-      
+
       // Calculate total duration in minutes for that day
       double totalMinutes = 0;
       for (var r in dayRentals) {
@@ -1283,7 +1285,7 @@ class _WeeklyBarChart extends StatelessWidget {
                     height: (value * 40).clamp(6, 40).toDouble(),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: index == 6 
+                        colors: index == 6
                           ? [const Color(0xff4ade80), Colors.white]
                           : [Colors.white.withValues(alpha: 0.4), Colors.white.withValues(alpha: 0.1)],
                         begin: Alignment.topCenter,
