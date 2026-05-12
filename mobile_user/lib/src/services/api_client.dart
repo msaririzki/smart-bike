@@ -3,7 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/bike.dart';
-import '../models/rental.dart';
+import '../models/rental.dart' hide RentalLocationPoint;
+import '../models/rental_location_point.dart';
 import 'session_store.dart';
 
 class ApiException implements Exception {
@@ -21,7 +22,7 @@ class ApiClient {
 
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000/api',
+    defaultValue: 'https://bike.ikydev.site/api',
   );
 
   final SessionStore _sessionStore;
@@ -89,6 +90,14 @@ class ApiClient {
   Future<Rental> finishRental(int rentalId) async {
     final json = await _post('/rentals/$rentalId/finish', body: {});
     return Rental.fromJson(json['data'] as Map<String, dynamic>);
+  }
+
+  Future<List<RentalLocationPoint>> rentalLocationPoints(int rentalId) async {
+    final json = await _get('/rentals/$rentalId/location-points');
+    return (json['data'] as List<dynamic>)
+        .map((item) =>
+            RentalLocationPoint.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> continueIdle(int rentalId) async {

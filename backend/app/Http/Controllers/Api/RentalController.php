@@ -81,6 +81,18 @@ class RentalController extends Controller
         return response()->json(['data' => $rental], 201);
     }
 
+    public function locationPoints(Request $request, Rental $rental): JsonResponse
+    {
+        abort_unless((int) $rental->user_id === (int) $request->user()->id, 404);
+
+        return response()->json([
+            'data' => $rental->locationPoints()
+                ->where('is_valid_movement', true)
+                ->orderBy('recorded_at')
+                ->get(['id', 'latitude', 'longitude', 'speed_kmh', 'accuracy_meters', 'recorded_at']),
+        ]);
+    }
+
     public function idleSettings(PricingConfigService $pricing): JsonResponse
     {
         return response()->json([

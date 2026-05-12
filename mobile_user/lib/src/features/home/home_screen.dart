@@ -5,6 +5,7 @@ import '../../models/bike.dart';
 import '../../models/rental.dart';
 import '../../services/api_client.dart';
 import '../rental/active_rental_screen.dart';
+import '../rental/map_test_screen.dart';
 import '../rental/qr_scan_screen.dart';
 import '../history/history_screen.dart';
 
@@ -123,6 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xfff7fbf8),
+
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Stack(
@@ -779,10 +781,18 @@ class _BottomNavigationMock extends StatelessWidget {
                       label: 'Beranda',
                       active: true,
                     ),
-                    const _BottomNavItem(
+                    _BottomNavItem(
                       icon: Icons.location_on_outlined,
                       label: 'Peta',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => MapTestScreen(api: api),
+                          ),
+                        );
+                      },
                     ),
+
                     const SizedBox(width: 62),
                     _BottomNavItem(
                       icon: Icons.history_rounded,
