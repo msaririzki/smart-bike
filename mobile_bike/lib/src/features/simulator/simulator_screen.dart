@@ -80,6 +80,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
   final List<_RoutePoint> _routePoints = [];
 
+  bool get _hasActiveRental => _summary?.rental != null;
+
   @override
   void initState() {
     super.initState();
@@ -294,7 +296,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   void _handleRealGpsPosition(Position pos) {
-    final speedKmh = _calculateDisplaySpeedKmh(pos);
+    final speedKmh = _hasActiveRental ? _calculateDisplaySpeedKmh(pos) : 0.0;
 
     setState(() {
       _lat = pos.latitude;
@@ -303,12 +305,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _accuracyMeters = pos.accuracy;
       _lastGpsReadAt = pos.timestamp.toLocal();
       _locationMode = 'Real GPS';
-      _addRoutePoint(
-        latitude: pos.latitude,
-        longitude: pos.longitude,
-        accuracyMeters: pos.accuracy,
-        source: 'Real GPS',
-      );
+      if (_hasActiveRental) {
+        _addRoutePoint(
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          accuracyMeters: pos.accuracy,
+          source: 'Real GPS',
+        );
+      }
     });
     _sendLocation(pos, speedKmh: speedKmh);
   }
@@ -472,6 +476,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   double _calculateDisplaySpeedKmh(Position pos) {
+    if (!_hasActiveRental) return 0;
+
     final gpsSpeedKmh =
         pos.speed.isFinite && pos.speed > 0 ? pos.speed * 3.6 : 0.0;
     final derivedSpeedKmh = _deriveSpeedFromLastRoutePoint(pos);
@@ -690,7 +696,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   Widget _buildDashboardView(Bike bike) {
     final rental = _summary?.rental;
-    final displaySpeed = _speedKmh ?? rental?.currentSpeedKmh ?? 0;
+    final displaySpeed =
+        rental == null ? 0.0 : (_speedKmh ?? rental.currentSpeedKmh ?? 0.0);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -725,6 +732,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           const SizedBox(height: 12),
           _SpeedDashboard(
             speedKmh: displaySpeed,
+            rentalActive: rental != null,
             accuracyMeters:
                 _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
             latitude: _lat ?? rental?.latestLocationPoint?.latitude,
@@ -1255,6 +1263,7 @@ class _BikeHeader extends StatelessWidget {
 class _SpeedDashboard extends StatelessWidget {
   const _SpeedDashboard({
     required this.speedKmh,
+    required this.rentalActive,
     required this.accuracyMeters,
     required this.latitude,
     required this.longitude,
@@ -1264,6 +1273,7 @@ class _SpeedDashboard extends StatelessWidget {
   });
 
   final double speedKmh;
+  final bool rentalActive;
   final double? accuracyMeters;
   final double? latitude;
   final double? longitude;
@@ -1288,6 +1298,37 @@ class _SpeedDashboard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          if (!rentalActive) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFAEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFEDF89)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: Color(0xFFB54708),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Belum ada rental aktif. GPS tetap dikirim untuk monitoring, tetapi speedometer dan jalur perjalanan belum dihitung.',
+                      style: TextStyle(
+                        color: Color(0xFF93370D),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
