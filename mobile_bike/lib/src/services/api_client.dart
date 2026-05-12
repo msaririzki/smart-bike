@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/bike.dart';
+import '../models/device_rental_summary.dart';
 import 'session_store.dart';
 
 class ApiException implements Exception {
@@ -52,6 +53,13 @@ class ApiClient {
     return Bike.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<DeviceRentalSummary> activeRentalSummary() async {
+    final json = await _get('/device/active-rental-summary');
+    final data = json['data'];
+    if (data is! Map) return const DeviceRentalSummary();
+    return DeviceRentalSummary.fromJson(Map<String, dynamic>.from(data));
+  }
+
   Future<Map<String, dynamic>> sendHeartbeat({
     required String networkType,
     required int batteryPercent,
@@ -70,6 +78,7 @@ class ApiClient {
     double? speedKmh,
     double? accuracyMeters,
     required String networkType,
+    DateTime? recordedAt,
   }) async {
     return _post('/device/location-update', body: {
       'latitude': latitude,
@@ -77,7 +86,7 @@ class ApiClient {
       if (speedKmh != null) 'speed_kmh': speedKmh,
       if (accuracyMeters != null) 'accuracy_meters': accuracyMeters,
       'network_type': networkType,
-      'recorded_at': DateTime.now().toIso8601String(),
+      'recorded_at': (recordedAt ?? DateTime.now()).toUtc().toIso8601String(),
     });
   }
 

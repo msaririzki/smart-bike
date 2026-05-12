@@ -60,9 +60,9 @@ class DatabaseSeeder extends Seeder
         app(PricingConfigService::class)->seedDefaults();
 
         $bikes = [
-            ['code' => 'BIKE-001', 'name' => 'Sepeda Kampus 1', 'current_latitude' => -5.147665, 'current_longitude' => 119.432732, 'assigned_device_user_id' => $device->id],
-            ['code' => 'BIKE-002', 'name' => 'Sepeda Kampus 2', 'current_latitude' => -5.148000, 'current_longitude' => 119.433100],
-            ['code' => 'BIKE-003', 'name' => 'Sepeda Kampus 3', 'current_latitude' => -5.147200, 'current_longitude' => 119.432300],
+            ['code' => 'BIKE-001', 'name' => 'Sepeda Kampus 1', 'current_latitude' => -8.583000, 'current_longitude' => 116.116000, 'assigned_device_user_id' => $device->id],
+            ['code' => 'BIKE-002', 'name' => 'Sepeda Kampus 2', 'current_latitude' => -8.584000, 'current_longitude' => 116.117000],
+            ['code' => 'BIKE-003', 'name' => 'Sepeda Kampus 3', 'current_latitude' => -8.585000, 'current_longitude' => 116.118000],
         ];
 
         foreach ($bikes as $bike) {

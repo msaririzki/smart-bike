@@ -56,23 +56,23 @@ class LocationBillingAndIdleTest extends TestCase
         Sanctum::actingAs($this->device);
 
         $this->postJson('/api/device/location-update', [
-            'latitude' => -5.147665,
-            'longitude' => 119.432732,
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
             'accuracy_meters' => 5,
             'recorded_at' => now()->subMinutes(2)->toISOString(),
         ])->assertOk();
 
         $this->postJson('/api/device/location-update', [
-            'latitude' => -5.147666,
-            'longitude' => 119.432733,
+            'latitude' => -8.583001,
+            'longitude' => 116.116001,
             'accuracy_meters' => 5,
             'recorded_at' => now()->subMinute()->toISOString(),
         ])->assertOk()
             ->assertJsonPath('message', 'Movement below threshold; not billed.');
 
         $this->postJson('/api/device/location-update', [
-            'latitude' => -5.148665,
-            'longitude' => 119.432732,
+            'latitude' => -8.584000,
+            'longitude' => 116.116000,
             'accuracy_meters' => 50,
             'recorded_at' => now()->toISOString(),
         ])->assertOk()
@@ -88,23 +88,23 @@ class LocationBillingAndIdleTest extends TestCase
         Sanctum::actingAs($this->device);
 
         $this->postJson('/api/device/location-update', [
-            'latitude' => -5.147665,
-            'longitude' => 119.432732,
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
             'accuracy_meters' => 5,
             'recorded_at' => now()->subMinutes(2)->toISOString(),
         ])->assertOk();
 
         $this->postJson('/api/device/location-update', [
-            'latitude' => -5.146665,
-            'longitude' => 119.432732,
+            'latitude' => -8.582000,
+            'longitude' => 116.116000,
             'accuracy_meters' => 5,
             'recorded_at' => now()->subMinute()->toISOString(),
         ])->assertOk()
             ->assertJsonPath('message', 'Valid movement processed.');
 
         $this->postJson('/api/device/location-update', [
-            'latitude' => -5.140000,
-            'longitude' => 119.432732,
+            'latitude' => -8.576000,
+            'longitude' => 116.116000,
             'accuracy_meters' => 5,
             'recorded_at' => now()->subSeconds(55)->toISOString(),
         ])->assertOk()
@@ -118,6 +118,29 @@ class LocationBillingAndIdleTest extends TestCase
             'ignored_reason' => 'speed_anomaly',
             'is_anomaly' => true,
         ]);
+    }
+
+    public function test_device_can_read_active_rental_dashboard_summary_for_assigned_bike(): void
+    {
+        Sanctum::actingAs($this->device);
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
+            'speed_kmh' => 12.5,
+            'accuracy_meters' => 5,
+            'network_type' => 'wifi',
+            'recorded_at' => now()->subMinute()->toISOString(),
+        ])->assertOk();
+
+        $this->getJson('/api/device/active-rental-summary')
+            ->assertOk()
+            ->assertJsonPath('data.bike.code', 'BIKE-GPS')
+            ->assertJsonPath('data.rental.id', $this->rental->id)
+            ->assertJsonPath('data.rental.status', Rental::STATUS_ACTIVE)
+            ->assertJsonPath('data.rental.user.name', 'User')
+            ->assertJsonPath('data.rental.latest_location_point.network_type', 'wifi')
+            ->assertJsonPath('data.rental.current_speed_kmh', 12.5);
     }
 
     public function test_idle_warning_idle_billing_and_resume_after_valid_movement(): void
@@ -146,14 +169,14 @@ class LocationBillingAndIdleTest extends TestCase
 
         Sanctum::actingAs($this->device);
         $this->postJson('/api/device/location-update', [
-            'latitude' => -5.147665,
-            'longitude' => 119.432732,
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
             'accuracy_meters' => 5,
             'recorded_at' => now()->subMinutes(2)->toISOString(),
         ])->assertOk();
         $this->postJson('/api/device/location-update', [
-            'latitude' => -5.146665,
-            'longitude' => 119.432732,
+            'latitude' => -8.582000,
+            'longitude' => 116.116000,
             'accuracy_meters' => 5,
             'recorded_at' => now()->toISOString(),
         ])->assertOk();

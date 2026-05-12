@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Bike;
 use App\Models\Rental;
+use App\Services\PricingConfigService;
 use App\Services\RentalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,6 +63,17 @@ class RentalController extends Controller
     {
         return response()->json([
             'data' => $this->rentals->continueIdle($request->user(), $rental),
+        ]);
+    }
+
+    public function idleSettings(PricingConfigService $pricing): JsonResponse
+    {
+        return response()->json([
+            'data' => [
+                'idle_warning_after_seconds' => $pricing->get('idle_warning_after_seconds'),
+                'idle_billing_amount' => $pricing->get('idle_billing_amount'),
+                'idle_billing_interval_seconds' => $pricing->get('idle_billing_interval_seconds'),
+            ],
         ]);
     }
 }

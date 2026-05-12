@@ -40,10 +40,16 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
   String? _error;
   DateTime _now = DateTime.now();
 
+  // Idle settings dari backend.
+  int? _idleWarningSeconds;
+  int? _idleBillingAmount;
+  int? _idleBillingIntervalSeconds;
+
   @override
   void initState() {
     super.initState();
     _loadRental();
+    _loadIdleSettings();
     _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (mounted) {
         _loadRental(silent: true);
@@ -61,6 +67,23 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
     _refreshTimer?.cancel();
     _durationTimer?.cancel();
     super.dispose();
+  }
+
+  /// Fetch idle settings dari backend (fire-and-forget, tidak blocking)
+  Future<void> _loadIdleSettings() async {
+    try {
+      final settings = await widget.api.idleSettings();
+      if (mounted) {
+        setState(() {
+          _idleWarningSeconds = settings['idle_warning_after_seconds'] as int?;
+          _idleBillingAmount = settings['idle_billing_amount'] as int?;
+          _idleBillingIntervalSeconds =
+              settings['idle_billing_interval_seconds'] as int?;
+        });
+      }
+    } catch (_) {
+      // Fallback: gunakan default, teks dialog tetap generic
+    }
   }
 
   Future<void> _loadRental({bool silent = false}) async {
@@ -226,13 +249,21 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
       barrierDismissible: false,
       builder: (dialogContext) {
         var isLoading = false;
+        String? dialogError;
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return IdleWarningDialog(
               isLoading: isLoading,
+              idleWarningSeconds: _idleWarningSeconds,
+              idleBillingAmount: _idleBillingAmount,
+              idleBillingIntervalSeconds: _idleBillingIntervalSeconds,
+              errorMessage: dialogError,
               onContinue: () async {
-                setDialogState(() => isLoading = true);
+                setDialogState(() {
+                  isLoading = true;
+                  dialogError = null;
+                });
 
                 try {
                   await widget.api.continueIdle(rentalId);
@@ -245,18 +276,25 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                   await _loadRental(silent: true);
                 } on ApiException catch (error) {
                   if (mounted) {
-                    setDialogState(() => isLoading = false);
-                    _showMessage(error.message);
+                    setDialogState(() {
+                      isLoading = false;
+                      dialogError = error.message;
+                    });
                   }
                 } catch (_) {
                   if (mounted) {
-                    setDialogState(() => isLoading = false);
-                    _showMessage('Gagal melanjutkan sewa.');
+                    setDialogState(() {
+                      isLoading = false;
+                      dialogError = 'Gagal melanjutkan sewa. Coba lagi.';
+                    });
                   }
                 }
               },
               onFinish: () async {
-                setDialogState(() => isLoading = true);
+                setDialogState(() {
+                  isLoading = true;
+                  dialogError = null;
+                });
 
                 final screenNavigator = Navigator.of(this.context);
                 final success = await _finishRental(closeScreen: false);
@@ -271,7 +309,10 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                 }
 
                 if (dialogContext.mounted) {
-                  setDialogState(() => isLoading = false);
+                  setDialogState(() {
+                    isLoading = false;
+                    dialogError = 'Gagal menyelesaikan sewa. Coba lagi.';
+                  });
                 }
               },
             );
@@ -330,6 +371,8 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                       routePoints: List.unmodifiable(_routePoints),
                       isFinishing: _isFinishing,
                       onFinish: () => _finishRental(),
+                      idleBillingAmount: _idleBillingAmount,
+                      idleBillingIntervalSeconds: _idleBillingIntervalSeconds,
                     ),
                 ],
               ),

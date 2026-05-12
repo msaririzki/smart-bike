@@ -28,6 +28,6 @@ class SettingController extends Controller
 
         $this->pricing->update($data['settings'], $request->user()->id);
 
-        return redirect()->route('admin.settings.edit')->with('status', 'Settings diperbarui.');
+        return redirect()->route('admin.settings.edit')->with('status', 'Pengaturan diperbarui.');
     }
 }
