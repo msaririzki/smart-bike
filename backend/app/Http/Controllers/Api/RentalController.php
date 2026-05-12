@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Bike;
 use App\Models\Rental;
+use App\Services\BikeQrRentalService;
 use App\Services\PricingConfigService;
 use App\Services\RentalService;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,10 @@ use Illuminate\Http\Request;
 
 class RentalController extends Controller
 {
-    public function __construct(private readonly RentalService $rentals) {}
+    public function __construct(
+        private readonly RentalService $rentals,
+        private readonly BikeQrRentalService $qrRentals,
+    ) {}
 
     public function start(Request $request): JsonResponse
     {
@@ -64,6 +68,17 @@ class RentalController extends Controller
         return response()->json([
             'data' => $this->rentals->continueIdle($request->user(), $rental),
         ]);
+    }
+
+    public function startFromQr(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string'],
+        ]);
+
+        $rental = $this->qrRentals->startFromQr($request->user(), $data['token']);
+
+        return response()->json(['data' => $rental], 201);
     }
 
     public function idleSettings(PricingConfigService $pricing): JsonResponse

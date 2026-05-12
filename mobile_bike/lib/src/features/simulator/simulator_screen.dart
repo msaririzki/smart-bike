@@ -13,6 +13,7 @@ import '../../services/gps_service.dart';
 import '../../services/session_store.dart';
 import 'manual_gps_panel.dart';
 import 'mock_route_service.dart';
+import 'qr_rental_panel.dart';
 
 class SimulatorScreen extends StatefulWidget {
   const SimulatorScreen({
@@ -724,6 +725,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             points: List.unmodifiable(_routePoints),
             latestAccuracyMeters:
                 _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
+          ),
+          const SizedBox(height: 12),
+          QrRentalPanel(
+            api: widget.api,
+            hasAssignedBike: true,
+            hasActiveRental: rental != null,
           ),
           const SizedBox(height: 12),
           // STATS KOMPAK (Kecepatan & Ringkasan Rental)

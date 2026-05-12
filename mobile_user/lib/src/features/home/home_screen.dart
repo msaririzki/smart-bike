@@ -5,6 +5,7 @@ import '../../models/bike.dart';
 import '../../models/rental.dart';
 import '../../services/api_client.dart';
 import '../rental/active_rental_screen.dart';
+import '../rental/qr_scan_screen.dart';
 import '../history/history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -62,21 +63,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _startRental(Bike bike) async {
-    setState(() => _isBusy = true);
-    try {
-      final rental = await widget.api.startRental(bike.id);
-      setState(() => _activeRental = rental);
-      await _load();
-      _showMessage('Rental dimulai untuk ${bike.code}.');
-      await _openActiveRental();
-    } on ApiException catch (error) {
-      _showMessage(error.message);
-    } finally {
-      if (mounted) {
-        setState(() => _isBusy = false);
-      }
-    }
+  void _promptScanQr() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Gunakan tombol Scan QR di bawah untuk menyewa sepeda ini.'),
+        duration: Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _finishRental() async {
@@ -169,6 +163,44 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
+                      // Scan QR banner
+                      if (_activeRental == null)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xffe8f7f2),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xffc6e9dc)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.qr_code_scanner_rounded, color: Color(0xff269276), size: 28),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Scan QR untuk mulai sewa',
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: const Color(0xff073f3a),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Tekan tombol scan di bawah atau gunakan kamera.',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: const Color(0xff8a9590),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (_bikes.isEmpty)
                         const _EmptyState()
                       else
@@ -176,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _BikeCard(
                             bike: bike,
                             isBusy: _isBusy || _activeRental != null,
-                            onStart: () => _startRental(bike),
+                            onAction: _promptScanQr,
                           ),
                           const SizedBox(height: 10),
                         ],
@@ -383,7 +415,7 @@ class _InactiveRentalContent extends StatelessWidget {
         SizedBox(
           width: 260,
           child: Text(
-            'Mulai sewa dari daftar sepeda di bawah.',
+            'Scan QR di sepeda untuk mulai sewa.',
             style: TextStyle(color: Color(0xe6ffffff), fontSize: 15),
           ),
         ),
@@ -589,12 +621,12 @@ class _BikeCard extends StatelessWidget {
   const _BikeCard({
     required this.bike,
     required this.isBusy,
-    required this.onStart,
+    required this.onAction,
   });
 
   final Bike bike;
   final bool isBusy;
-  final VoidCallback onStart;
+  final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -682,7 +714,7 @@ class _BikeCard extends StatelessWidget {
             width: 70,
             height: 38,
             child: FilledButton(
-              onPressed: available && !isBusy ? onStart : null,
+              onPressed: available && !isBusy ? onAction : null,
               style: FilledButton.styleFrom(
                 padding: EdgeInsets.zero,
                 backgroundColor: const Color(0xff269276),
@@ -694,7 +726,7 @@ class _BikeCard extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Sewa',
+                'Lihat',
                 maxLines: 1,
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
@@ -785,10 +817,23 @@ class _BottomNavigationMock extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.center_focus_strong_rounded,
-                color: Colors.white,
-                size: 28,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => QrScanScreen(api: api),
+                      ),
+                    );
+                  },
+                  child: const Icon(
+                    Icons.qr_code_scanner_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
               ),
             ),
           ],
