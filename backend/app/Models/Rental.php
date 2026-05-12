@@ -38,6 +38,8 @@ class Rental extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    protected $appends = ['current_speed_kmh'];
+
     protected function casts(): array
     {
         return [
@@ -79,5 +81,10 @@ class Rental extends Model
     public function billingLogs(): HasMany
     {
         return $this->hasMany(RentalBillingLog::class);
+    }
+
+    public function getCurrentSpeedKmhAttribute(): float
+    {
+        return (float) ($this->latestLocationPoint?->speed_kmh ?? 0);
     }
 }

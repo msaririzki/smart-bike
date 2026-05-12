@@ -9,7 +9,7 @@ class Rental {
     required this.idleCost,
     required this.totalCost,
     this.startedAt,
-    this.currentSpeedKmh,
+    this.currentSpeedKmh = 0,
     this.latestLocationPoint,
     this.bike,
   });
@@ -21,7 +21,7 @@ class Rental {
   final int idleCost;
   final int totalCost;
   final DateTime? startedAt;
-  final double? currentSpeedKmh;
+  final double currentSpeedKmh;
   final RentalLocationPoint? latestLocationPoint;
   final Bike? bike;
 
@@ -40,9 +40,7 @@ class Rental {
   factory Rental.fromJson(Map<String, dynamic> json) {
     final latestPoint = json['latest_location_point'];
     final parsedLatestPoint = latestPoint is Map
-        ? RentalLocationPoint.fromJson(
-            Map<String, dynamic>.from(latestPoint),
-          )
+        ? RentalLocationPoint.fromJson(Map<String, dynamic>.from(latestPoint))
         : null;
 
     return Rental(
@@ -55,7 +53,8 @@ class Rental {
       startedAt: _toDateTime(json['started_at']),
       currentSpeedKmh:
           _toDouble(json['current_speed_kmh']) ??
-          parsedLatestPoint?.speedKmh,
+          parsedLatestPoint?.speedKmh ??
+          0,
       latestLocationPoint: parsedLatestPoint,
       bike: json['bike'] == null
           ? null

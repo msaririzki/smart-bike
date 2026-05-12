@@ -1,4 +1,5 @@
 import 'bike.dart';
+import 'rental_location_point.dart';
 
 class RentalHistory {
   const RentalHistory({
@@ -11,6 +12,7 @@ class RentalHistory {
     required this.startedAt,
     this.endedAt,
     this.bike,
+    this.locationPoints = const [],
   });
 
   final int id;
@@ -22,6 +24,7 @@ class RentalHistory {
   final DateTime startedAt;
   final DateTime? endedAt;
   final Bike? bike;
+  final List<RentalLocationPoint> locationPoints;
 
   double get totalDistanceKilometers => totalDistanceMeters / 1000;
 
@@ -66,6 +69,14 @@ class RentalHistory {
       bike: json['bike'] == null
           ? null
           : Bike.fromJson(json['bike'] as Map<String, dynamic>),
+      locationPoints: json['location_points'] == null
+          ? const []
+          : (json['location_points'] as List)
+                .map(
+                  (e) =>
+                      RentalLocationPoint.fromJson(e as Map<String, dynamic>),
+                )
+                .toList(),
     );
   }
 }

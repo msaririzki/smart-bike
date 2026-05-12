@@ -1,9 +1,37 @@
-# Catatan Server Ikydev - Deploy Smart Bike Backend
+﻿# Catatan Server Ikydev - Deploy Smart Bike Backend
 
 Domain: `ikydev.site`  
-Backend/API/Admin: `https://api.ikydev.site`  
-Admin URL: `https://api.ikydev.site/admin`  
-API URL untuk mobile: `https://api.ikydev.site/api`
+Backend/API/Admin: `https://bike.ikydev.site`  
+Admin URL: `https://bike.ikydev.site/admin`  
+API URL untuk mobile: `https://bike.ikydev.site/api`
+
+---
+
+## Cek Port Server
+
+Port yang sudah terlihat aktif di server:
+
+```text
+8001 -> e-mas-kapor-web-1
+8003 -> prikotes-web-1
+8010 -> fyt-web
+3307 -> e-mas-kapor-db-1
+```
+
+Port Smart Bike diset agar tidak bentrok:
+
+```text
+8005 -> smart-bike web/nginx
+3311 -> smart-bike MariaDB external
+```
+
+Runtime Docker backend memakai PHP 8.4. Ini wajib karena `composer.lock` memakai paket Symfony v8 yang membutuhkan PHP `>=8.4`.
+
+Cloudflare Tunnel untuk `bike.ikydev.site` diarahkan ke:
+
+```text
+http://localhost:8005
+```
 
 ---
 
@@ -97,7 +125,7 @@ nano backend/.env
 Pastikan:
 
 ```env
-APP_URL=https://api.ikydev.site
+APP_URL=https://bike.ikydev.site
 APP_ENV=production
 APP_DEBUG=false
 
@@ -108,6 +136,12 @@ DB_PASSWORD=sama_dengan_DB_PASSWORD_di_root_env
 ```
 
 `APP_KEY` boleh kosong saat deploy pertama. Container akan menjalankan `php artisan key:generate --force`.
+
+Catatan:
+
+`backend/.env` di-mount sebagai file ke container. Docker Compose tidak memuat seluruh isi `backend/.env` sebagai environment container supaya `APP_KEY` yang baru di-generate tidak tertimpa nilai kosong dari environment.
+
+Kalau `APP_KEY` pernah rusak karena dua key tergabung, kosongkan dulu nilainya menjadi `APP_KEY=`, lalu jalankan ulang service `app` dan `queue`. Entrypoint akan generate ulang key yang valid.
 
 ---
 
@@ -134,8 +168,8 @@ docker compose logs -f db
 Tes lokal di server:
 
 ```bash
-curl -I http://localhost:8001
-curl -I http://localhost:8001/admin
+curl -I http://localhost:8005
+curl -I http://localhost:8005/admin
 ```
 
 ---
@@ -151,25 +185,25 @@ Di Cloudflare Zero Trust:
 ```text
 Subdomain: api
 Domain: ikydev.site
-Service: http://localhost:8001
+Service: http://localhost:8005
 ```
 
 Hasil akhirnya:
 
 ```text
-https://api.ikydev.site
+https://bike.ikydev.site
 ```
 
 Admin:
 
 ```text
-https://api.ikydev.site/admin
+https://bike.ikydev.site/admin
 ```
 
 API:
 
 ```text
-https://api.ikydev.site/api
+https://bike.ikydev.site/api
 ```
 
 ---
@@ -180,20 +214,20 @@ Untuk `mobile_user`:
 
 ```bash
 cd mobile_user
-flutter build apk --dart-define=API_BASE_URL=https://api.ikydev.site/api
+flutter build apk --dart-define=API_BASE_URL=https://bike.ikydev.site/api
 ```
 
 Untuk `mobile_bike`:
 
 ```bash
 cd mobile_bike
-flutter build apk --dart-define=API_BASE_URL=https://api.ikydev.site/api
+flutter build apk --dart-define=API_BASE_URL=https://bike.ikydev.site/api
 ```
 
 Kalau testing langsung:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=https://api.ikydev.site/api
+flutter run --dart-define=API_BASE_URL=https://bike.ikydev.site/api
 ```
 
 ---
@@ -262,7 +296,8 @@ docker compose exec -T db mariadb -u root -p smart_bike_rental < backup-smart-bi
 - Untuk HP, selalu pakai:
 
 ```text
-https://api.ikydev.site/api
+https://bike.ikydev.site/api
 ```
 
 - Server tanpa IP publik tetap bisa dipakai karena Cloudflare Tunnel memakai koneksi keluar dari server ke Cloudflare.
+

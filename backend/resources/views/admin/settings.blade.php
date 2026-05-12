@@ -4,7 +4,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <h1 style="margin: 0; color: #0f766e;">Pengaturan Sistem</h1>
     </div>
-    
+
     <form method="post" action="{{ route('admin.settings.update') }}">
         @csrf
         @method('put')
@@ -24,7 +24,7 @@
                 </div>
             @endforeach
         </div>
-        
+
         <div class="card" style="margin-top: 24px; display: flex; justify-content: flex-end; background: #f8fafc; border: 1px dashed #cbd5e1;">
             <button class="button" type="submit" style="padding: 12px 24px; font-size: 15px; font-weight: 600;">Simpan Pengaturan</button>
         </div>

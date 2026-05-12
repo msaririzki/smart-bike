@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../../models/rental.dart';
 import 'idle_badge_widget.dart';
 import 'map_widget.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 class ActiveRentalDetail extends StatelessWidget {
   const ActiveRentalDetail({
@@ -14,6 +15,8 @@ class ActiveRentalDetail extends StatelessWidget {
     required this.routePoints,
     required this.isFinishing,
     required this.onFinish,
+    this.idleBillingAmount,
+    this.idleBillingIntervalSeconds,
     super.key,
   });
 
@@ -23,27 +26,37 @@ class ActiveRentalDetail extends StatelessWidget {
   final List<LatLng> routePoints;
   final bool isFinishing;
   final VoidCallback onFinish;
+  final int? idleBillingAmount;
+  final int? idleBillingIntervalSeconds;
 
   @override
   Widget build(BuildContext context) {
     final bike = rental.bike;
-    final speed = rental.currentSpeedKmh ?? 0;
+    final speed = rental.currentSpeedKmh;
     final latitude = rental.latitude;
     final longitude = rental.longitude;
+    final screenSize = MediaQuery.sizeOf(context);
+    final compact = screenSize.width < 380 || screenSize.height < 720;
+    final mapHeight = compact ? 190.0 : 250.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _StatusHeader(status: rental.status),
+        if (rental.status == 'idle_billing') ...[
+          const SizedBox(height: 10),
+          _IdleBillingExplanation(
+            currency: currency,
+            billingAmount: idleBillingAmount,
+            intervalSeconds: idleBillingIntervalSeconds,
+          ),
+        ],
         const SizedBox(height: 16),
-        _BikePanel(
-          code: bike?.code ?? 'Bike',
-          name: bike?.name ?? 'Sepeda',
-        ),
+        _BikePanel(code: bike?.code ?? 'Bike', name: bike?.name ?? 'Sepeda'),
         const SizedBox(height: 16),
         if (latitude != null && longitude != null) ...[
           SizedBox(
-            height: 250,
+            height: mapHeight,
             child: MapWidget(
               latitude: latitude,
               longitude: longitude,
@@ -54,10 +67,20 @@ class ActiveRentalDetail extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'Lokasi: ${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: const Color(0xff667085),
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: const Color(0xff667085)),
           ),
+          if (routePoints.length >= 2) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Jalur di peta adalah ringkasan titik GPS yang dikirim perangkat sepeda.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
         ] else ...[
           const _LocationUnavailableCard(),
@@ -181,7 +204,12 @@ class _StatusHeader extends StatelessWidget {
               ],
             ),
           ),
-          StatusBadge(status: status),
+          Flexible(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FittedBox(child: StatusBadge(status: status)),
+            ),
+          ),
         ],
       ),
     );
@@ -248,7 +276,7 @@ class _BikePanel extends StatelessWidget {
         children: [
           const CircleAvatar(
             backgroundColor: Color(0xffccfbf1),
-            child: Icon(Icons.pedal_bike, color: Color(0xff0f766e)),
+            child: Icon(Icons.pedal_bike, color: AppColors.primaryDark),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -258,7 +286,7 @@ class _BikePanel extends StatelessWidget {
                 Text(
                   code,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: const Color(0xff0f766e),
+                    color: AppColors.primaryDark,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -303,7 +331,7 @@ class _LocationUnavailableCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Rental aktif sudah ditemukan, tetapi simulator belum mengirim latitude dan longitude yang bisa ditampilkan di peta.',
+                  'Rental aktif sudah ditemukan, tetapi perangkat mobile_bike belum mengirim latitude dan longitude yang bisa ditampilkan di peta.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: const Color(0xff93370d),
                   ),
@@ -327,6 +355,7 @@ class _ConnectionPanel extends StatelessWidget {
     final lastUpdate = rental.lastLocationUpdateAt;
     final networkType = rental.networkType;
     final accuracy = rental.gpsAccuracyMeters;
+    final relativeTime = _formatRelativeTime(lastUpdate);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -336,13 +365,16 @@ class _ConnectionPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _GpsQualityBadge(accuracy: accuracy),
+          const SizedBox(height: 12),
           _ConnectionRow(
             icon: Icons.update,
-            label: 'Last update',
+            label: 'GPS sepeda terakhir',
             value: lastUpdate == null
                 ? 'Belum ada data GPS'
-                : DateFormat('HH:mm:ss, dd MMM yyyy').format(lastUpdate),
+                : '${DateFormat('HH:mm:ss, dd MMM yyyy').format(lastUpdate)} ($relativeTime)',
           ),
           const SizedBox(height: 10),
           _ConnectionRow(
@@ -364,6 +396,86 @@ class _ConnectionPanel extends StatelessWidget {
       ),
     );
   }
+
+  String _formatRelativeTime(DateTime? dateTime) {
+    if (dateTime == null) {
+      return 'GPS belum tersedia';
+    }
+
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.isNegative || diff.inSeconds < 5) {
+      return 'Baru saja';
+    }
+    if (diff.inSeconds < 60) {
+      return '${diff.inSeconds} detik lalu';
+    }
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} menit lalu';
+    }
+    if (diff.inHours < 24) {
+      return '${diff.inHours} jam lalu';
+    }
+    return '${diff.inDays} hari lalu';
+  }
+}
+
+class _GpsQualityBadge extends StatelessWidget {
+  const _GpsQualityBadge({required this.accuracy});
+
+  final double? accuracy;
+
+  @override
+  Widget build(BuildContext context) {
+    final accuracy = this.accuracy;
+    final (label, color, background, icon) = switch (accuracy) {
+      null => (
+        'GPS Belum Tersedia',
+        const Color(0xff667085),
+        const Color(0xfff2f4f7),
+        Icons.gps_off,
+      ),
+      <= 25 => (
+        'GPS Akurat',
+        const Color(0xff027a48),
+        const Color(0xffecfdf3),
+        Icons.gps_fixed,
+      ),
+      _ => (
+        'GPS Kurang Akurat',
+        const Color(0xffb54708),
+        const Color(0xfffffaeb),
+        Icons.gps_not_fixed,
+      ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17, color: color),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              accuracy == null
+                  ? label
+                  : '$label (${accuracy.toStringAsFixed(1)} m)',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ConnectionRow extends StatelessWidget {
@@ -381,7 +493,7 @@ class _ConnectionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: const Color(0xff0f766e)),
+        Icon(icon, size: 18, color: AppColors.primaryDark),
         const SizedBox(width: 10),
         Expanded(
           child: Text(label, style: Theme.of(context).textTheme.labelMedium),
@@ -391,9 +503,9 @@ class _ConnectionRow extends StatelessWidget {
             value,
             textAlign: TextAlign.right,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
       ],
@@ -456,8 +568,7 @@ class _MetricCard extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color:
-                emphasized ? const Color(0xff0f766e) : const Color(0xff475467),
+            color: emphasized ? AppColors.primaryDark : const Color(0xff475467),
           ),
           const Spacer(),
           Text(label, style: Theme.of(context).textTheme.labelMedium),
@@ -467,9 +578,9 @@ class _MetricCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(height: 2),
@@ -480,6 +591,86 @@ class _MetricCard extends StatelessWidget {
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: const Color(0xff667085)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IdleBillingExplanation extends StatelessWidget {
+  const _IdleBillingExplanation({
+    required this.currency,
+    this.billingAmount,
+    this.intervalSeconds,
+  });
+
+  final NumberFormat currency;
+  final int? billingAmount;
+  final int? intervalSeconds;
+
+  @override
+  Widget build(BuildContext context) {
+    String rateText = 'Biaya idle sedang berjalan.';
+    if (billingAmount != null && billingAmount! > 0) {
+      final formatted = currency.format(billingAmount);
+      if (intervalSeconds != null && intervalSeconds! > 0) {
+        final intervalLabel = intervalSeconds! >= 60
+            ? '${intervalSeconds! ~/ 60} menit'
+            : '$intervalSeconds detik';
+        rateText = 'Biaya idle sedang berjalan, $formatted per $intervalLabel.';
+      } else {
+        rateText = 'Biaya idle sedang berjalan, $formatted per interval.';
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.red.shade50, Colors.orange.shade50],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.red.shade200.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red.shade100,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.monetization_on_outlined,
+              size: 22,
+              color: Colors.red.shade700,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Idle Billing Aktif',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Colors.red.shade800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  rateText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.red.shade700,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

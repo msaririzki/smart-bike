@@ -133,8 +133,8 @@
         const routeMapCountElement = document.getElementById('route-map-count');
         const routeMapCenterButton = document.getElementById('route-map-center');
         const initialRouteCenter = @json([
-            'latitude' => $rental->latestLocationPoint?->latitude ?? $rental->bike->current_latitude ?? -5.1477,
-            'longitude' => $rental->latestLocationPoint?->longitude ?? $rental->bike->current_longitude ?? 119.4327,
+            'latitude' => $rental->latestLocationPoint?->latitude ?? $rental->bike->current_latitude ?? -8.5830,
+            'longitude' => $rental->latestLocationPoint?->longitude ?? $rental->bike->current_longitude ?? 116.1160,
         ]);
         const routeEscapeHtml = (value) => String(value ?? '-')
             .replaceAll('&', '&amp;')

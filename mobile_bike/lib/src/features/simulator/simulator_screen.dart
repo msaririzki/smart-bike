@@ -13,6 +13,7 @@ import '../../services/gps_service.dart';
 import '../../services/session_store.dart';
 import 'manual_gps_panel.dart';
 import 'mock_route_service.dart';
+import 'qr_rental_panel.dart';
 
 class SimulatorScreen extends StatefulWidget {
   const SimulatorScreen({
@@ -43,7 +44,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   Bike? _bike;
   DeviceRentalSummary? _summary;
   bool _loadingBike = true;
-  bool _loadingSummary = true;
 
   bool _streaming = false;
   bool _isSimulating = false;
@@ -55,29 +55,37 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   Timer? _summaryTimer;
   Timer? _clockTimer;
   Timer? _mockTimer;
+  Timer? _realGpsRefreshTimer;
 
-  double? _lat;
-  double? _lng;
   double? _speedKmh;
   double? _accuracyMeters;
   String _networkType = 'unknown';
   int _batteryPercent = 0;
   int _pointsSent = 0;
+  DateTime? _lastGpsReadAt;
   DateTime? _lastSentAt;
   int? _activeRentalId;
   DateTime _now = DateTime.now();
-  String _lastServerMsg = '-';
+  String _lastServerMsg = 'Belum ada pengiriman';
   String _simulationProgress = '';
   int _currentInterval = 5;
   SimulationMode _currentMode = SimulationMode.loop;
-  String _locationMode = 'None';
+  String _locationMode = 'Belum aktif';
+  bool _checkingLocationAccess = true;
+  bool _locationAccessGranted = false;
+  bool _autoStartAttempted = false;
+  LocationAccessStatus _locationAccessStatus = LocationAccessStatus.denied;
+  String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
   final List<_RoutePoint> _routePoints = [];
+
+  bool get _hasActiveRental => _summary?.rental != null;
 
   @override
   void initState() {
     super.initState();
     _loadBike();
     _loadRentalSummary();
+    _ensureLocationReady(requestIfDenied: true, showMessage: false);
     _listenNetwork();
     _loadBattery();
     _summaryTimer = Timer.periodic(
@@ -106,6 +114,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     try {
       final bike = await widget.api.currentAssignment();
       if (mounted) setState(() => _bike = bike);
+      _autoStartRealGpsIfReady();
     } catch (e) {
       _showMessage('Gagal memuat sepeda: $e');
     } finally {
@@ -114,7 +123,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   Future<void> _loadRentalSummary({bool silent = false}) async {
-    if (!silent && mounted) setState(() => _loadingSummary = true);
     try {
       final summary = await widget.api.activeRentalSummary();
       if (!mounted) return;
@@ -129,8 +137,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       });
     } catch (e) {
       if (!silent) _showMessage('Gagal memuat ringkasan rental: $e');
-    } finally {
-      if (!silent && mounted) setState(() => _loadingSummary = false);
     }
   }
 
@@ -164,12 +170,76 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     return 'Offline';
   }
 
-  Future<void> _startStream() async {
+  Future<bool> _ensureLocationReady({
+    required bool requestIfDenied,
+    bool showMessage = true,
+  }) async {
+    if (mounted) setState(() => _checkingLocationAccess = true);
+
+    final access = await _gps.ensureLocationAccess(
+      requestIfDenied: requestIfDenied,
+    );
+    final message = _locationAccessText(access.status);
+
+    if (!mounted) return access.granted;
+    setState(() {
+      _checkingLocationAccess = false;
+      _locationAccessGranted = access.granted;
+      _locationAccessStatus = access.status;
+      _locationAccessMessage = message;
+    });
+
+    if (!access.granted && showMessage) {
+      _showMessage(message);
+    }
+
+    if (access.granted) {
+      _autoStartRealGpsIfReady();
+    }
+
+    return access.granted;
+  }
+
+  void _autoStartRealGpsIfReady() {
+    if (_autoStartAttempted || _bike == null || !_locationAccessGranted) {
+      return;
+    }
+    if (_streaming || _isSimulating) return;
+
+    _autoStartAttempted = true;
+    _startStream(requestPermission: false);
+  }
+
+  Future<void> _openLocationSettings() async {
+    if (_locationAccessStatus == LocationAccessStatus.deniedForever) {
+      await Geolocator.openAppSettings();
+    } else {
+      await Geolocator.openLocationSettings();
+    }
+
+    await _ensureLocationReady(requestIfDenied: false, showMessage: false);
+  }
+
+  String _locationAccessText(LocationAccessStatus status) {
+    return switch (status) {
+      LocationAccessStatus.granted =>
+        'Akses lokasi aktif. GPS real siap dikirim ke server.',
+      LocationAccessStatus.serviceDisabled =>
+        'GPS perangkat belum aktif. Nyalakan Lokasi/GPS di pengaturan HP.',
+      LocationAccessStatus.denied =>
+        'Izin lokasi ditolak. Berikan izin lokasi agar sepeda bisa mengirim GPS real.',
+      LocationAccessStatus.deniedForever =>
+        'Izin lokasi diblokir permanen. Buka pengaturan aplikasi lalu izinkan Lokasi.',
+    };
+  }
+
+  Future<void> _startStream({bool requestPermission = true}) async {
     if (_isSimulating) _stopSimulation();
 
-    final granted = await _gps.requestPermission();
+    final granted = requestPermission
+        ? await _ensureLocationReady(requestIfDenied: true)
+        : _locationAccessGranted;
     if (!granted) {
-      _showMessage('Izin lokasi diperlukan untuk mengirim data GPS real.');
       return;
     }
 
@@ -179,26 +249,65 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _locationMode = 'Real GPS';
     });
 
-    _positionSub = _gps.positionStream(intervalSeconds: 5).listen((pos) {
+    final currentPosition = await _gps.getCurrentPosition();
+    if (currentPosition != null && _shouldAcceptGpsPosition(currentPosition)) {
+      _handleRealGpsPosition(currentPosition);
+    }
+
+    _positionSub = _gps.positionStream().listen((pos) {
       if (!mounted) return;
       if (!_shouldAcceptGpsPosition(pos)) return;
+      _handleRealGpsPosition(pos);
+    }, onError: (Object error) {
+      if (!mounted) return;
       setState(() {
-        _lat = pos.latitude;
-        _lng = pos.longitude;
-        _speedKmh = pos.speed * 3.6;
-        _accuracyMeters = pos.accuracy;
-        _locationMode = 'Real GPS';
+        _streaming = false;
+        _locationMode = 'GPS error';
+        _lastServerMsg = 'GPS gagal: $error';
+      });
+      _showMessage('Stream GPS berhenti: $error');
+    });
+
+    _startRealGpsRefresh();
+    _startHeartbeat();
+  }
+
+  void _startRealGpsRefresh() {
+    _realGpsRefreshTimer?.cancel();
+    _realGpsRefreshTimer = Timer.periodic(
+      Duration(seconds: _currentInterval),
+      (_) => _refreshRealGpsPosition(),
+    );
+  }
+
+  Future<void> _refreshRealGpsPosition() async {
+    if (!_streaming || _isSimulating || _sending) return;
+
+    final currentPosition = await _gps.getCurrentPosition();
+    if (!mounted || currentPosition == null) return;
+    if (!_shouldAcceptGpsPosition(currentPosition)) return;
+
+    _handleRealGpsPosition(currentPosition);
+  }
+
+  void _handleRealGpsPosition(Position pos) {
+    final speedKmh = _hasActiveRental ? _calculateDisplaySpeedKmh(pos) : 0.0;
+
+    setState(() {
+      _speedKmh = speedKmh;
+      _accuracyMeters = pos.accuracy;
+      _lastGpsReadAt = pos.timestamp.toLocal();
+      _locationMode = 'Real GPS';
+      if (_hasActiveRental) {
         _addRoutePoint(
           latitude: pos.latitude,
           longitude: pos.longitude,
           accuracyMeters: pos.accuracy,
           source: 'Real GPS',
         );
-      });
-      _sendLocation(pos);
+      }
     });
-
-    _startHeartbeat();
+    _sendLocation(pos, speedKmh: speedKmh);
   }
 
   void _stopStream() {
@@ -208,7 +317,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     if (mounted) {
       setState(() {
         _streaming = false;
-        _locationMode = 'None';
+        _locationMode = 'Belum aktif';
       });
     }
   }
@@ -216,6 +325,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   void _stopRealGps() {
     _positionSub?.cancel();
     _positionSub = null;
+    _realGpsRefreshTimer?.cancel();
+    _realGpsRefreshTimer = null;
   }
 
   void _startHeartbeat() {
@@ -327,10 +438,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     required String mode,
   }) {
     setState(() {
-      _lat = latitude;
-      _lng = longitude;
       _speedKmh = speedKmh;
       _accuracyMeters = accuracyMeters;
+      _lastGpsReadAt = DateTime.now();
       _locationMode = mode;
       _addRoutePoint(
         latitude: latitude,
@@ -356,16 +466,47 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _sendLocation(pos);
   }
 
-  Future<void> _sendLocation(Position pos) async {
+  double _calculateDisplaySpeedKmh(Position pos) {
+    if (!_hasActiveRental) return 0;
+
+    final gpsSpeedKmh =
+        pos.speed.isFinite && pos.speed > 0 ? pos.speed * 3.6 : 0.0;
+    final derivedSpeedKmh = _deriveSpeedFromLastRoutePoint(pos);
+
+    if (gpsSpeedKmh >= 1) return gpsSpeedKmh;
+    if (derivedSpeedKmh >= 1) return derivedSpeedKmh;
+
+    return math.max(gpsSpeedKmh, derivedSpeedKmh);
+  }
+
+  double _deriveSpeedFromLastRoutePoint(Position pos) {
+    if (_routePoints.isEmpty) return 0;
+
+    final last = _routePoints.last;
+    final distance = _haversineMeters(
+      last.latitude,
+      last.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+    final seconds = DateTime.now().difference(last.recordedAt).inMilliseconds /
+        Duration.millisecondsPerSecond;
+    if (seconds <= 0 || distance < _minRouteDistanceMeters) return 0;
+
+    return (distance / seconds) * 3.6;
+  }
+
+  Future<void> _sendLocation(Position pos, {double? speedKmh}) async {
     if (_sending) return;
     setState(() => _sending = true);
     try {
       final res = await widget.api.sendLocationUpdate(
         latitude: pos.latitude,
         longitude: pos.longitude,
-        speedKmh: pos.speed * 3.6,
+        speedKmh: speedKmh ?? (pos.speed * 3.6),
         accuracyMeters: pos.accuracy,
         networkType: _networkType,
+        recordedAt: pos.timestamp.toLocal(),
       );
       if (mounted) {
         setState(() {
@@ -546,7 +687,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   Widget _buildDashboardView(Bike bike) {
     final rental = _summary?.rental;
-    final displaySpeed = _speedKmh ?? rental?.currentSpeedKmh ?? 0;
+    final displaySpeed =
+        rental == null ? 0.0 : (_speedKmh ?? rental.currentSpeedKmh ?? 0.0);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -561,33 +703,66 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             mode: _locationMode,
             sending: _sending,
             serverMessage: _lastServerMsg,
-          ),
-          const SizedBox(height: 12),
-          _BikeHeader(bike: bike),
-          const SizedBox(height: 12),
-          _SpeedDashboard(
-            speedKmh: displaySpeed,
-            accuracyMeters:
-                _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
-            latitude: _lat ?? rental?.latestLocationPoint?.latitude,
-            longitude: _lng ?? rental?.latestLocationPoint?.longitude,
+            lastGpsReadAt: _lastGpsReadAt,
             lastSentAt: _lastSentAt,
-            routePoints: List.unmodifiable(_routePoints),
+          ),
+          if (_checkingLocationAccess || !_locationAccessGranted) ...[
+            const SizedBox(height: 12),
+            _LocationAccessBanner(
+              checking: _checkingLocationAccess,
+              status: _locationAccessStatus,
+              message: _locationAccessMessage,
+              onRequestPermission: () => _ensureLocationReady(
+                requestIfDenied: true,
+              ),
+              onOpenSettings: _openLocationSettings,
+            ),
+          ],
+          const SizedBox(height: 12),
+          // MAP UTAMA (Besar di Atas)
+          _MiniRouteMap(
+            height: 380,
+            points: List.unmodifiable(_routePoints),
+            latestAccuracyMeters:
+                _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
           ),
           const SizedBox(height: 12),
-          _RentalDashboard(
+          QrRentalPanel(
+            api: widget.api,
+            hasAssignedBike: true,
+            hasActiveRental: rental != null,
+          ),
+          const SizedBox(height: 12),
+          // STATS KOMPAK (Kecepatan & Ringkasan Rental)
+          _CompactStatsRow(
+            speedKmh: displaySpeed,
+            rentalActive: rental != null,
+            distanceKm: rental?.totalDistanceKilometers ?? 0,
+            totalCost: rental?.totalCost ?? 0,
+          ),
+          const SizedBox(height: 12),
+          // DEVICE & RENTAL DETAIL (Kecil di Bawah)
+          _DeviceAndRentalSummary(
+            bike: bike,
             rental: rental,
-            loading: _loadingSummary,
-            now: _now,
-          ),
-          const SizedBox(height: 12),
-          _DeviceGrid(
             batteryPercent: _batteryPercent,
             networkType: _networkType,
             pointsSent: _pointsSent,
             lastSentAt: _lastSentAt,
             locationMode: _locationMode,
             streaming: _streaming,
+            now: _now,
+          ),
+          const SizedBox(height: 12),
+          _FieldTestChecklist(
+            locationAccess: _locationAccessGranted,
+            gpsEnabled: _locationAccessStatus != LocationAccessStatus.serviceDisabled,
+            autoStart: _streaming,
+            networkType: _networkType,
+            lastGpsAt: _lastGpsReadAt,
+            lastServerAt: _lastSentAt,
+            accuracyMeters: _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
+            rentalActive: rental != null,
           ),
           const SizedBox(height: 12),
           _buildControls(),
@@ -611,7 +786,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               _streaming ? Icons.stop_circle_outlined : Icons.gps_fixed_rounded,
             ),
             label: Text(
-              _streaming ? 'Hentikan Pengiriman' : 'Mulai Kirim GPS Real',
+              _streaming ? 'Hentikan Sementara' : 'Aktifkan GPS Sekarang',
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             style: FilledButton.styleFrom(
@@ -683,7 +858,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Panel ini selalu tampil agar kontrol tambahan tidak terlewat. Untuk penggunaan nyata, tetap gunakan tombol Mulai Kirim GPS Real.',
+                  'Panel ini hanya untuk demo/testing. Penggunaan nyata memakai GPS real yang aktif otomatis setelah device login.',
                   style: TextStyle(
                     color: Color(0xFF475467),
                     fontSize: 12,
@@ -709,22 +884,250 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 }
 
+class _FieldTestChecklist extends StatelessWidget {
+  const _FieldTestChecklist({
+    required this.locationAccess,
+    required this.gpsEnabled,
+    required this.autoStart,
+    required this.networkType,
+    required this.lastGpsAt,
+    required this.lastServerAt,
+    required this.accuracyMeters,
+    required this.rentalActive,
+  });
+
+  final bool locationAccess;
+  final bool gpsEnabled;
+  final bool autoStart;
+  final String networkType;
+  final DateTime? lastGpsAt;
+  final DateTime? lastServerAt;
+  final double? accuracyMeters;
+  final bool rentalActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final accuracyOk = accuracyMeters != null && accuracyMeters! <= 50;
+    final gpsFresh = _isFresh(lastGpsAt, const Duration(seconds: 15));
+    final serverFresh = _isFresh(lastServerAt, const Duration(seconds: 15));
+
+    return _Panel(
+      borderColor: const Color(0xFFD0D5DD),
+      backgroundColor: const Color(0xFFFFFFFF),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Checklist Tes Lapangan',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          ),
+          const SizedBox(height: 12),
+          _CheckRow(
+            ok: locationAccess,
+            label: 'Izin lokasi',
+            detail: locationAccess ? 'Diizinkan' : 'Belum diizinkan',
+          ),
+          _CheckRow(
+            ok: gpsEnabled,
+            label: 'GPS perangkat',
+            detail: gpsEnabled ? 'Aktif' : 'GPS HP belum aktif',
+          ),
+          _CheckRow(
+            ok: autoStart,
+            label: 'Tracking otomatis',
+            detail: autoStart ? 'Berjalan' : 'Belum berjalan',
+          ),
+          _CheckRow(
+            ok: networkType != 'Offline',
+            label: 'Jaringan',
+            detail: networkType,
+          ),
+          _CheckRow(
+            ok: gpsFresh,
+            label: 'GPS dibaca',
+            detail: _relativeTimeLabel(lastGpsAt),
+          ),
+          _CheckRow(
+            ok: serverFresh,
+            label: 'Server menerima',
+            detail: _relativeTimeLabel(lastServerAt),
+          ),
+          _CheckRow(
+            ok: accuracyOk,
+            label: 'Akurasi GPS',
+            detail: accuracyMeters == null
+                ? 'Belum ada data'
+                : '${accuracyMeters!.toStringAsFixed(0)} m',
+          ),
+          _CheckRow(
+            ok: rentalActive,
+            label: 'Rental aktif',
+            detail: rentalActive ? 'Ada rental berjalan' : 'Monitoring saja',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckRow extends StatelessWidget {
+  const _CheckRow({
+    required this.ok,
+    required this.label,
+    required this.detail,
+  });
+
+  final bool ok;
+  final String label;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = ok ? const Color(0xFF027A48) : const Color(0xFFB54708);
+    final background = ok ? const Color(0xFFECFDF3) : const Color(0xFFFFFAEB);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration:
+                BoxDecoration(color: background, shape: BoxShape.circle),
+            child: Icon(
+              ok ? Icons.check_rounded : Icons.priority_high_rounded,
+              size: 16,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF344054),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Flexible(
+            child: Text(
+              detail,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationAccessBanner extends StatelessWidget {
+  const _LocationAccessBanner({
+    required this.checking,
+    required this.status,
+    required this.message,
+    required this.onRequestPermission,
+    required this.onOpenSettings,
+  });
+
+  final bool checking;
+  final LocationAccessStatus status;
+  final String message;
+  final VoidCallback onRequestPermission;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final needsAppSettings = status == LocationAccessStatus.deniedForever;
+    final needsLocationSettings =
+        status == LocationAccessStatus.serviceDisabled || needsAppSettings;
+
+    return _Panel(
+      borderColor: const Color(0xFFFDB022),
+      backgroundColor: const Color(0xFFFFFCF5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.location_off_rounded,
+                color: Color(0xFFB54708),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  checking ? 'Mengecek akses lokasi...' : message,
+                  style: const TextStyle(
+                    color: Color(0xFF7A2E0E),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!checking) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onRequestPermission,
+                  icon: const Icon(Icons.gps_fixed_rounded, size: 18),
+                  label: const Text('Minta Izin Lokasi'),
+                ),
+                if (needsLocationSettings)
+                  TextButton.icon(
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.settings_rounded, size: 18),
+                    label: Text(
+                      needsAppSettings
+                          ? 'Buka Pengaturan Aplikasi'
+                          : 'Aktifkan GPS',
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _StatusBanner extends StatelessWidget {
   const _StatusBanner({
     required this.streaming,
     required this.mode,
     required this.sending,
     required this.serverMessage,
+    required this.lastGpsReadAt,
+    required this.lastSentAt,
   });
 
   final bool streaming;
   final String mode;
   final bool sending;
   final String serverMessage;
+  final DateTime? lastGpsReadAt;
+  final DateTime? lastSentAt;
 
   @override
   Widget build(BuildContext context) {
     final color = streaming ? const Color(0xFF027A48) : const Color(0xFFB42318);
+    final title = streaming ? 'GPS aktif otomatis' : 'GPS otomatis berhenti';
+    final subtitle = streaming
+        ? 'Mode: $mode | GPS: ${_relativeTimeLabel(lastGpsReadAt)} | Server: ${_relativeTimeLabel(lastSentAt)}'
+        : 'Mode: $mode | Server: $serverMessage';
 
     return _Panel(
       child: Row(
@@ -736,7 +1139,7 @@ class _StatusBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  streaming ? 'Pengiriman GPS aktif' : 'Pengiriman berhenti',
+                  title,
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.w800,
@@ -744,8 +1147,8 @@ class _StatusBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Mode: $mode | Server: $serverMessage',
-                  maxLines: 1,
+                  subtitle,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF667085),
@@ -761,6 +1164,8 @@ class _StatusBanner extends StatelessWidget {
               height: 18,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
+          if (!sending && streaming)
+            const Icon(Icons.sensors_rounded, color: Color(0xFF0F766E)),
         ],
       ),
     );
@@ -783,167 +1188,230 @@ class _RoutePoint {
   final DateTime recordedAt;
 }
 
-class _BikeHeader extends StatelessWidget {
-  const _BikeHeader({required this.bike});
+class _CompactStatsRow extends StatelessWidget {
+  const _CompactStatsRow({
+    required this.speedKmh,
+    required this.rentalActive,
+    required this.distanceKm,
+    required this.totalCost,
+  });
 
-  final Bike bike;
+  final double speedKmh;
+  final bool rentalActive;
+  final double distanceKm;
+  final int totalCost;
 
   @override
   Widget build(BuildContext context) {
-    return _Panel(
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              color: Color(0xFFCCFBF1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.pedal_bike_rounded,
-              color: Color(0xFF0F766E),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
+    return Row(
+      children: [
+        Expanded(
+          flex: 4,
+          child: _Panel(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  bike.code,
-                  style: const TextStyle(
-                    color: Color(0xFF0F766E),
+                const Text(
+                  'SPEED',
+                  style: TextStyle(
+                    color: Color(0xFF667085),
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    fontSize: 13,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  bike.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      speedKmh.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF101828),
                       ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'km/h',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF667085),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          _Badge(label: _statusLabel(bike.status)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 6,
+          child: _Panel(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            backgroundColor: const Color(0xFFF0FDFA),
+            borderColor: const Color(0xFF99F6E4),
+            child: Column(
+              children: [
+                _CompactInfoRow(
+                  label: 'DISTANCE',
+                  value: '${distanceKm.toStringAsFixed(2)} km',
+                  icon: Icons.route_outlined,
+                ),
+                const Divider(height: 12, color: Color(0xFFCCFBF1)),
+                _CompactInfoRow(
+                  label: 'TOTAL COST',
+                  value: _formatRupiah(totalCost),
+                  icon: Icons.payments_outlined,
+                  emphasized: true,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CompactInfoRow extends StatelessWidget {
+  const _CompactInfoRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: emphasized ? const Color(0xFF0F766E) : const Color(0xFF667085)),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF667085)),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: emphasized ? 14 : 12,
+            fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
+            color: emphasized ? const Color(0xFF134E4A) : const Color(0xFF101828),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DeviceAndRentalSummary extends StatelessWidget {
+  const _DeviceAndRentalSummary({
+    required this.bike,
+    required this.rental,
+    required this.batteryPercent,
+    required this.networkType,
+    required this.pointsSent,
+    required this.lastSentAt,
+    required this.locationMode,
+    required this.streaming,
+    required this.now,
+  });
+
+  final Bike bike;
+  final ActiveBikeRental? rental;
+  final int batteryPercent;
+  final String networkType;
+  final int pointsSent;
+  final DateTime? lastSentAt;
+  final String locationMode;
+  final bool streaming;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.pedal_bike_rounded, size: 18, color: Color(0xFF0F766E)),
+              const SizedBox(width: 8),
+              Text(
+                '${bike.code} - ${bike.name}',
+                style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF101828), fontSize: 13),
+              ),
+              const Spacer(),
+              if (rental != null)
+                _Badge(label: _rentalStatusLabel(rental!.status)),
+            ],
+          ),
+          const Divider(height: 16),
+          _MetricGridCompact(
+            children: [
+              _MetricItemSmall(label: 'Baterai', value: '$batteryPercent%', icon: Icons.battery_std),
+              _MetricItemSmall(label: 'Jaringan', value: networkType, icon: Icons.network_check),
+              _MetricItemSmall(label: 'Titik', value: '$pointsSent', icon: Icons.upload),
+              _MetricItemSmall(label: 'Mode', value: locationMode, icon: Icons.explore_outlined),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _SpeedDashboard extends StatelessWidget {
-  const _SpeedDashboard({
-    required this.speedKmh,
-    required this.accuracyMeters,
-    required this.latitude,
-    required this.longitude,
-    required this.lastSentAt,
-    required this.routePoints,
-  });
-
-  final double speedKmh;
-  final double? accuracyMeters;
-  final double? latitude;
-  final double? longitude;
-  final DateTime? lastSentAt;
-  final List<_RoutePoint> routePoints;
+class _MetricGridCompact extends StatelessWidget {
+  const _MetricGridCompact({required this.children});
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    final speedPercent = (speedKmh / 40).clamp(0.0, 1.0);
-    final gpsQuality = _gpsQualityLabel(accuracyMeters);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: children.map((c) => Expanded(child: c)).toList(),
+    );
+  }
+}
 
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Kecepatan Real-Time',
-            style: TextStyle(
-              color: Color(0xFF667085),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                speedKmh.toStringAsFixed(1),
-                style: const TextStyle(
-                  color: Color(0xFF101828),
-                  fontSize: 58,
-                  fontWeight: FontWeight.w900,
-                  height: .95,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 7),
-                child: Text(
-                  'km/h',
-                  style: TextStyle(
-                    color: Color(0xFF667085),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              minHeight: 10,
-              value: speedPercent,
-              backgroundColor: const Color(0xFFE4E7EC),
-              color: const Color(0xFF0F766E),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _MiniRouteMap(
-            points: routePoints,
-            latestAccuracyMeters: accuracyMeters,
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _InfoPill(
-                icon: Icons.gps_fixed,
-                label: gpsQuality,
-              ),
-              _InfoPill(
-                icon: Icons.my_location,
-                label: latitude == null || longitude == null
-                    ? 'Koordinat belum ada'
-                    : '${latitude!.toStringAsFixed(6)}, ${longitude!.toStringAsFixed(6)}',
-              ),
-              _InfoPill(
-                icon: Icons.update,
-                label: lastSentAt == null
-                    ? 'Belum terkirim'
-                    : '${_timeDiff(lastSentAt!)} lalu',
-              ),
-            ],
-          ),
-        ],
-      ),
+class _MetricItemSmall extends StatelessWidget {
+  const _MetricItemSmall({required this.label, required this.value, required this.icon});
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF667085)),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF667085))),
+        Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF101828))),
+      ],
     );
   }
 }
 
 class _MiniRouteMap extends StatelessWidget {
   const _MiniRouteMap({
+    this.height = 170,
     required this.points,
     required this.latestAccuracyMeters,
   });
 
+  final double height;
   final List<_RoutePoint> points;
   final double? latestAccuracyMeters;
 
@@ -952,7 +1420,7 @@ class _MiniRouteMap extends StatelessWidget {
     final pointCount = points.length;
 
     return Container(
-      height: 170,
+      height: height,
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(8),
@@ -1184,358 +1652,6 @@ class _LegendDot extends StatelessWidget {
   }
 }
 
-class _RentalDashboard extends StatelessWidget {
-  const _RentalDashboard({
-    required this.rental,
-    required this.loading,
-    required this.now,
-  });
-
-  final ActiveBikeRental? rental;
-  final bool loading;
-  final DateTime now;
-
-  @override
-  Widget build(BuildContext context) {
-    if (loading && rental == null) {
-      return const _Panel(
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (rental == null) {
-      return const _Panel(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Rental Aktif',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Belum ada rental aktif untuk sepeda ini. Dashboard tetap bisa mengirim heartbeat dan lokasi untuk monitoring admin.',
-              style: TextStyle(color: Color(0xFF667085)),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final activeRental = rental!;
-    final duration = activeRental.startedAt == null
-        ? Duration.zero
-        : now.difference(activeRental.startedAt!);
-
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Ringkasan Rental Aktif',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                ),
-              ),
-              _Badge(label: _rentalStatusLabel(activeRental.status)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            activeRental.user == null
-                ? 'Penyewa tidak tersedia'
-                : 'Penyewa: ${activeRental.user!.name}',
-            style: const TextStyle(color: Color(0xFF667085)),
-          ),
-          const SizedBox(height: 14),
-          _MetricWrap(
-            children: [
-              _MetricTile(
-                label: 'Durasi',
-                value: _formatDuration(duration),
-                icon: Icons.timer_outlined,
-              ),
-              _MetricTile(
-                label: 'Total Jarak',
-                value:
-                    '${activeRental.totalDistanceKilometers.toStringAsFixed(2)} km',
-                icon: Icons.route_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _CostRow(
-            distanceCost: activeRental.distanceCost,
-            idleCost: activeRental.idleCost,
-            totalCost: activeRental.totalCost,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CostRow extends StatelessWidget {
-  const _CostRow({
-    required this.distanceCost,
-    required this.idleCost,
-    required this.totalCost,
-  });
-
-  final int distanceCost;
-  final int idleCost;
-  final int totalCost;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0FDFA),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF99F6E4)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _CostItem(
-              label: 'Jarak',
-              value: _formatRupiah(distanceCost),
-              icon: Icons.payments_outlined,
-            ),
-          ),
-          _CostDivider(),
-          Expanded(
-            child: _CostItem(
-              label: 'Idle',
-              value: _formatRupiah(idleCost),
-              icon: Icons.hourglass_bottom,
-            ),
-          ),
-          _CostDivider(),
-          Expanded(
-            child: _CostItem(
-              label: 'Total',
-              value: _formatRupiah(totalCost),
-              icon: Icons.receipt_long,
-              emphasized: true,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CostItem extends StatelessWidget {
-  const _CostItem({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.emphasized = false,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    final color =
-        emphasized ? const Color(0xFF0F766E) : const Color(0xFF475467);
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: color),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            maxLines: 1,
-            style: TextStyle(
-              color: emphasized
-                  ? const Color(0xFF134E4A)
-                  : const Color(0xFF101828),
-              fontSize: emphasized ? 16 : 14,
-              fontWeight: emphasized ? FontWeight.w900 : FontWeight.w800,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CostDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 42,
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      color: const Color(0xFFCCFBF1),
-    );
-  }
-}
-
-class _DeviceGrid extends StatelessWidget {
-  const _DeviceGrid({
-    required this.batteryPercent,
-    required this.networkType,
-    required this.pointsSent,
-    required this.lastSentAt,
-    required this.locationMode,
-    required this.streaming,
-  });
-
-  final int batteryPercent;
-  final String networkType;
-  final int pointsSent;
-  final DateTime? lastSentAt;
-  final String locationMode;
-  final bool streaming;
-
-  @override
-  Widget build(BuildContext context) {
-    return _MetricWrap(
-      children: [
-        _MetricTile(
-          label: 'Baterai',
-          value: '$batteryPercent%',
-          icon: Icons.battery_charging_full,
-          emphasized: batteryPercent <= 20,
-        ),
-        _MetricTile(
-          label: 'Jaringan',
-          value: networkType,
-          icon: Icons.network_cell_outlined,
-        ),
-        _MetricTile(
-          label: 'Titik Terkirim',
-          value: '$pointsSent',
-          icon: Icons.upload_rounded,
-        ),
-        _MetricTile(
-          label: 'Terakhir Kirim',
-          value: lastSentAt == null ? '-' : '${_timeDiff(lastSentAt!)} lalu',
-          icon: Icons.update,
-        ),
-        _MetricTile(
-          label: 'Mode Lokasi',
-          value: locationMode,
-          icon: Icons.explore_outlined,
-        ),
-        _MetricTile(
-          label: 'Status Device',
-          value: streaming ? 'Aktif' : 'Standby',
-          icon: Icons.sensors,
-        ),
-      ],
-    );
-  }
-}
-
-class _MetricWrap extends StatelessWidget {
-  const _MetricWrap({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 560 ? 3 : 2;
-        return GridView.count(
-          crossAxisCount: columns,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: columns == 3 ? 1.7 : 1.35,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          children: children,
-        );
-      },
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.emphasized = false,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Panel(
-      padding: const EdgeInsets.all(12),
-      borderColor: emphasized ? const Color(0xFF5EEAD4) : null,
-      backgroundColor: emphasized ? const Color(0xFFF0FDFA) : Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            color:
-                emphasized ? const Color(0xFF0F766E) : const Color(0xFF667085),
-          ),
-          const Spacer(),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF667085), fontSize: 12),
-          ),
-          const SizedBox(height: 3),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF101828),
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _Panel extends StatelessWidget {
   const _Panel({
@@ -1598,45 +1714,6 @@ class _Badge extends StatelessWidget {
   }
 }
 
-class _InfoPill extends StatelessWidget {
-  const _InfoPill({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F7),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: const Color(0xFF475467)),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF475467),
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StatusDot extends StatefulWidget {
   const _StatusDot({required this.active});
 
@@ -1689,26 +1766,6 @@ class _StatusDotState extends State<_StatusDot>
   }
 }
 
-String _formatDuration(Duration duration) {
-  final safeDuration = duration.isNegative ? Duration.zero : duration;
-  final hours = safeDuration.inHours;
-  final minutes = safeDuration.inMinutes.remainder(60);
-  final seconds = safeDuration.inSeconds.remainder(60);
-
-  if (hours > 0) {
-    return [
-      hours.toString().padLeft(2, '0'),
-      minutes.toString().padLeft(2, '0'),
-      seconds.toString().padLeft(2, '0'),
-    ].join(':');
-  }
-
-  return [
-    minutes.toString().padLeft(2, '0'),
-    seconds.toString().padLeft(2, '0'),
-  ].join(':');
-}
-
 String _formatRupiah(int value) {
   final raw = value.abs().toString();
   final buffer = StringBuffer();
@@ -1723,18 +1780,22 @@ String _formatRupiah(int value) {
 }
 
 String _timeDiff(DateTime dt) {
-  final diff = DateTime.now().difference(dt);
+  final rawDiff = DateTime.now().difference(dt);
+  final diff = rawDiff.isNegative ? Duration.zero : rawDiff;
   if (diff.inSeconds < 60) return '${diff.inSeconds}s';
   if (diff.inMinutes < 60) return '${diff.inMinutes}m';
   return '${diff.inHours}j';
 }
 
-String _gpsQualityLabel(double? accuracyMeters) {
-  if (accuracyMeters == null) return 'GPS belum tersedia';
-  if (accuracyMeters <= 10) return 'GPS sangat akurat';
-  if (accuracyMeters <= 25) return 'GPS akurat';
-  if (accuracyMeters <= 50) return 'GPS sedang';
-  return 'GPS kurang akurat';
+String _relativeTimeLabel(DateTime? dt) {
+  if (dt == null) return 'Belum ada';
+  return '${_timeDiff(dt)} lalu';
+}
+
+bool _isFresh(DateTime? dt, Duration maxAge) {
+  if (dt == null) return false;
+  final age = DateTime.now().difference(dt);
+  return !age.isNegative && age <= maxAge;
 }
 
 double _haversineMeters(
@@ -1759,18 +1820,6 @@ double _haversineMeters(
 }
 
 double _toRadians(double degrees) => degrees * (math.pi / 180);
-
-String _statusLabel(String status) {
-  return switch (status) {
-    'available' => 'Tersedia',
-    'reserved' => 'Dipesan',
-    'in_use' => 'Dipakai',
-    'idle' => 'Diam',
-    'offline' => 'Offline',
-    'maintenance' => 'Perawatan',
-    _ => status,
-  };
-}
 
 String _rentalStatusLabel(String status) {
   return switch (status) {

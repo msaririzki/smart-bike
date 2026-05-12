@@ -13,7 +13,7 @@
                 <span class="badge {{ $statusBadge }}" style="font-size: 14px;">{{ $adminStatusLabels[$statusBadge] ?? $statusBadge }}</span>
                 <span class="badge {{ $bike->is_online ? 'available' : 'maintenance' }}" style="font-size: 14px;">{{ $bike->is_online ? 'Online' : 'Offline' }}</span>
             </div>
-            
+
             <p style="margin-bottom: 4px;"><strong>Baterai:</strong></p>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
                 <span style="font-weight: 600;">{{ $bike->battery_percent !== null ? $bike->battery_percent.'%' : '-' }}</span>
