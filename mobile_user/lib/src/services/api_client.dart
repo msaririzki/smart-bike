@@ -95,6 +95,12 @@ class ApiClient {
     await _post('/rentals/$rentalId/idle/continue', body: {});
   }
 
+  /// Ambil setting idle dari backend (durasi warning, biaya, interval).
+  Future<Map<String, dynamic>> idleSettings() async {
+    final json = await _get('/rentals/idle-settings');
+    return json['data'] as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> rentalHistory({int page = 1}) async {
     final json = await _get('/rentals/history?page=$page');
     return json['data'] as Map<String, dynamic>;

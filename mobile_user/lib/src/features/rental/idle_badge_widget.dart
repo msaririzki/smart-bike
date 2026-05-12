@@ -16,14 +16,72 @@ RentalStatus parseRentalStatus(String status) {
   }
 }
 
-class StatusBadge extends StatelessWidget {
+class StatusBadge extends StatefulWidget {
   const StatusBadge({super.key, required this.status});
 
   final String status;
 
   @override
+  State<StatusBadge> createState() => _StatusBadgeState();
+}
+
+class _StatusBadgeState extends State<StatusBadge>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _pulseController;
+  Animation<double>? _pulseAnimation;
+
+  bool get _shouldPulse {
+    final parsed = parseRentalStatus(widget.status);
+    return parsed == RentalStatus.idleWarning ||
+        parsed == RentalStatus.idleBilling;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAnimation();
+  }
+
+  @override
+  void didUpdateWidget(StatusBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.status != widget.status) {
+      _setupAnimation();
+    }
+  }
+
+  void _setupAnimation() {
+    if (_shouldPulse) {
+      if (_pulseController == null) {
+        _pulseController = AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 1200),
+        );
+        _pulseAnimation = Tween<double>(begin: 1.0, end: 0.4).animate(
+          CurvedAnimation(
+            parent: _pulseController!,
+            curve: Curves.easeInOut,
+          ),
+        );
+        _pulseController!.repeat(reverse: true);
+      }
+    } else {
+      _pulseController?.stop();
+      _pulseController?.dispose();
+      _pulseController = null;
+      _pulseAnimation = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final parsed = parseRentalStatus(status);
+    final parsed = parseRentalStatus(widget.status);
 
     final (label, gradient, textColor, icon, glowColor) = switch (parsed) {
       RentalStatus.active => (
@@ -48,7 +106,7 @@ class StatusBadge extends StatelessWidget {
           const Color(0xffef4444),
         ),
       RentalStatus.other => (
-          status.toUpperCase(),
+          widget.status.toUpperCase(),
           const [Color(0xff6b7280), Color(0xff9ca3af)],
           Colors.white,
           Icons.info_outline,
@@ -56,7 +114,7 @@ class StatusBadge extends StatelessWidget {
         ),
     };
 
-    return Container(
+    final badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -91,5 +149,15 @@ class StatusBadge extends StatelessWidget {
         ],
       ),
     );
+
+    // Pulse animation untuk idle_warning dan idle_billing
+    if (_pulseAnimation != null) {
+      return FadeTransition(
+        opacity: _pulseAnimation!,
+        child: badge,
+      );
+    }
+
+    return badge;
   }
 }
