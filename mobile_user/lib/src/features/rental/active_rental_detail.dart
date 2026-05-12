@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../../models/rental.dart';
 import 'idle_badge_widget.dart';
 import 'map_widget.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 class ActiveRentalDetail extends StatelessWidget {
   const ActiveRentalDetail({
@@ -34,6 +35,9 @@ class ActiveRentalDetail extends StatelessWidget {
     final speed = rental.currentSpeedKmh;
     final latitude = rental.latitude;
     final longitude = rental.longitude;
+    final screenSize = MediaQuery.sizeOf(context);
+    final compact = screenSize.width < 380 || screenSize.height < 720;
+    final mapHeight = compact ? 190.0 : 250.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -52,7 +56,7 @@ class ActiveRentalDetail extends StatelessWidget {
         const SizedBox(height: 16),
         if (latitude != null && longitude != null) ...[
           SizedBox(
-            height: 250,
+            height: mapHeight,
             child: MapWidget(
               latitude: latitude,
               longitude: longitude,
@@ -62,7 +66,7 @@ class ActiveRentalDetail extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Lokasi sepeda terakhir dari mobile_bike: ${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
+            'Lokasi: ${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: const Color(0xff667085)),
@@ -72,7 +76,7 @@ class ActiveRentalDetail extends StatelessWidget {
             Text(
               'Jalur di peta adalah ringkasan titik GPS yang dikirim perangkat sepeda.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: const Color(0xff0f766e),
+                color: AppColors.primaryDark,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -200,7 +204,12 @@ class _StatusHeader extends StatelessWidget {
               ],
             ),
           ),
-          StatusBadge(status: status),
+          Flexible(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FittedBox(child: StatusBadge(status: status)),
+            ),
+          ),
         ],
       ),
     );
@@ -267,7 +276,7 @@ class _BikePanel extends StatelessWidget {
         children: [
           const CircleAvatar(
             backgroundColor: Color(0xffccfbf1),
-            child: Icon(Icons.pedal_bike, color: Color(0xff0f766e)),
+            child: Icon(Icons.pedal_bike, color: AppColors.primaryDark),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -277,7 +286,7 @@ class _BikePanel extends StatelessWidget {
                 Text(
                   code,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: const Color(0xff0f766e),
+                    color: AppColors.primaryDark,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -346,6 +355,7 @@ class _ConnectionPanel extends StatelessWidget {
     final lastUpdate = rental.lastLocationUpdateAt;
     final networkType = rental.networkType;
     final accuracy = rental.gpsAccuracyMeters;
+    final relativeTime = _formatRelativeTime(lastUpdate);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -355,13 +365,16 @@ class _ConnectionPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _GpsQualityBadge(accuracy: accuracy),
+          const SizedBox(height: 12),
           _ConnectionRow(
             icon: Icons.update,
             label: 'GPS sepeda terakhir',
             value: lastUpdate == null
                 ? 'Belum ada data GPS'
-                : DateFormat('HH:mm:ss, dd MMM yyyy').format(lastUpdate),
+                : '${DateFormat('HH:mm:ss, dd MMM yyyy').format(lastUpdate)} ($relativeTime)',
           ),
           const SizedBox(height: 10),
           _ConnectionRow(
@@ -383,6 +396,86 @@ class _ConnectionPanel extends StatelessWidget {
       ),
     );
   }
+
+  String _formatRelativeTime(DateTime? dateTime) {
+    if (dateTime == null) {
+      return 'GPS belum tersedia';
+    }
+
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.isNegative || diff.inSeconds < 5) {
+      return 'Baru saja';
+    }
+    if (diff.inSeconds < 60) {
+      return '${diff.inSeconds} detik lalu';
+    }
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} menit lalu';
+    }
+    if (diff.inHours < 24) {
+      return '${diff.inHours} jam lalu';
+    }
+    return '${diff.inDays} hari lalu';
+  }
+}
+
+class _GpsQualityBadge extends StatelessWidget {
+  const _GpsQualityBadge({required this.accuracy});
+
+  final double? accuracy;
+
+  @override
+  Widget build(BuildContext context) {
+    final accuracy = this.accuracy;
+    final (label, color, background, icon) = switch (accuracy) {
+      null => (
+        'GPS Belum Tersedia',
+        const Color(0xff667085),
+        const Color(0xfff2f4f7),
+        Icons.gps_off,
+      ),
+      <= 25 => (
+        'GPS Akurat',
+        const Color(0xff027a48),
+        const Color(0xffecfdf3),
+        Icons.gps_fixed,
+      ),
+      _ => (
+        'GPS Kurang Akurat',
+        const Color(0xffb54708),
+        const Color(0xfffffaeb),
+        Icons.gps_not_fixed,
+      ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17, color: color),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              accuracy == null
+                  ? label
+                  : '$label (${accuracy.toStringAsFixed(1)} m)',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ConnectionRow extends StatelessWidget {
@@ -400,7 +493,7 @@ class _ConnectionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: const Color(0xff0f766e)),
+        Icon(icon, size: 18, color: AppColors.primaryDark),
         const SizedBox(width: 10),
         Expanded(
           child: Text(label, style: Theme.of(context).textTheme.labelMedium),
@@ -475,9 +568,7 @@ class _MetricCard extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: emphasized
-                ? const Color(0xff0f766e)
-                : const Color(0xff475467),
+            color: emphasized ? AppColors.primaryDark : const Color(0xff475467),
           ),
           const Spacer(),
           Text(label, style: Theme.of(context).textTheme.labelMedium),
@@ -537,15 +628,10 @@ class _IdleBillingExplanation extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.red.shade50,
-            Colors.orange.shade50,
-          ],
+          colors: [Colors.red.shade50, Colors.orange.shade50],
         ),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: Colors.red.shade200.withValues(alpha: 0.6),
-        ),
+        border: Border.all(color: Colors.red.shade200.withValues(alpha: 0.6)),
       ),
       child: Row(
         children: [

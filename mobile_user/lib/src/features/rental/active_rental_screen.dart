@@ -36,6 +36,7 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
   bool _isRefreshing = false;
   bool _isFinishing = false;
   bool _idleDialogOpen = false;
+  bool _queuedVisibleRefresh = false;
   String? _error;
   DateTime _now = DateTime.now();
 
@@ -86,7 +87,14 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
   }
 
   Future<void> _loadRental({bool silent = false}) async {
-    if (!mounted || _isRefreshing) {
+    if (!mounted) {
+      return;
+    }
+
+    if (_isRefreshing) {
+      if (!silent) {
+        _queuedVisibleRefresh = true;
+      }
       return;
     }
 
@@ -105,7 +113,9 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
       }
 
       final rental = detail == null ? null : Rental.fromJson(detail);
-      final routeHistory = rental == null ? null : await _loadRouteHistory(rental);
+      final routeHistory = rental == null
+          ? null
+          : await _loadRouteHistory(rental);
       if (!mounted) {
         return;
       }
@@ -117,19 +127,24 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
       });
       _handleIdleStatus(rental);
     } on ApiException catch (error) {
-      if (mounted) {
+      if (mounted && !silent) {
         setState(() => _error = error.message);
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && !silent) {
         setState(() => _error = 'Gagal memuat rental aktif.');
       }
     } finally {
       if (mounted) {
+        final shouldRunQueuedRefresh = _queuedVisibleRefresh;
+        _queuedVisibleRefresh = false;
         setState(() {
           _isLoading = false;
           _isRefreshing = false;
         });
+        if (shouldRunQueuedRefresh) {
+          unawaited(_loadRental());
+        }
       }
     }
   }
@@ -334,9 +349,9 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

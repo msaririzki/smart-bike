@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 class IdleWarningDialog extends StatelessWidget {
   const IdleWarningDialog({
@@ -94,10 +95,7 @@ class IdleWarningDialog extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Colors.orange.shade300,
-                    Colors.deepOrange.shade400,
-                  ],
+                  colors: [Colors.orange.shade300, Colors.deepOrange.shade400],
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -145,10 +143,7 @@ class IdleWarningDialog extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Colors.amber.shade50,
-                    Colors.orange.shade50,
-                  ],
+                  colors: [Colors.amber.shade50, Colors.orange.shade50],
                 ),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
@@ -235,8 +230,11 @@ class IdleWarningDialog extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline,
-                        size: 18, color: Colors.red.shade600),
+                    Icon(
+                      Icons.error_outline,
+                      size: 18,
+                      color: Colors.red.shade600,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -289,12 +287,15 @@ class IdleWarningDialog extends StatelessWidget {
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xff0f766e), Color(0xff0d9488)],
+                          colors: [
+                            AppColors.primaryDark,
+                            AppColors.primaryDark,
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xff0f766e).withValues(
+                            color: AppColors.primaryDark.withValues(
                               alpha: 0.35,
                             ),
                             blurRadius: 12,
@@ -304,8 +305,11 @@ class IdleWarningDialog extends StatelessWidget {
                       ),
                       child: ElevatedButton.icon(
                         onPressed: onContinue,
-                        icon: const Icon(Icons.play_arrow_rounded,
-                            color: Colors.white, size: 22),
+                        icon: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                         label: const Text(
                           'Lanjutkan Sewa',
                           style: TextStyle(
@@ -332,8 +336,11 @@ class IdleWarningDialog extends StatelessWidget {
                     height: 50,
                     child: OutlinedButton.icon(
                       onPressed: onFinish,
-                      icon: Icon(Icons.stop_circle_outlined,
-                          color: Colors.red.shade400, size: 20),
+                      icon: Icon(
+                        Icons.stop_circle_outlined,
+                        color: Colors.red.shade400,
+                        size: 20,
+                      ),
                       label: Text(
                         'Selesaikan Sewa',
                         style: TextStyle(

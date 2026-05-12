@@ -5,15 +5,22 @@ import '../../services/api_client.dart';
 import 'rental_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({required this.api, super.key});
+  const HistoryScreen({
+    required this.api,
+    this.showScaffold = true,
+    this.bottomPadding = 0,
+    super.key,
+  });
 
   final ApiClient api;
+  final bool showScaffold;
+  final double bottomPadding;
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  State<HistoryScreen> createState() => HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class HistoryScreenState extends State<HistoryScreen> {
   List<RentalHistory>? _history;
   bool _isLoading = true;
   String? _error;
@@ -35,7 +42,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadHistory();
+    loadHistory();
     _scrollController.addListener(_onScroll);
   }
 
@@ -55,7 +62,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  Future<void> _loadHistory() async {
+  Future<void> loadHistory() async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -261,6 +268,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final body = Padding(
+      padding: EdgeInsets.only(bottom: widget.bottomPadding),
+      child: _buildBody(context),
+    );
+
+    if (!widget.showScaffold) {
+      return ColoredBox(color: const Color(0xfff7fbf8), child: body);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xfff7fbf8),
       appBar: AppBar(
@@ -273,40 +289,41 @@ class _HistoryScreenState extends State<HistoryScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            onPressed: _isLoading ? null : _loadHistory,
+            onPressed: _isLoading ? null : loadHistory,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
-      body: _isLoading
-          ? const _ShimmerLoadingView()
-          : _error != null
-          ? RefreshIndicator(
-              onRefresh: _loadHistory,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height - 100,
-                  child: _ErrorView(message: _error!, onRetry: _loadHistory),
-                ),
-              ),
-            )
-          : _history == null || _history!.isEmpty
-          ? RefreshIndicator(
-              onRefresh: _loadHistory,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-                  const _EmptyView(),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadHistory,
-              child: _buildFilteredList(),
-            ),
+      body: body,
     );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    return _isLoading
+        ? const _ShimmerLoadingView()
+        : _error != null
+        ? RefreshIndicator(
+            onRefresh: loadHistory,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height - 100,
+                child: _ErrorView(message: _error!, onRetry: loadHistory),
+              ),
+            ),
+          )
+        : _history == null || _history!.isEmpty
+        ? RefreshIndicator(
+            onRefresh: loadHistory,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                const _EmptyView(),
+              ],
+            ),
+          )
+        : RefreshIndicator(onRefresh: loadHistory, child: _buildFilteredList());
   }
 
   List<RentalHistory> get _filteredHistory {
