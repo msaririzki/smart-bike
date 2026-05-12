@@ -41,6 +41,8 @@ class MapWidget extends StatefulWidget {
     this.pathHistory = const [],
     this.userLatitude,
     this.userLongitude,
+    this.latestLocationLabel = 'Lokasi sepeda terakhir',
+    this.routeLabel = 'Jalur dari perangkat sepeda',
     this.onRoutePointTap,
     this.onSpotTap,
     this.bikeLabel,
@@ -62,6 +64,9 @@ class MapWidget extends StatefulWidget {
   /// User's own location (blue dot).
   final double? userLatitude;
   final double? userLongitude;
+
+  final String latestLocationLabel;
+  final String routeLabel;
 
   final void Function(int index, LatLng point)? onRoutePointTap;
   final void Function(PopularSpot spot)? onSpotTap;
@@ -264,6 +269,8 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                   builder: (context, _) => _buildMap(_interpolatedBikePos),
                 )
               : _buildMap(LatLng(widget.latitude, widget.longitude)),
+          // Source labels
+          _buildSourceLabels(),
           // Map controls overlay
           Positioned(
             right: 12,
@@ -305,6 +312,29 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSourceLabels() {
+    return Align(
+      alignment: Alignment.topLeft,
+      child: SafeArea(
+        minimum: const EdgeInsets.all(10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _MapSourceChip(
+              icon: Icons.pedal_bike,
+              label: widget.latestLocationLabel,
+            ),
+            if (widget.routePoints.length >= 2) ...[
+              const SizedBox(height: 6),
+              _MapSourceChip(icon: Icons.route, label: widget.routeLabel),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -721,9 +751,9 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     height: 56,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xff0f766e).withValues(
-                        alpha: _pulseAnimation.value,
-                      ),
+                      color: const Color(
+                        0xff0f766e,
+                      ).withValues(alpha: _pulseAnimation.value),
                     ),
                   ),
                   Container(
@@ -794,11 +824,58 @@ class _MapControlButton extends StatelessWidget {
   }
 }
 
+class _MapSourceChip extends StatelessWidget {
+  const _MapSourceChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 250),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0x1f0f172a)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: const Color(0xff0f766e)),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xff0f172a),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 double calculateDistance(LatLng p1, LatLng p2) {
   const earthRadius = 6371000.0;
   final dLat = _toRadians(p2.latitude - p1.latitude);
   final dLng = _toRadians(p2.longitude - p1.longitude);
-  final a = sin(dLat / 2) * sin(dLat / 2) +
+  final a =
+      sin(dLat / 2) * sin(dLat / 2) +
       cos(_toRadians(p1.latitude)) *
           cos(_toRadians(p2.latitude)) *
           sin(dLng / 2) *

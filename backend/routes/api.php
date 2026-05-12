@@ -25,12 +25,14 @@ Route::middleware(['auth:sanctum', 'role:user'])->group(function (): void {
     Route::get('/rentals/active', [RentalController::class, 'active']);
     Route::get('/rentals/history', [RentalController::class, 'history']);
     Route::get('/rentals/{rental}/location-points', [RentalController::class, 'locationPoints']);
+    Route::get('/rentals/idle-settings', [RentalController::class, 'idleSettings']);
     Route::post('/rentals/{rental}/finish', [RentalController::class, 'finish']);
     Route::post('/rentals/{rental}/idle/continue', [RentalController::class, 'continueIdle']);
 });
 
 Route::middleware(['auth:sanctum', 'role:device'])->prefix('device')->group(function (): void {
     Route::get('/current-assignment', [DeviceController::class, 'currentAssignment']);
+    Route::get('/active-rental-summary', [DeviceController::class, 'activeRentalSummary']);
     Route::post('/location-update', [DeviceController::class, 'locationUpdate']);
     Route::post('/heartbeat', [DeviceController::class, 'heartbeat']);
 });

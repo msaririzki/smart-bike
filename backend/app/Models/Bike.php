@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'code',
@@ -45,8 +46,34 @@ class Bike extends Model
         return $this->hasMany(Rental::class);
     }
 
+    public function activeRental(): HasOne
+    {
+        return $this->hasOne(Rental::class)
+            ->whereIn('status', [
+                Rental::STATUS_ACTIVE,
+                Rental::STATUS_IDLE_WARNING,
+                Rental::STATUS_IDLE_BILLING,
+            ])
+            ->latestOfMany('started_at');
+    }
+
     public function locationPoints(): HasMany
     {
         return $this->hasMany(RentalLocationPoint::class);
+    }
+
+    public function latestLocationPoint(): HasOne
+    {
+        return $this->hasOne(RentalLocationPoint::class)->latestOfMany('recorded_at');
+    }
+
+    public function deviceHeartbeats(): HasMany
+    {
+        return $this->hasMany(DeviceHeartbeat::class);
+    }
+
+    public function latestHeartbeat(): HasOne
+    {
+        return $this->hasOne(DeviceHeartbeat::class)->latestOfMany('last_seen_at');
     }
 }

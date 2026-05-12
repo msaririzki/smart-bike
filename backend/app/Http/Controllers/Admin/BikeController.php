@@ -30,7 +30,7 @@ class BikeController extends Controller
     {
         Bike::query()->create($this->validated($request));
 
-        return redirect()->route('admin.bikes.index')->with('status', 'Bike dibuat.');
+        return redirect()->route('admin.bikes.index')->with('status', 'Sepeda dibuat.');
     }
 
     public function edit(Bike $bike): View
@@ -45,7 +45,7 @@ class BikeController extends Controller
     {
         $bike->update($this->validated($request, $bike->id));
 
-        return redirect()->route('admin.bikes.index')->with('status', 'Bike diperbarui.');
+        return redirect()->route('admin.bikes.index')->with('status', 'Sepeda diperbarui.');
     }
 
     private function validated(Request $request, ?int $bikeId = null): array

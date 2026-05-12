@@ -6,19 +6,73 @@ use App\Http\Controllers\Controller;
 use App\Models\Bike;
 use App\Models\Rental;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    private const LOMBOK_LATITUDE_RANGE = [-8.95, -8.20];
+
+    private const LOMBOK_LONGITUDE_RANGE = [115.75, 116.75];
+
     public function __invoke(): View
     {
+        $activeRentalStatuses = [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING];
+
         return view('admin.dashboard', [
             'totalBikes' => Bike::query()->count(),
-            'activeRentals' => Rental::query()->whereIn('status', [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING])->count(),
-            'completedRentals' => Rental::query()->where('status', Rental::STATUS_COMPLETED)->count(),
+            'availableBikes' => Bike::query()->where('status', 'available')->count(),
+            'inUseBikes' => Bike::query()->whereIn('status', ['in_use', 'idle'])->count(),
             'offlineBikes' => Bike::query()->where('is_online', false)->count(),
+            'activeRentals' => Rental::query()->whereIn('status', $activeRentalStatuses)->count(),
+            'completedRentalsToday' => Rental::query()
+                ->where('status', Rental::STATUS_COMPLETED)
+                ->whereDate('ended_at', today())
+                ->count(),
             'totalRevenue' => Rental::query()->sum('total_cost'),
+            'totalDistanceMeters' => Rental::query()->sum('total_distance_meters'),
             'users' => User::query()->where('role', 'user')->count(),
+            'mapBikes' => $this->bikeMapData(),
         ]);
+    }
+
+    public function mapData(): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->bikeMapData(),
+            'updated_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    private function bikeMapData(): Collection
+    {
+        return Bike::query()
+            ->with(['assignedDevice:id,name,email', 'activeRental.user:id,name,email', 'latestHeartbeat'])
+            ->whereNotNull('current_latitude')
+            ->whereNotNull('current_longitude')
+            ->whereBetween('current_latitude', self::LOMBOK_LATITUDE_RANGE)
+            ->whereBetween('current_longitude', self::LOMBOK_LONGITUDE_RANGE)
+            ->orderBy('code')
+            ->get()
+            ->map(fn (Bike $bike): array => [
+                'code' => $bike->code,
+                'name' => $bike->name,
+                'status' => $bike->status,
+                'is_online' => $bike->is_online,
+                'battery_percent' => $bike->battery_percent,
+                'network_type' => $bike->latestHeartbeat?->network_type,
+                'latitude' => (float) $bike->current_latitude,
+                'longitude' => (float) $bike->current_longitude,
+                'last_seen_at' => $bike->last_seen_at?->format('Y-m-d H:i:s'),
+                'device' => $bike->assignedDevice?->email,
+                'active_rental' => $bike->activeRental ? [
+                    'id' => $bike->activeRental->id,
+                    'user' => $bike->activeRental->user?->name,
+                    'detail_url' => route('admin.rentals.show', $bike->activeRental),
+                ] : null,
+                'detail_url' => route('admin.monitoring.show', $bike),
+            ])
+            ->values();
     }
 }

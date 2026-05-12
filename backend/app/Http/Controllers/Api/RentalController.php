@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Bike;
 use App\Models\Rental;
+use App\Services\PricingConfigService;
 use App\Services\RentalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,10 @@ class RentalController extends Controller
             ->whereIn('status', [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING])
             ->latest('started_at')
             ->first();
+
+        if ($rental) {
+            $rental->setAttribute('current_speed_kmh', $rental->latestLocationPoint?->speed_kmh);
+        }
 
         return response()->json(['data' => $rental]);
     }
@@ -68,6 +73,17 @@ class RentalController extends Controller
                 ->where('is_valid_movement', true)
                 ->orderBy('recorded_at')
                 ->get(['id', 'latitude', 'longitude', 'speed_kmh', 'accuracy_meters', 'recorded_at']),
+        ]);
+    }
+
+    public function idleSettings(PricingConfigService $pricing): JsonResponse
+    {
+        return response()->json([
+            'data' => [
+                'idle_warning_after_seconds' => $pricing->get('idle_warning_after_seconds'),
+                'idle_billing_amount' => $pricing->get('idle_billing_amount'),
+                'idle_billing_interval_seconds' => $pricing->get('idle_billing_interval_seconds'),
+            ],
         ]);
     }
 }
