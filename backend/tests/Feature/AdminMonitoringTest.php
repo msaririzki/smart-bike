@@ -46,8 +46,8 @@ class AdminMonitoringTest extends TestCase
             'status' => 'in_use',
             'is_online' => true,
             'battery_percent' => 75,
-            'current_latitude' => -5.147665,
-            'current_longitude' => 119.432732,
+            'current_latitude' => -8.583000,
+            'current_longitude' => 116.116000,
             'assigned_device_user_id' => $device->id,
             'last_seen_at' => now(),
         ]);
@@ -94,8 +94,8 @@ class AdminMonitoringTest extends TestCase
             'status' => 'idle',
             'is_online' => true,
             'battery_percent' => 64,
-            'current_latitude' => -5.147665,
-            'current_longitude' => 119.432732,
+            'current_latitude' => -8.583000,
+            'current_longitude' => 116.116000,
             'assigned_device_user_id' => $device->id,
             'last_seen_at' => now(),
         ]);
@@ -115,8 +115,8 @@ class AdminMonitoringTest extends TestCase
         RentalLocationPoint::query()->create([
             'rental_id' => $rental->id,
             'bike_id' => $bike->id,
-            'latitude' => -5.147665,
-            'longitude' => 119.432732,
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
             'network_type' => '4g',
             'recorded_at' => now(),
         ]);

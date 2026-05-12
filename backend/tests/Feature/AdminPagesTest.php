@@ -33,8 +33,8 @@ class AdminPagesTest extends TestCase
             'status' => 'available',
             'is_online' => false,
             'battery_percent' => 15,
-            'current_latitude' => -5.147665,
-            'current_longitude' => 119.432732,
+            'current_latitude' => -8.583000,
+            'current_longitude' => 116.116000,
         ]);
         $rental = Rental::query()->create([
             'user_id' => $user->id,
@@ -45,8 +45,8 @@ class AdminPagesTest extends TestCase
         RentalLocationPoint::query()->create([
             'rental_id' => $rental->id,
             'bike_id' => $bike->id,
-            'latitude' => -5.147665,
-            'longitude' => 119.432732,
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
             'recorded_at' => now(),
         ]);
 
@@ -55,7 +55,7 @@ class AdminPagesTest extends TestCase
         $this->get('/admin')->assertOk()->assertSee('Sepeda Tersedia');
         $this->get('/admin/dashboard/map-data')->assertOk()->assertJsonPath('data.0.code', 'BIKE-ADMIN-1');
         $this->get('/admin/rentals?status=running')->assertOk()->assertSee('Rental Aktif');
-        $this->get("/admin/rentals/{$rental->id}/route-map-data")->assertOk()->assertJsonPath('data.0.latitude', -5.147665);
+        $this->get("/admin/rentals/{$rental->id}/route-map-data")->assertOk()->assertJsonPath('data.0.latitude', -8.583000);
         $this->get('/admin/users')->assertOk()->assertSee('Manajemen Pengguna');
         $this->get("/admin/users/{$user->id}")->assertOk()->assertSee('Histori Rental Pengguna');
         $this->get('/admin/reports')->assertOk()->assertSee('Sepeda Paling Sering Dipakai');

@@ -78,6 +78,7 @@ class ApiClient {
     double? speedKmh,
     double? accuracyMeters,
     required String networkType,
+    DateTime? recordedAt,
   }) async {
     return _post('/device/location-update', body: {
       'latitude': latitude,
@@ -85,7 +86,7 @@ class ApiClient {
       if (speedKmh != null) 'speed_kmh': speedKmh,
       if (accuracyMeters != null) 'accuracy_meters': accuracyMeters,
       'network_type': networkType,
-      'recorded_at': DateTime.now().toIso8601String(),
+      'recorded_at': (recordedAt ?? DateTime.now()).toUtc().toIso8601String(),
     });
   }
 

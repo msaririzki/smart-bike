@@ -25,34 +25,38 @@
         </div>
     </form>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Nama</th>
-                <th>Email</th>
-                <th>Telepon</th>
-                <th>Hak Akses</th>
-                <th>Total Rental</th>
-                <th>Dibuat</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($users as $user)
+    <div class="table-responsive">
+        <table>
+            <thead>
                 <tr>
-                    <td>{{ $user->name }}</td>
-                    <td>{{ $user->email }}</td>
-                    <td>{{ $user->phone ?? '-' }}</td>
-                    <td><span class="badge {{ $user->role }}">{{ $adminRoleLabels[$user->role] ?? $user->role }}</span></td>
-                    <td>{{ $user->rentals_count }}</td>
-                    <td>{{ $user->created_at }}</td>
-                    <td><a href="{{ route('admin.users.show', $user) }}">Lihat Detail</a></td>
+                    <th>Nama</th>
+                    <th>Email</th>
+                    <th>Telepon</th>
+                    <th>Hak Akses</th>
+                    <th>Total Rental</th>
+                    <th>Dibuat</th>
+                    <th></th>
                 </tr>
-            @empty
-                <tr><td colspan="7" class="muted">Tidak ada user yang cocok.</td></tr>
-            @endforelse
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @forelse($users as $user)
+                    <tr>
+                        <td><strong>{{ $user->name }}</strong></td>
+                        <td>{{ $user->email }}</td>
+                        <td>{{ $user->phone ?? '-' }}</td>
+                        <td><span class="badge {{ $user->role }}">{{ $adminRoleLabels[$user->role] ?? $user->role }}</span></td>
+                        <td>{{ $user->rentals_count }}</td>
+                        <td>{{ $user->created_at }}</td>
+                        <td><a href="{{ route('admin.users.show', $user) }}" class="button secondary" style="padding: 6px 12px; font-size: 13px;">Lihat Detail</a></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="7" class="muted">Tidak ada user yang cocok.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
 
-    {{ $users->links() }}
+    <div style="margin-top: 16px;">
+        {{ $users->links() }}
+    </div>
 @endsection

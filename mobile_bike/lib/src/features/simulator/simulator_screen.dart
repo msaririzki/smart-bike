@@ -55,6 +55,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   Timer? _summaryTimer;
   Timer? _clockTimer;
   Timer? _mockTimer;
+  Timer? _realGpsRefreshTimer;
 
   double? _lat;
   double? _lng;
@@ -63,21 +64,30 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   String _networkType = 'unknown';
   int _batteryPercent = 0;
   int _pointsSent = 0;
+  DateTime? _lastGpsReadAt;
   DateTime? _lastSentAt;
   int? _activeRentalId;
   DateTime _now = DateTime.now();
-  String _lastServerMsg = '-';
+  String _lastServerMsg = 'Belum ada pengiriman';
   String _simulationProgress = '';
   int _currentInterval = 5;
   SimulationMode _currentMode = SimulationMode.loop;
-  String _locationMode = 'None';
+  String _locationMode = 'Belum aktif';
+  bool _checkingLocationAccess = true;
+  bool _locationAccessGranted = false;
+  bool _autoStartAttempted = false;
+  LocationAccessStatus _locationAccessStatus = LocationAccessStatus.denied;
+  String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
   final List<_RoutePoint> _routePoints = [];
+
+  bool get _hasActiveRental => _summary?.rental != null;
 
   @override
   void initState() {
     super.initState();
     _loadBike();
     _loadRentalSummary();
+    _ensureLocationReady(requestIfDenied: true, showMessage: false);
     _listenNetwork();
     _loadBattery();
     _summaryTimer = Timer.periodic(
@@ -106,6 +116,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     try {
       final bike = await widget.api.currentAssignment();
       if (mounted) setState(() => _bike = bike);
+      _autoStartRealGpsIfReady();
     } catch (e) {
       _showMessage('Gagal memuat sepeda: $e');
     } finally {
@@ -164,12 +175,76 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     return 'Offline';
   }
 
-  Future<void> _startStream() async {
+  Future<bool> _ensureLocationReady({
+    required bool requestIfDenied,
+    bool showMessage = true,
+  }) async {
+    if (mounted) setState(() => _checkingLocationAccess = true);
+
+    final access = await _gps.ensureLocationAccess(
+      requestIfDenied: requestIfDenied,
+    );
+    final message = _locationAccessText(access.status);
+
+    if (!mounted) return access.granted;
+    setState(() {
+      _checkingLocationAccess = false;
+      _locationAccessGranted = access.granted;
+      _locationAccessStatus = access.status;
+      _locationAccessMessage = message;
+    });
+
+    if (!access.granted && showMessage) {
+      _showMessage(message);
+    }
+
+    if (access.granted) {
+      _autoStartRealGpsIfReady();
+    }
+
+    return access.granted;
+  }
+
+  void _autoStartRealGpsIfReady() {
+    if (_autoStartAttempted || _bike == null || !_locationAccessGranted) {
+      return;
+    }
+    if (_streaming || _isSimulating) return;
+
+    _autoStartAttempted = true;
+    _startStream(requestPermission: false);
+  }
+
+  Future<void> _openLocationSettings() async {
+    if (_locationAccessStatus == LocationAccessStatus.deniedForever) {
+      await Geolocator.openAppSettings();
+    } else {
+      await Geolocator.openLocationSettings();
+    }
+
+    await _ensureLocationReady(requestIfDenied: false, showMessage: false);
+  }
+
+  String _locationAccessText(LocationAccessStatus status) {
+    return switch (status) {
+      LocationAccessStatus.granted =>
+        'Akses lokasi aktif. GPS real siap dikirim ke server.',
+      LocationAccessStatus.serviceDisabled =>
+        'GPS perangkat belum aktif. Nyalakan Lokasi/GPS di pengaturan HP.',
+      LocationAccessStatus.denied =>
+        'Izin lokasi ditolak. Berikan izin lokasi agar sepeda bisa mengirim GPS real.',
+      LocationAccessStatus.deniedForever =>
+        'Izin lokasi diblokir permanen. Buka pengaturan aplikasi lalu izinkan Lokasi.',
+    };
+  }
+
+  Future<void> _startStream({bool requestPermission = true}) async {
     if (_isSimulating) _stopSimulation();
 
-    final granted = await _gps.requestPermission();
+    final granted = requestPermission
+        ? await _ensureLocationReady(requestIfDenied: true)
+        : _locationAccessGranted;
     if (!granted) {
-      _showMessage('Izin lokasi diperlukan untuk mengirim data GPS real.');
       return;
     }
 
@@ -179,26 +254,67 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _locationMode = 'Real GPS';
     });
 
-    _positionSub = _gps.positionStream(intervalSeconds: 5).listen((pos) {
+    final currentPosition = await _gps.getCurrentPosition();
+    if (currentPosition != null && _shouldAcceptGpsPosition(currentPosition)) {
+      _handleRealGpsPosition(currentPosition);
+    }
+
+    _positionSub = _gps.positionStream().listen((pos) {
       if (!mounted) return;
       if (!_shouldAcceptGpsPosition(pos)) return;
+      _handleRealGpsPosition(pos);
+    }, onError: (Object error) {
+      if (!mounted) return;
       setState(() {
-        _lat = pos.latitude;
-        _lng = pos.longitude;
-        _speedKmh = pos.speed * 3.6;
-        _accuracyMeters = pos.accuracy;
-        _locationMode = 'Real GPS';
+        _streaming = false;
+        _locationMode = 'GPS error';
+        _lastServerMsg = 'GPS gagal: $error';
+      });
+      _showMessage('Stream GPS berhenti: $error');
+    });
+
+    _startRealGpsRefresh();
+    _startHeartbeat();
+  }
+
+  void _startRealGpsRefresh() {
+    _realGpsRefreshTimer?.cancel();
+    _realGpsRefreshTimer = Timer.periodic(
+      Duration(seconds: _currentInterval),
+      (_) => _refreshRealGpsPosition(),
+    );
+  }
+
+  Future<void> _refreshRealGpsPosition() async {
+    if (!_streaming || _isSimulating || _sending) return;
+
+    final currentPosition = await _gps.getCurrentPosition();
+    if (!mounted || currentPosition == null) return;
+    if (!_shouldAcceptGpsPosition(currentPosition)) return;
+
+    _handleRealGpsPosition(currentPosition);
+  }
+
+  void _handleRealGpsPosition(Position pos) {
+    final speedKmh = _hasActiveRental ? _calculateDisplaySpeedKmh(pos) : 0.0;
+
+    setState(() {
+      _lat = pos.latitude;
+      _lng = pos.longitude;
+      _speedKmh = speedKmh;
+      _accuracyMeters = pos.accuracy;
+      _lastGpsReadAt = pos.timestamp.toLocal();
+      _locationMode = 'Real GPS';
+      if (_hasActiveRental) {
         _addRoutePoint(
           latitude: pos.latitude,
           longitude: pos.longitude,
           accuracyMeters: pos.accuracy,
           source: 'Real GPS',
         );
-      });
-      _sendLocation(pos);
+      }
     });
-
-    _startHeartbeat();
+    _sendLocation(pos, speedKmh: speedKmh);
   }
 
   void _stopStream() {
@@ -208,7 +324,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     if (mounted) {
       setState(() {
         _streaming = false;
-        _locationMode = 'None';
+        _locationMode = 'Belum aktif';
       });
     }
   }
@@ -216,6 +332,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   void _stopRealGps() {
     _positionSub?.cancel();
     _positionSub = null;
+    _realGpsRefreshTimer?.cancel();
+    _realGpsRefreshTimer = null;
   }
 
   void _startHeartbeat() {
@@ -331,6 +449,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _lng = longitude;
       _speedKmh = speedKmh;
       _accuracyMeters = accuracyMeters;
+      _lastGpsReadAt = DateTime.now();
       _locationMode = mode;
       _addRoutePoint(
         latitude: latitude,
@@ -356,16 +475,47 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _sendLocation(pos);
   }
 
-  Future<void> _sendLocation(Position pos) async {
+  double _calculateDisplaySpeedKmh(Position pos) {
+    if (!_hasActiveRental) return 0;
+
+    final gpsSpeedKmh =
+        pos.speed.isFinite && pos.speed > 0 ? pos.speed * 3.6 : 0.0;
+    final derivedSpeedKmh = _deriveSpeedFromLastRoutePoint(pos);
+
+    if (gpsSpeedKmh >= 1) return gpsSpeedKmh;
+    if (derivedSpeedKmh >= 1) return derivedSpeedKmh;
+
+    return math.max(gpsSpeedKmh, derivedSpeedKmh);
+  }
+
+  double _deriveSpeedFromLastRoutePoint(Position pos) {
+    if (_routePoints.isEmpty) return 0;
+
+    final last = _routePoints.last;
+    final distance = _haversineMeters(
+      last.latitude,
+      last.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+    final seconds = DateTime.now().difference(last.recordedAt).inMilliseconds /
+        Duration.millisecondsPerSecond;
+    if (seconds <= 0 || distance < _minRouteDistanceMeters) return 0;
+
+    return (distance / seconds) * 3.6;
+  }
+
+  Future<void> _sendLocation(Position pos, {double? speedKmh}) async {
     if (_sending) return;
     setState(() => _sending = true);
     try {
       final res = await widget.api.sendLocationUpdate(
         latitude: pos.latitude,
         longitude: pos.longitude,
-        speedKmh: pos.speed * 3.6,
+        speedKmh: speedKmh ?? (pos.speed * 3.6),
         accuracyMeters: pos.accuracy,
         networkType: _networkType,
+        recordedAt: pos.timestamp.toLocal(),
       );
       if (mounted) {
         setState(() {
@@ -546,7 +696,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   Widget _buildDashboardView(Bike bike) {
     final rental = _summary?.rental;
-    final displaySpeed = _speedKmh ?? rental?.currentSpeedKmh ?? 0;
+    final displaySpeed =
+        rental == null ? 0.0 : (_speedKmh ?? rental.currentSpeedKmh ?? 0.0);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -561,16 +712,32 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             mode: _locationMode,
             sending: _sending,
             serverMessage: _lastServerMsg,
+            lastGpsReadAt: _lastGpsReadAt,
+            lastSentAt: _lastSentAt,
           ),
+          if (_checkingLocationAccess || !_locationAccessGranted) ...[
+            const SizedBox(height: 12),
+            _LocationAccessBanner(
+              checking: _checkingLocationAccess,
+              status: _locationAccessStatus,
+              message: _locationAccessMessage,
+              onRequestPermission: () => _ensureLocationReady(
+                requestIfDenied: true,
+              ),
+              onOpenSettings: _openLocationSettings,
+            ),
+          ],
           const SizedBox(height: 12),
           _BikeHeader(bike: bike),
           const SizedBox(height: 12),
           _SpeedDashboard(
             speedKmh: displaySpeed,
+            rentalActive: rental != null,
             accuracyMeters:
                 _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
             latitude: _lat ?? rental?.latestLocationPoint?.latitude,
             longitude: _lng ?? rental?.latestLocationPoint?.longitude,
+            lastGpsReadAt: _lastGpsReadAt,
             lastSentAt: _lastSentAt,
             routePoints: List.unmodifiable(_routePoints),
           ),
@@ -585,9 +752,25 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             batteryPercent: _batteryPercent,
             networkType: _networkType,
             pointsSent: _pointsSent,
+            lastGpsReadAt: _lastGpsReadAt,
             lastSentAt: _lastSentAt,
             locationMode: _locationMode,
             streaming: _streaming,
+          ),
+          const SizedBox(height: 12),
+          _TestReadinessPanel(
+            bike: bike,
+            rental: rental,
+            locationGranted: _locationAccessGranted,
+            gpsEnabled:
+                _locationAccessStatus != LocationAccessStatus.serviceDisabled,
+            streaming: _streaming,
+            networkType: _networkType,
+            accuracyMeters:
+                _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
+            lastGpsReadAt: _lastGpsReadAt,
+            lastSentAt: _lastSentAt,
+            serverMessage: _lastServerMsg,
           ),
           const SizedBox(height: 12),
           _buildControls(),
@@ -611,7 +794,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               _streaming ? Icons.stop_circle_outlined : Icons.gps_fixed_rounded,
             ),
             label: Text(
-              _streaming ? 'Hentikan Pengiriman' : 'Mulai Kirim GPS Real',
+              _streaming ? 'Hentikan Sementara' : 'Aktifkan GPS Sekarang',
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             style: FilledButton.styleFrom(
@@ -683,7 +866,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Panel ini selalu tampil agar kontrol tambahan tidak terlewat. Untuk penggunaan nyata, tetap gunakan tombol Mulai Kirim GPS Real.',
+                  'Panel ini hanya untuk demo/testing. Penggunaan nyata memakai GPS real yang aktif otomatis setelah device login.',
                   style: TextStyle(
                     color: Color(0xFF475467),
                     fontSize: 12,
@@ -709,22 +892,262 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 }
 
+class _TestReadinessPanel extends StatelessWidget {
+  const _TestReadinessPanel({
+    required this.bike,
+    required this.rental,
+    required this.locationGranted,
+    required this.gpsEnabled,
+    required this.streaming,
+    required this.networkType,
+    required this.accuracyMeters,
+    required this.lastGpsReadAt,
+    required this.lastSentAt,
+    required this.serverMessage,
+  });
+
+  final Bike bike;
+  final ActiveBikeRental? rental;
+  final bool locationGranted;
+  final bool gpsEnabled;
+  final bool streaming;
+  final String networkType;
+  final double? accuracyMeters;
+  final DateTime? lastGpsReadAt;
+  final DateTime? lastSentAt;
+  final String serverMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final serverOk = lastSentAt != null && !serverMessage.startsWith('Error:');
+    final accuracyOk = accuracyMeters != null && accuracyMeters! <= 50;
+    final gpsFresh = _isFresh(lastGpsReadAt, const Duration(seconds: 15));
+    final serverFresh = _isFresh(lastSentAt, const Duration(seconds: 15));
+
+    return _Panel(
+      borderColor: const Color(0xFFD0D5DD),
+      backgroundColor: const Color(0xFFFFFFFF),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Checklist Tes Lapangan',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            rental == null
+                ? 'Mode monitoring aktif untuk ${bike.code}. Belum ada rental aktif, jadi jarak dan biaya belum dihitung.'
+                : 'Rental aktif ditemukan. Jalur, jarak, idle, dan biaya akan dihitung dari GPS sepeda.',
+            style: const TextStyle(color: Color(0xFF667085), fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          _CheckRow(
+            ok: locationGranted,
+            label: 'Izin lokasi',
+            detail: locationGranted ? 'Diizinkan' : 'Belum diizinkan',
+          ),
+          _CheckRow(
+            ok: gpsEnabled,
+            label: 'GPS perangkat',
+            detail: gpsEnabled ? 'Aktif' : 'GPS HP belum aktif',
+          ),
+          _CheckRow(
+            ok: streaming,
+            label: 'Tracking otomatis',
+            detail: streaming ? 'Berjalan' : 'Belum berjalan',
+          ),
+          _CheckRow(
+            ok: networkType != 'Offline',
+            label: 'Jaringan',
+            detail: networkType,
+          ),
+          _CheckRow(
+            ok: gpsFresh,
+            label: 'GPS dibaca',
+            detail: _relativeTimeLabel(lastGpsReadAt),
+          ),
+          _CheckRow(
+            ok: serverOk && serverFresh,
+            label: 'Server menerima',
+            detail: serverOk ? _relativeTimeLabel(lastSentAt) : serverMessage,
+          ),
+          _CheckRow(
+            ok: accuracyOk,
+            label: 'Akurasi GPS',
+            detail: accuracyMeters == null
+                ? 'Belum ada data'
+                : '${accuracyMeters!.toStringAsFixed(0)} m',
+          ),
+          _CheckRow(
+            ok: rental != null,
+            label: 'Rental aktif',
+            detail: rental == null ? 'Monitoring saja' : 'Ada rental berjalan',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckRow extends StatelessWidget {
+  const _CheckRow({
+    required this.ok,
+    required this.label,
+    required this.detail,
+  });
+
+  final bool ok;
+  final String label;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = ok ? const Color(0xFF027A48) : const Color(0xFFB54708);
+    final background = ok ? const Color(0xFFECFDF3) : const Color(0xFFFFFAEB);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration:
+                BoxDecoration(color: background, shape: BoxShape.circle),
+            child: Icon(
+              ok ? Icons.check_rounded : Icons.priority_high_rounded,
+              size: 16,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF344054),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Flexible(
+            child: Text(
+              detail,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationAccessBanner extends StatelessWidget {
+  const _LocationAccessBanner({
+    required this.checking,
+    required this.status,
+    required this.message,
+    required this.onRequestPermission,
+    required this.onOpenSettings,
+  });
+
+  final bool checking;
+  final LocationAccessStatus status;
+  final String message;
+  final VoidCallback onRequestPermission;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final needsAppSettings = status == LocationAccessStatus.deniedForever;
+    final needsLocationSettings =
+        status == LocationAccessStatus.serviceDisabled || needsAppSettings;
+
+    return _Panel(
+      borderColor: const Color(0xFFFDB022),
+      backgroundColor: const Color(0xFFFFFCF5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.location_off_rounded,
+                color: Color(0xFFB54708),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  checking ? 'Mengecek akses lokasi...' : message,
+                  style: const TextStyle(
+                    color: Color(0xFF7A2E0E),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!checking) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onRequestPermission,
+                  icon: const Icon(Icons.gps_fixed_rounded, size: 18),
+                  label: const Text('Minta Izin Lokasi'),
+                ),
+                if (needsLocationSettings)
+                  TextButton.icon(
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.settings_rounded, size: 18),
+                    label: Text(
+                      needsAppSettings
+                          ? 'Buka Pengaturan Aplikasi'
+                          : 'Aktifkan GPS',
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _StatusBanner extends StatelessWidget {
   const _StatusBanner({
     required this.streaming,
     required this.mode,
     required this.sending,
     required this.serverMessage,
+    required this.lastGpsReadAt,
+    required this.lastSentAt,
   });
 
   final bool streaming;
   final String mode;
   final bool sending;
   final String serverMessage;
+  final DateTime? lastGpsReadAt;
+  final DateTime? lastSentAt;
 
   @override
   Widget build(BuildContext context) {
     final color = streaming ? const Color(0xFF027A48) : const Color(0xFFB42318);
+    final title = streaming ? 'GPS aktif otomatis' : 'GPS otomatis berhenti';
+    final subtitle = streaming
+        ? 'Mode: $mode | GPS: ${_relativeTimeLabel(lastGpsReadAt)} | Server: ${_relativeTimeLabel(lastSentAt)}'
+        : 'Mode: $mode | Server: $serverMessage';
 
     return _Panel(
       child: Row(
@@ -736,7 +1159,7 @@ class _StatusBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  streaming ? 'Pengiriman GPS aktif' : 'Pengiriman berhenti',
+                  title,
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.w800,
@@ -744,8 +1167,8 @@ class _StatusBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Mode: $mode | Server: $serverMessage',
-                  maxLines: 1,
+                  subtitle,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF667085),
@@ -761,6 +1184,8 @@ class _StatusBanner extends StatelessWidget {
               height: 18,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
+          if (!sending && streaming)
+            const Icon(Icons.sensors_rounded, color: Color(0xFF0F766E)),
         ],
       ),
     );
@@ -838,17 +1263,21 @@ class _BikeHeader extends StatelessWidget {
 class _SpeedDashboard extends StatelessWidget {
   const _SpeedDashboard({
     required this.speedKmh,
+    required this.rentalActive,
     required this.accuracyMeters,
     required this.latitude,
     required this.longitude,
+    required this.lastGpsReadAt,
     required this.lastSentAt,
     required this.routePoints,
   });
 
   final double speedKmh;
+  final bool rentalActive;
   final double? accuracyMeters;
   final double? latitude;
   final double? longitude;
+  final DateTime? lastGpsReadAt;
   final DateTime? lastSentAt;
   final List<_RoutePoint> routePoints;
 
@@ -869,6 +1298,37 @@ class _SpeedDashboard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          if (!rentalActive) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFAEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFEDF89)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: Color(0xFFB54708),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Belum ada rental aktif. GPS tetap dikirim untuk monitoring, tetapi speedometer dan jalur perjalanan belum dihitung.',
+                      style: TextStyle(
+                        color: Color(0xFF93370D),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -926,9 +1386,11 @@ class _SpeedDashboard extends StatelessWidget {
               ),
               _InfoPill(
                 icon: Icons.update,
-                label: lastSentAt == null
-                    ? 'Belum terkirim'
-                    : '${_timeDiff(lastSentAt!)} lalu',
+                label: 'GPS: ${_relativeTimeLabel(lastGpsReadAt)}',
+              ),
+              _InfoPill(
+                icon: Icons.cloud_done_outlined,
+                label: 'Server: ${_relativeTimeLabel(lastSentAt)}',
               ),
             ],
           ),
@@ -1408,6 +1870,7 @@ class _DeviceGrid extends StatelessWidget {
     required this.batteryPercent,
     required this.networkType,
     required this.pointsSent,
+    required this.lastGpsReadAt,
     required this.lastSentAt,
     required this.locationMode,
     required this.streaming,
@@ -1416,6 +1879,7 @@ class _DeviceGrid extends StatelessWidget {
   final int batteryPercent;
   final String networkType;
   final int pointsSent;
+  final DateTime? lastGpsReadAt;
   final DateTime? lastSentAt;
   final String locationMode;
   final bool streaming;
@@ -1441,9 +1905,14 @@ class _DeviceGrid extends StatelessWidget {
           icon: Icons.upload_rounded,
         ),
         _MetricTile(
-          label: 'Terakhir Kirim',
-          value: lastSentAt == null ? '-' : '${_timeDiff(lastSentAt!)} lalu',
+          label: 'GPS Dibaca',
+          value: _relativeTimeLabel(lastGpsReadAt),
           icon: Icons.update,
+        ),
+        _MetricTile(
+          label: 'Server Terima',
+          value: _relativeTimeLabel(lastSentAt),
+          icon: Icons.cloud_done_outlined,
         ),
         _MetricTile(
           label: 'Mode Lokasi',
@@ -1723,10 +2192,22 @@ String _formatRupiah(int value) {
 }
 
 String _timeDiff(DateTime dt) {
-  final diff = DateTime.now().difference(dt);
+  final rawDiff = DateTime.now().difference(dt);
+  final diff = rawDiff.isNegative ? Duration.zero : rawDiff;
   if (diff.inSeconds < 60) return '${diff.inSeconds}s';
   if (diff.inMinutes < 60) return '${diff.inMinutes}m';
   return '${diff.inHours}j';
+}
+
+String _relativeTimeLabel(DateTime? dt) {
+  if (dt == null) return 'Belum ada';
+  return '${_timeDiff(dt)} lalu';
+}
+
+bool _isFresh(DateTime? dt, Duration maxAge) {
+  if (dt == null) return false;
+  final age = DateTime.now().difference(dt);
+  return !age.isNegative && age <= maxAge;
 }
 
 String _gpsQualityLabel(double? accuracyMeters) {
