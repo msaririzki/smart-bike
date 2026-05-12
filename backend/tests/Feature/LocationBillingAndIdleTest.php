@@ -190,7 +190,15 @@ class LocationBillingAndIdleTest extends TestCase
         Sanctum::actingAs($this->user);
         $this->postJson("/api/rentals/{$this->rental->id}/idle/continue")
             ->assertOk()
-            ->assertJsonPath('data.status', Rental::STATUS_IDLE_BILLING);
+            ->assertJsonPath('data.status', Rental::STATUS_IDLE_WARNING);
+
+        $this->assertDatabaseHas('rental_idle_events', [
+            'rental_id' => $this->rental->id,
+            'event_type' => 'warning_acknowledged',
+        ]);
+
+        $this->rental->refresh()->update(['idle_warning_at' => now()->subSeconds(61)]);
+        app(IdleDetectionService::class)->moveWarningsToIdleBilling();
 
         $this->rental->refresh()->update(['last_idle_billing_at' => now()->subSeconds(301)]);
         app(IdleDetectionService::class)->applyIdleBillingDue();

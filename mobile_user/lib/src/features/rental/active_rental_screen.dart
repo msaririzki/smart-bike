@@ -313,7 +313,9 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                   }
 
                   _closeIdleDialog();
-                  _showMessage('Sewa dilanjutkan. Biaya idle mulai berjalan.');
+                  _showMessage(
+                    'Peringatan dikonfirmasi. Lanjut bergerak agar biaya idle tidak berjalan.',
+                  );
                   await _loadRental(silent: true);
                 } on ApiException catch (error) {
                   if (mounted) {

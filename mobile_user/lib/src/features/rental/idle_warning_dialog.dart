@@ -169,7 +169,7 @@ class IdleWarningDialog extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Jika Anda memilih Lanjutkan, biaya idle akan dikenakan selama sepeda masih diam.',
+                          'Pilih lanjut jika masih memakai sepeda. Jika tetap diam setelah waktu toleransi, biaya idle akan berjalan.',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.orange.shade900,
@@ -311,7 +311,7 @@ class IdleWarningDialog extends StatelessWidget {
                           size: 22,
                         ),
                         label: const Text(
-                          'Lanjutkan Sewa',
+                          'Saya Lanjutkan',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 15,
