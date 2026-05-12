@@ -86,4 +86,39 @@ class AdminPagesTest extends TestCase
             'role' => 'admin',
         ]);
     }
+
+    public function test_admin_can_create_bike_with_device_login_account(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin',
+            'email' => 'admin@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
+
+        $response = $this->actingAs($admin)->post('/admin/bikes', [
+            'code' => 'BIKE-FAST-1',
+            'name' => 'Sepeda Cepat 1',
+            'status' => 'available',
+            'current_latitude' => -8.583,
+            'current_longitude' => 116.116,
+            'battery_percent' => 100,
+            'create_device_account' => '1',
+            'device_email' => 'device-fast-1@example.test',
+            'device_password' => 'password123',
+        ]);
+
+        $response
+            ->assertRedirect('/admin/bikes')
+            ->assertSessionHas('device_credentials.email', 'device-fast-1@example.test')
+            ->assertSessionHas('device_credentials.password', 'password123');
+
+        $device = User::query()->where('email', 'device-fast-1@example.test')->firstOrFail();
+
+        $this->assertSame('device', $device->role);
+        $this->assertDatabaseHas('bikes', [
+            'code' => 'BIKE-FAST-1',
+            'assigned_device_user_id' => $device->id,
+        ]);
+    }
 }

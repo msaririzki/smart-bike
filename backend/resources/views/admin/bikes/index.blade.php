@@ -2,6 +2,27 @@
 
 @section('content')
     <h1>Sepeda</h1>
+    @if(session('device_credentials'))
+        @php($credentials = session('device_credentials'))
+        <div class="card" style="border-color: #0f766e; background: #f0fdfa;">
+            <h2 style="margin-top: 0; color: #134e4a;">Kredensial Login Mobile Bike</h2>
+            <p class="muted" style="margin-top: 0;">Gunakan akun ini untuk login di aplikasi <strong>mobile_bike</strong>. Password hanya ditampilkan setelah akun dibuat.</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                <div>
+                    <span class="muted">Kode sepeda</span>
+                    <p style="margin: 4px 0 0; font-weight: 800;">{{ $credentials['bike_code'] }}</p>
+                </div>
+                <div>
+                    <span class="muted">Email device</span>
+                    <p style="margin: 4px 0 0; font-weight: 800;">{{ $credentials['email'] }}</p>
+                </div>
+                <div>
+                    <span class="muted">Password</span>
+                    <p style="margin: 4px 0 0; font-weight: 800;">{{ $credentials['password'] }}</p>
+                </div>
+            </div>
+        </div>
+    @endif
     <p><a class="button" href="{{ route('admin.bikes.create') }}">Tambah Sepeda</a></p>
     <div class="table-responsive">
         <table>
