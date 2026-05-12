@@ -25,6 +25,8 @@ Port Smart Bike diset agar tidak bentrok:
 3311 -> smart-bike MariaDB external
 ```
 
+Runtime Docker backend memakai PHP 8.4. Ini wajib karena `composer.lock` memakai paket Symfony v8 yang membutuhkan PHP `>=8.4`.
+
 Cloudflare Tunnel untuk `bike.ikydev.site` diarahkan ke:
 
 ```text

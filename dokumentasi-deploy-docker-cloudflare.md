@@ -18,6 +18,8 @@ Service yang tersedia:
 - `db`: MariaDB
 - `cloudflared`: opsional untuk Cloudflare Tunnel
 
+Runtime backend memakai PHP 8.4 karena `composer.lock` project ini sudah mengunci beberapa paket Symfony v8 yang membutuhkan PHP `>=8.4`.
+
 Arsitektur deploy:
 
 ```text
