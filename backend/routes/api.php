@@ -22,9 +22,11 @@ Route::middleware(['auth:sanctum', 'role:user,admin,superadmin'])->group(functio
 
 Route::middleware(['auth:sanctum', 'role:user'])->group(function (): void {
     Route::post('/rentals/start', [RentalController::class, 'start']);
+    Route::post('/rentals/start-from-qr', [RentalController::class, 'startFromQr']);
     Route::get('/rentals/active', [RentalController::class, 'active']);
     Route::get('/rentals/history', [RentalController::class, 'history']);
     Route::get('/rentals/idle-settings', [RentalController::class, 'idleSettings']);
+    Route::get('/rentals/{rental}/location-points', [RentalController::class, 'locationPoints']);
     Route::post('/rentals/{rental}/finish', [RentalController::class, 'finish']);
     Route::post('/rentals/{rental}/idle/continue', [RentalController::class, 'continueIdle']);
 });
@@ -34,4 +36,5 @@ Route::middleware(['auth:sanctum', 'role:device'])->prefix('device')->group(func
     Route::get('/active-rental-summary', [DeviceController::class, 'activeRentalSummary']);
     Route::post('/location-update', [DeviceController::class, 'locationUpdate']);
     Route::post('/heartbeat', [DeviceController::class, 'heartbeat']);
+    Route::post('/rental-qr', [DeviceController::class, 'generateRentalQr']);
 });

@@ -9,6 +9,8 @@ import '../../services/api_client.dart';
 import '../../theme/app_colors.dart';
 import '../history/history_screen.dart';
 import '../rental/active_rental_screen.dart';
+import '../rental/map_test_screen.dart';
+import '../rental/qr_scan_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.api, required this.onLogout, super.key});
@@ -173,7 +175,19 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: _CustomBottomNavBar(
         selectedIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => MapTestScreen(api: widget.api)),
+            );
+          } else if (index == 2) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => QrScanScreen(api: widget.api)),
+            );
+          } else {
+            setState(() => _selectedIndex = index);
+          }
+        },
       ),
     );
   }

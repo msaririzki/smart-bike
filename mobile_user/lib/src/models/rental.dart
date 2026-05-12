@@ -9,7 +9,7 @@ class Rental {
     required this.idleCost,
     required this.totalCost,
     this.startedAt,
-    this.currentSpeedKmh,
+    this.currentSpeedKmh = 0,
     this.latestLocationPoint,
     this.bike,
   });
@@ -21,7 +21,7 @@ class Rental {
   final int idleCost;
   final int totalCost;
   final DateTime? startedAt;
-  final double? currentSpeedKmh;
+  final double currentSpeedKmh;
   final RentalLocationPoint? latestLocationPoint;
   final Bike? bike;
 
@@ -52,7 +52,9 @@ class Rental {
       totalCost: _toInt(json['total_cost']),
       startedAt: _toDateTime(json['started_at']),
       currentSpeedKmh:
-          _toDouble(json['current_speed_kmh']) ?? parsedLatestPoint?.speedKmh,
+          _toDouble(json['current_speed_kmh']) ??
+          parsedLatestPoint?.speedKmh ??
+          0,
       latestLocationPoint: parsedLatestPoint,
       bike: json['bike'] == null
           ? null

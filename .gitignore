@@ -10,3 +10,6 @@ node_modules/
 vendor/
 
 *.log
+
+# APK build output (too large for GitHub)
+apk-output/

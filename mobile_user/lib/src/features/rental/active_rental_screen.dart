@@ -113,9 +113,14 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
       }
 
       final rental = detail == null ? null : Rental.fromJson(detail);
+      final routeHistory = rental == null ? null : await _loadRouteHistory(rental);
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _rental = rental;
-        _syncRoutePoints(rental);
+        _syncRoutePoints(rental, routeHistory: routeHistory);
         _error = null;
       });
       _handleIdleStatus(rental);
@@ -183,7 +188,16 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
     return false;
   }
 
-  void _syncRoutePoints(Rental? rental) {
+  Future<List<LatLng>?> _loadRouteHistory(Rental rental) async {
+    try {
+      final points = await widget.api.rentalLocationPoints(rental.id);
+      return points.map((point) => point.latLng).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _syncRoutePoints(Rental? rental, {List<LatLng>? routeHistory}) {
     if (rental == null) {
       _routeRentalId = null;
       _routePoints.clear();
@@ -193,6 +207,12 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
     if (_routeRentalId != rental.id) {
       _routeRentalId = rental.id;
       _routePoints.clear();
+    }
+
+    if (routeHistory != null) {
+      _routePoints
+        ..clear()
+        ..addAll(routeHistory);
     }
 
     final latitude = rental.latitude;

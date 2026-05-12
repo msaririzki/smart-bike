@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Bike;
+use App\Services\BikeQrRentalService;
 use App\Services\BikeStatusService;
 use App\Services\LocationProcessingService;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +15,7 @@ class DeviceController extends Controller
     public function __construct(
         private readonly BikeStatusService $bikeStatus,
         private readonly LocationProcessingService $locations,
+        private readonly BikeQrRentalService $qrService,
     ) {}
 
     public function currentAssignment(Request $request): JsonResponse
@@ -115,5 +117,24 @@ class DeviceController extends Controller
         ]);
 
         return response()->json($this->locations->process($request->user(), $data));
+    }
+
+    public function generateRentalQr(Request $request): JsonResponse
+    {
+        $session = $this->qrService->generateQr($request->user());
+        $session->load('bike');
+
+        return response()->json([
+            'data' => [
+                'token' => $session->token,
+                'payload' => 'smartbike://rent?token=' . $session->token,
+                'expires_at' => $session->expires_at->toISOString(),
+                'bike' => [
+                    'id' => $session->bike->id,
+                    'code' => $session->bike->code,
+                    'name' => $session->bike->name,
+                ],
+            ],
+        ], 201);
     }
 }

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/bike.dart';
 import '../models/device_rental_summary.dart';
+import '../models/rental_qr_session.dart';
 import 'session_store.dart';
 
 class ApiException implements Exception {
@@ -19,7 +20,7 @@ class ApiClient {
 
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000/api',
+    defaultValue: 'https://bike.ikydev.site/api',
   );
 
   final SessionStore _session;
@@ -88,6 +89,13 @@ class ApiClient {
       'network_type': networkType,
       'recorded_at': (recordedAt ?? DateTime.now()).toUtc().toIso8601String(),
     });
+  }
+
+  // ─── QR Rental ───────────────────────────────────────────────────────────
+
+  Future<RentalQrSession> createRentalQr() async {
+    final json = await _post('/device/rental-qr', body: {});
+    return RentalQrSession.fromJson(json['data'] as Map<String, dynamic>);
   }
 
   // ─── Internal ────────────────────────────────────────────────────────────
