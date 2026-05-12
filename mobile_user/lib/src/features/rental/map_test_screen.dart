@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'map_widget.dart';
+import 'rolling_number.dart';
 import 'routing_service.dart';
 
 class MapTestScreen extends StatefulWidget {
@@ -517,10 +518,11 @@ class _InfoPanel extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: _InfoItem(
+                child: _InfoItemRolling(
                   icon: Icons.speed,
                   label: 'Kecepatan',
-                  value: '${speed.toStringAsFixed(1)} km/h',
+                  value: speed.toStringAsFixed(1),
+                  suffix: 'km/h',
                 ),
               ),
               Expanded(
@@ -603,6 +605,45 @@ class _InfoItem extends StatelessWidget {
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w600,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoItemRolling extends StatelessWidget {
+  const _InfoItemRolling({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.suffix = '',
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final String suffix;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xff0f766e)),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: const Color(0xff667085),
+              ),
+        ),
+        const SizedBox(height: 2),
+        RollingNumber(
+          value: value,
+          suffix: suffix,
+          textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
         ),
       ],

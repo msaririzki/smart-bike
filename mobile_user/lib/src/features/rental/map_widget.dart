@@ -62,6 +62,15 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
 
+  // Animated Route Drawing
+  AnimationController? _routeAnimController;
+  Animation<double>? _routeAnimation;
+  List<LatLng> _animatedRoutePoints = [];
+
+  // Marker Bounce
+  AnimationController? _bounceController;
+  Animation<double>? _bounceAnimation;
+
   @override
   void initState() {
     super.initState();
@@ -75,12 +84,40 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     _pulseAnimation = Tween<double>(begin: 0.35, end: 0.12).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // Marker bounce animation (plays once on load)
+    _bounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _bounceAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: -30.0, end: 0.0).chain(CurveTween(curve: Curves.bounceOut)), weight: 70),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -4.0), weight: 15),
+      TweenSequenceItem(tween: Tween(begin: -4.0, end: 0.0), weight: 15),
+    ]).animate(_bounceController!);
+    _bounceController!.forward();
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _routeAnimController?.dispose();
+    _bounceController?.dispose();
     super.dispose();
+  }
+
+  void _startRouteAnimation(List<LatLng> points) {
+    _routeAnimController?.dispose();
+    _animatedRoutePoints = points;
+
+    _routeAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    _routeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _routeAnimController!, curve: Curves.easeInOut),
+    );
+    _routeAnimController!.forward();
   }
 
   @override
@@ -91,6 +128,19 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
         LatLng(widget.latitude, widget.longitude),
         _mapController.camera.zoom,
       );
+    }
+
+    // Trigger route animation when navigation route changes
+    if (widget.navigationRoute.length >= 2 &&
+        widget.navigationRoute != old.navigationRoute) {
+      _startRouteAnimation(widget.navigationRoute);
+    }
+    // Clear animation when route is removed
+    if (widget.navigationRoute.isEmpty && old.navigationRoute.isNotEmpty) {
+      _routeAnimController?.dispose();
+      _routeAnimController = null;
+      _routeAnimation = null;
+      _animatedRoutePoints = [];
     }
   }
 
@@ -107,6 +157,8 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
           _buildTileLayer(),
           if (widget.mapType == MapType.hybrid) _buildHybridLabelLayer(),
           if (widget.navigationRoute.length >= 2) _buildNavigationRoute(),
+          if (widget.navigationRoute.length >= 2 && _routeAnimation != null)
+            _buildAnimatedNavigationOverlay(),
           if (widget.routePoints.length >= 2) _buildRouteLayer(),
           if (widget.pickupPoint != null) _buildPickupMarker(),
           if (widget.routePoints.isNotEmpty) _buildStartMarker(),
@@ -148,16 +200,41 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
   }
 
   PolylineLayer _buildNavigationRoute() {
+    // Base route: shown as faint guideline
     return PolylineLayer(
       polylines: [
         Polyline(
           points: widget.navigationRoute,
-          color: const Color(0xff3b82f6),
+          color: const Color(0xff3b82f6).withValues(alpha: 0.2),
           strokeWidth: 5,
-          borderColor: const Color(0xff1d4ed8).withValues(alpha: 0.4),
+          borderColor: const Color(0xff1d4ed8).withValues(alpha: 0.1),
           borderStrokeWidth: 2,
         ),
       ],
+    );
+  }
+
+  /// Animated overlay: reveals the route progressively
+  Widget _buildAnimatedNavigationOverlay() {
+    return AnimatedBuilder(
+      animation: _routeAnimation!,
+      builder: (context, _) {
+        final totalPoints = _animatedRoutePoints.length;
+        final visibleCount = (_routeAnimation!.value * totalPoints).round().clamp(2, totalPoints);
+        final visiblePoints = _animatedRoutePoints.sublist(0, visibleCount);
+
+        return PolylineLayer(
+          polylines: [
+            Polyline(
+              points: visiblePoints,
+              color: const Color(0xff3b82f6),
+              strokeWidth: 5,
+              borderColor: const Color(0xff1d4ed8).withValues(alpha: 0.4),
+              borderStrokeWidth: 2,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -282,35 +359,44 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
         return Marker(
           point: spot.position,
           width: 44,
-          height: 52,
-          child: GestureDetector(
-            onTap: () => widget.onSpotTap?.call(spot),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color(0xff8b5cf6),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2.5),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x44000000),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
+          height: 62,
+          child: AnimatedBuilder(
+            animation: _bounceAnimation!,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, _bounceAnimation!.value),
+                child: child,
+              );
+            },
+            child: GestureDetector(
+              onTap: () => widget.onSpotTap?.call(spot),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xff8b5cf6),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2.5),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x44000000),
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(spot.icon, color: Colors.white, size: 18),
                   ),
-                  child: Icon(spot.icon, color: Colors.white, size: 18),
-                ),
-                const Icon(
-                  Icons.arrow_drop_down,
-                  color: Color(0xff8b5cf6),
-                  size: 16,
-                ),
-              ],
+                  const Icon(
+                    Icons.arrow_drop_down,
+                    color: Color(0xff8b5cf6),
+                    size: 16,
+                  ),
+                ],
+              ),
             ),
           ),
         );
