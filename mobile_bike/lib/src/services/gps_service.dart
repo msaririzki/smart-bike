@@ -1,4 +1,8 @@
+import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 enum LocationAccessStatus {
   granted,
@@ -38,6 +42,8 @@ class GpsService {
       return const LocationAccessResult(LocationAccessStatus.denied);
     }
 
+    await Permission.notification.request();
+
     return const LocationAccessResult(LocationAccessStatus.granted);
   }
 
@@ -59,11 +65,28 @@ class GpsService {
 
   /// Stream posisi real-time saat perangkat bergerak minimal 1 meter.
   Stream<Position> positionStream() {
+    final locationSettings = defaultTargetPlatform == TargetPlatform.android
+        ? AndroidSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 1,
+            intervalDuration: const Duration(seconds: 5),
+            foregroundNotificationConfig: const ForegroundNotificationConfig(
+              notificationTitle: 'Smart Bike sedang mengirim lokasi',
+              notificationText:
+                  'GPS sepeda aktif agar admin dan penyewa bisa memantau lokasi.',
+              notificationChannelName: 'Pelacakan Sepeda',
+              enableWakeLock: true,
+              setOngoing: true,
+              color: Color(0xFF0F766E),
+            ),
+          )
+        : const LocationSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 1,
+          );
+
     return Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 1,
-      ),
+      locationSettings: locationSettings,
     );
   }
 }

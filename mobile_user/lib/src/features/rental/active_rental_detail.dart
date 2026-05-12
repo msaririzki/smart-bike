@@ -36,10 +36,7 @@ class ActiveRentalDetail extends StatelessWidget {
       children: [
         _StatusHeader(status: rental.status),
         const SizedBox(height: 16),
-        _BikePanel(
-          code: bike?.code ?? 'Bike',
-          name: bike?.name ?? 'Sepeda',
-        ),
+        _BikePanel(code: bike?.code ?? 'Bike', name: bike?.name ?? 'Sepeda'),
         const SizedBox(height: 16),
         if (latitude != null && longitude != null) ...[
           SizedBox(
@@ -53,11 +50,21 @@ class ActiveRentalDetail extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Lokasi: ${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: const Color(0xff667085),
-            ),
+            'Lokasi sepeda terakhir dari mobile_bike: ${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: const Color(0xff667085)),
           ),
+          if (routePoints.length >= 2) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Jalur di peta adalah ringkasan titik GPS yang dikirim perangkat sepeda.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: const Color(0xff0f766e),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
         ] else ...[
           const _LocationUnavailableCard(),
@@ -303,7 +310,7 @@ class _LocationUnavailableCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Rental aktif sudah ditemukan, tetapi simulator belum mengirim latitude dan longitude yang bisa ditampilkan di peta.',
+                  'Rental aktif sudah ditemukan, tetapi perangkat mobile_bike belum mengirim latitude dan longitude yang bisa ditampilkan di peta.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: const Color(0xff93370d),
                   ),
@@ -339,7 +346,7 @@ class _ConnectionPanel extends StatelessWidget {
         children: [
           _ConnectionRow(
             icon: Icons.update,
-            label: 'Last update',
+            label: 'GPS sepeda terakhir',
             value: lastUpdate == null
                 ? 'Belum ada data GPS'
                 : DateFormat('HH:mm:ss, dd MMM yyyy').format(lastUpdate),
@@ -391,9 +398,9 @@ class _ConnectionRow extends StatelessWidget {
             value,
             textAlign: TextAlign.right,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
       ],
@@ -456,8 +463,9 @@ class _MetricCard extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color:
-                emphasized ? const Color(0xff0f766e) : const Color(0xff475467),
+            color: emphasized
+                ? const Color(0xff0f766e)
+                : const Color(0xff475467),
           ),
           const Spacer(),
           Text(label, style: Theme.of(context).textTheme.labelMedium),
@@ -467,9 +475,9 @@ class _MetricCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(height: 2),
