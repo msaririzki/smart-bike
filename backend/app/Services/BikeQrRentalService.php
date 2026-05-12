@@ -29,6 +29,12 @@ class BikeQrRentalService
             ]);
         }
 
+        if ($bike->status !== 'available') {
+            throw ValidationException::withMessages([
+                'bike' => 'Sepeda tidak tersedia untuk disewa (status: ' . $bike->status . ').',
+            ]);
+        }
+
         // Check if bike has an active rental
         $hasActiveRental = Rental::query()
             ->where('bike_id', $bike->id)
@@ -94,12 +100,27 @@ class BikeQrRentalService
             ]);
         }
 
-        return DB::transaction(function () use ($user, $bike, $session) {
-            // Mark token as used
-            $session->update([
-                'used_at' => now(),
-                'used_by_user_id' => $user->id,
+        if ($bike->assigned_device_user_id !== $session->device_user_id) {
+            throw ValidationException::withMessages([
+                'token' => 'Sepeda ini sudah di-assign ke perangkat lain, QR tidak berlaku.',
             ]);
+        }
+
+        return DB::transaction(function () use ($user, $bike, $session) {
+            // Atomic update to mark token as used and prevent race conditions
+            $updated = BikeQrSession::query()
+                ->where('id', $session->id)
+                ->whereNull('used_at')
+                ->update([
+                    'used_at' => now(),
+                    'used_by_user_id' => $user->id,
+                ]);
+
+            if (! $updated) {
+                throw ValidationException::withMessages([
+                    'token' => 'QR sudah digunakan oleh request lain.',
+                ]);
+            }
 
             // Use existing RentalService to start the rental
             return $this->rentals->start($user, $bike);

@@ -63,21 +63,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _startRental(Bike bike) async {
-    setState(() => _isBusy = true);
-    try {
-      final rental = await widget.api.startRental(bike.id);
-      setState(() => _activeRental = rental);
-      await _load();
-      _showMessage('Rental dimulai untuk ${bike.code}.');
-      await _openActiveRental();
-    } on ApiException catch (error) {
-      _showMessage(error.message);
-    } finally {
-      if (mounted) {
-        setState(() => _isBusy = false);
-      }
-    }
+  void _promptScanQr() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Gunakan tombol Scan QR di bawah untuk menyewa sepeda ini.'),
+        duration: Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _finishRental() async {
@@ -215,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _BikeCard(
                             bike: bike,
                             isBusy: _isBusy || _activeRental != null,
-                            onStart: () => _startRental(bike),
+                            onAction: _promptScanQr,
                           ),
                           const SizedBox(height: 10),
                         ],
@@ -628,12 +621,12 @@ class _BikeCard extends StatelessWidget {
   const _BikeCard({
     required this.bike,
     required this.isBusy,
-    required this.onStart,
+    required this.onAction,
   });
 
   final Bike bike;
   final bool isBusy;
-  final VoidCallback onStart;
+  final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -721,7 +714,7 @@ class _BikeCard extends StatelessWidget {
             width: 70,
             height: 38,
             child: FilledButton(
-              onPressed: available && !isBusy ? onStart : null,
+              onPressed: available && !isBusy ? onAction : null,
               style: FilledButton.styleFrom(
                 padding: EdgeInsets.zero,
                 backgroundColor: const Color(0xff269276),
@@ -732,10 +725,10 @@ class _BikeCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-            child: const Text(
-              'Lihat',
-              maxLines: 1,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              child: const Text(
+                'Lihat',
+                maxLines: 1,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
           ),
