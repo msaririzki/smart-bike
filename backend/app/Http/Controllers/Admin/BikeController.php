@@ -16,6 +16,10 @@ use Illuminate\View\View;
 
 class BikeController extends Controller
 {
+    private const DEFAULT_LATITUDE = -8.583000;
+    private const DEFAULT_LONGITUDE = 116.116000;
+    private const DEFAULT_BATTERY_PERCENT = 100;
+
     public function index(): View
     {
         return view('admin.bikes.index', [
@@ -32,9 +36,9 @@ class BikeController extends Controller
                 'code' => sprintf('BIKE-%03d', $nextNumber),
                 'name' => sprintf('Sepeda Kampus %d', $nextNumber),
                 'status' => 'available',
-                'current_latitude' => -8.583000,
-                'current_longitude' => 116.116000,
-                'battery_percent' => 100,
+                'current_latitude' => self::DEFAULT_LATITUDE,
+                'current_longitude' => self::DEFAULT_LONGITUDE,
+                'battery_percent' => self::DEFAULT_BATTERY_PERCENT,
             ]),
             'devices' => $this->availableDeviceUsers()->get(),
         ]);
@@ -95,6 +99,12 @@ class BikeController extends Controller
 
         $createDevice = (bool) ($data['create_device_account'] ?? false);
         $credentials = null;
+
+        if (! $bike?->exists) {
+            $data['current_latitude'] = $data['current_latitude'] ?? self::DEFAULT_LATITUDE;
+            $data['current_longitude'] = $data['current_longitude'] ?? self::DEFAULT_LONGITUDE;
+            $data['battery_percent'] = $data['battery_percent'] ?? self::DEFAULT_BATTERY_PERCENT;
+        }
 
         if ($createDevice) {
             $password = ($data['device_password'] ?? null) ?: 'Bike-'.Str::upper(Str::random(8));
