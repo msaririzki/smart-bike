@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/bike.dart';
-import '../models/rental.dart';
+import '../models/rental.dart' hide RentalLocationPoint;
 import '../models/rental_location_point.dart';
 import 'session_store.dart';
 
