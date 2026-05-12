@@ -11,6 +11,12 @@ use Illuminate\Support\Facades\DB;
 
 class LocationProcessingService
 {
+    private const MIN_RELIABLE_REPORTED_SPEED_KMH = 2.0;
+
+    private const MAX_DYNAMIC_MOVEMENT_THRESHOLD_METERS = 35.0;
+
+    private const MAX_STATIONARY_JITTER_METERS = 120.0;
+
     public function __construct(
         private readonly PricingConfigService $pricing,
         private readonly BillingService $billing,
@@ -81,7 +87,7 @@ class LocationProcessingService
                 (float) $data['longitude'],
             );
 
-            $threshold = (float) $this->pricing->get('minimum_movement_threshold_meters');
+            $threshold = $this->movementThresholdMeters($data, $previous);
             if ($distance < $threshold) {
                 $point = $this->storePoint($bike, $rental, $data, $recordedAt, 'below_threshold', $distance);
                 $this->idleDetection->checkIdleWarnings();
@@ -92,6 +98,14 @@ class LocationProcessingService
             $seconds = max(1, abs($recordedAt->diffInSeconds($previous->recorded_at)));
             $speedKmh = ($distance / $seconds) * 3.6;
             $maxSpeed = (float) $this->pricing->get('max_reasonable_speed_kmh');
+            $reportedSpeedKmh = isset($data['speed_kmh']) ? (float) $data['speed_kmh'] : null;
+
+            if ($this->looksLikeStationaryJitter($reportedSpeedKmh, $distance, $threshold)) {
+                $point = $this->storePoint($bike, $rental, $data, $recordedAt, 'stationary_jitter', $distance);
+                $this->idleDetection->checkIdleWarnings();
+
+                return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Stationary GPS jitter ignored; not billed.'];
+            }
 
             if ($speedKmh > $maxSpeed) {
                 $point = $this->storePoint($bike, $rental, $data, $recordedAt, 'speed_anomaly', $distance, true);
@@ -109,6 +123,28 @@ class LocationProcessingService
 
             return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Valid movement processed.'];
         });
+    }
+
+    private function movementThresholdMeters(array $data, RentalLocationPoint $previous): float
+    {
+        $configuredThreshold = max(1.0, (float) $this->pricing->get('minimum_movement_threshold_meters'));
+        $currentAccuracy = isset($data['accuracy_meters']) ? (float) $data['accuracy_meters'] : 0.0;
+        $previousAccuracy = $previous->accuracy_meters !== null ? (float) $previous->accuracy_meters : 0.0;
+        $dynamicThreshold = min(
+            self::MAX_DYNAMIC_MOVEMENT_THRESHOLD_METERS,
+            max($currentAccuracy, $previousAccuracy) * 1.5,
+        );
+
+        return max($configuredThreshold, $dynamicThreshold);
+    }
+
+    private function looksLikeStationaryJitter(?float $reportedSpeedKmh, float $distance, float $threshold): bool
+    {
+        if ($reportedSpeedKmh === null || $reportedSpeedKmh >= self::MIN_RELIABLE_REPORTED_SPEED_KMH) {
+            return false;
+        }
+
+        return $distance < max(self::MAX_STATIONARY_JITTER_METERS, $threshold);
     }
 
     public function haversineMeters(float $lat1, float $lon1, float $lat2, float $lon2): float

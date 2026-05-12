@@ -121,4 +121,27 @@ class AdminPagesTest extends TestCase
             'assigned_device_user_id' => $device->id,
         ]);
     }
+
+    public function test_new_bike_uses_ubg_defaults_when_location_and_battery_are_empty(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin',
+            'email' => 'admin@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
+
+        $this->actingAs($admin)->post('/admin/bikes', [
+            'code' => 'BIKE-UBG-1',
+            'name' => 'Sepeda UBG Default',
+            'status' => 'available',
+        ])->assertRedirect('/admin/bikes');
+
+        $this->assertDatabaseHas('bikes', [
+            'code' => 'BIKE-UBG-1',
+            'current_latitude' => -8.583000,
+            'current_longitude' => 116.116000,
+            'battery_percent' => 100,
+        ]);
+    }
 }

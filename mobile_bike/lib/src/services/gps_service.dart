@@ -63,12 +63,12 @@ class GpsService {
     }
   }
 
-  /// Stream posisi real-time saat perangkat bergerak minimal 1 meter.
+  /// Stream posisi real-time saat perangkat bergerak cukup jauh untuk menekan GPS jitter.
   Stream<Position> positionStream() {
     final locationSettings = defaultTargetPlatform == TargetPlatform.android
         ? AndroidSettings(
             accuracy: LocationAccuracy.bestForNavigation,
-            distanceFilter: 1,
+            distanceFilter: 8,
             intervalDuration: const Duration(seconds: 5),
             foregroundNotificationConfig: const ForegroundNotificationConfig(
               notificationTitle: 'Smart Bike sedang mengirim lokasi',
@@ -82,7 +82,7 @@ class GpsService {
           )
         : const LocationSettings(
             accuracy: LocationAccuracy.bestForNavigation,
-            distanceFilter: 1,
+            distanceFilter: 8,
           );
 
     return Geolocator.getPositionStream(

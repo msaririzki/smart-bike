@@ -4,7 +4,9 @@ import 'dart:math' as math;
 import 'package:battery_plus/battery_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 
 import '../../models/bike.dart';
 import '../../models/device_rental_summary.dart';
@@ -33,9 +35,12 @@ class SimulatorScreen extends StatefulWidget {
 }
 
 class _SimulatorScreenState extends State<SimulatorScreen> {
-  static const double _maxAcceptedGpsAccuracyMeters = 50;
+  static const double _maxAcceptedGpsAccuracyMeters = 25;
   static const double _maxAcceptedJumpSpeedKmh = 80;
-  static const double _minRouteDistanceMeters = 1.5;
+  static const double _minRouteDistanceMeters = 10;
+  static const double _maxDynamicMovementThresholdMeters = 35;
+  static const double _minReliableSpeedKmh = 2;
+  static const Duration _stationaryServerPingInterval = Duration(seconds: 15);
   static const int _maxRoutePoints = 120;
 
   final _gps = GpsService();
@@ -62,11 +67,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   double? _accuracyMeters;
   String _networkType = 'unknown';
   int _batteryPercent = 0;
-  int _pointsSent = 0;
   DateTime? _lastGpsReadAt;
   DateTime? _lastSentAt;
-  int? _activeRentalId;
   DateTime _now = DateTime.now();
+  int? _activeRentalId;
   String _lastServerMsg = 'Belum ada pengiriman';
   String _simulationProgress = '';
   int _currentInterval = 5;
@@ -80,6 +84,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   LocationAccessStatus _locationAccessStatus = LocationAccessStatus.denied;
   String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
   final List<_RoutePoint> _routePoints = [];
+  _RoutePoint? _lastAcceptedGpsPoint;
+  DateTime? _lastStationarySentAt;
+  _BikeMapType _mapType = _BikeMapType.standard;
 
   bool get _hasActiveRental => _summary?.rental != null;
 
@@ -95,12 +102,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       const Duration(seconds: 5),
       (_) => _loadRentalSummary(silent: true),
     );
-    _clockTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) {
-        if (mounted) setState(() => _now = DateTime.now());
-      },
-    );
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() => _now = DateTime.now());
+      }
+    });
   }
 
   @override
@@ -135,6 +141,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         final nextRentalId = summary.rental?.id;
         if (_activeRentalId != null && nextRentalId != _activeRentalId) {
           _routePoints.clear();
+          _lastAcceptedGpsPoint = null;
+          _lastStationarySentAt = null;
         }
         _activeRentalId = nextRentalId;
       });
@@ -306,13 +314,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     });
 
     final currentPosition = await _gps.getCurrentPosition();
-    if (currentPosition != null && _shouldAcceptGpsPosition(currentPosition)) {
+    if (currentPosition != null) {
       _handleRealGpsPosition(currentPosition);
     }
 
     _positionSub = _gps.positionStream().listen((pos) {
       if (!mounted) return;
-      if (!_shouldAcceptGpsPosition(pos)) return;
       _handleRealGpsPosition(pos);
     }, onError: (Object error) {
       if (!mounted) return;
@@ -341,29 +348,76 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
     final currentPosition = await _gps.getCurrentPosition();
     if (!mounted || currentPosition == null) return;
-    if (!_shouldAcceptGpsPosition(currentPosition)) return;
 
     _handleRealGpsPosition(currentPosition);
   }
 
   void _handleRealGpsPosition(Position pos) {
-    final speedKmh = _hasActiveRental ? _calculateDisplaySpeedKmh(pos) : 0.0;
+    final sampledAt = pos.timestamp.toLocal();
 
     setState(() {
-      _speedKmh = speedKmh;
       _accuracyMeters = pos.accuracy;
-      _lastGpsReadAt = pos.timestamp.toLocal();
+      _lastGpsReadAt = sampledAt;
       _locationMode = 'Real GPS';
-      if (_hasActiveRental) {
-        _addRoutePoint(
-          latitude: pos.latitude,
-          longitude: pos.longitude,
-          accuracyMeters: pos.accuracy,
-          source: 'Real GPS',
-        );
-      }
     });
-    _sendLocation(pos, speedKmh: speedKmh);
+
+    if (pos.accuracy > _maxAcceptedGpsAccuracyMeters) {
+      setState(() {
+        _speedKmh = 0;
+        _lastServerMsg =
+            'GPS kurang akurat (${pos.accuracy.toStringAsFixed(1)} m), titik diabaikan';
+      });
+      return;
+    }
+
+    if (!_hasActiveRental) {
+      setState(() => _speedKmh = 0);
+      _sendLocation(pos, speedKmh: 0);
+      return;
+    }
+
+    final previous = _lastAcceptedGpsPoint;
+    if (previous == null) {
+      _acceptRealGpsPoint(pos, speedKmh: 0, message: 'Baseline GPS disimpan.');
+      return;
+    }
+
+    final distance = _haversineMeters(
+      previous.latitude,
+      previous.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+    final seconds = sampledAt.difference(previous.recordedAt).inMilliseconds /
+        Duration.millisecondsPerSecond;
+    final impliedSpeedKmh = seconds <= 0 ? 0.0 : (distance / seconds) * 3.6;
+    final movementThreshold = _movementThresholdMeters(pos, previous);
+
+    if (distance < movementThreshold) {
+      setState(() {
+        _speedKmh = 0;
+        _lastServerMsg =
+            'GPS stabil: perpindahan ${distance.toStringAsFixed(1)} m dianggap diam';
+      });
+      _sendStationaryPingIfDue(previous, pos);
+      return;
+    }
+
+    if (impliedSpeedKmh > _maxAcceptedJumpSpeedKmh) {
+      setState(() {
+        _speedKmh = 0;
+        _lastServerMsg =
+            'GPS loncat, titik diabaikan (${impliedSpeedKmh.toStringAsFixed(1)} km/h)';
+      });
+      return;
+    }
+
+    final speedKmh = _displaySpeedKmh(pos, impliedSpeedKmh);
+    _acceptRealGpsPoint(
+      pos,
+      speedKmh: speedKmh,
+      message: 'GPS valid, pergerakan ${distance.toStringAsFixed(1)} m.',
+    );
   }
 
   void _stopStream() {
@@ -522,34 +576,86 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _sendLocation(pos);
   }
 
-  double _calculateDisplaySpeedKmh(Position pos) {
-    if (!_hasActiveRental) return 0;
-
+  double _displaySpeedKmh(Position pos, double impliedSpeedKmh) {
     final gpsSpeedKmh =
         pos.speed.isFinite && pos.speed > 0 ? pos.speed * 3.6 : 0.0;
-    final derivedSpeedKmh = _deriveSpeedFromLastRoutePoint(pos);
 
-    if (gpsSpeedKmh >= 1) return gpsSpeedKmh;
-    if (derivedSpeedKmh >= 1) return derivedSpeedKmh;
+    if (gpsSpeedKmh >= _minReliableSpeedKmh &&
+        gpsSpeedKmh <= _maxAcceptedJumpSpeedKmh) {
+      return gpsSpeedKmh;
+    }
 
-    return math.max(gpsSpeedKmh, derivedSpeedKmh);
+    return impliedSpeedKmh >= _minReliableSpeedKmh ? impliedSpeedKmh : 0;
   }
 
-  double _deriveSpeedFromLastRoutePoint(Position pos) {
-    if (_routePoints.isEmpty) return 0;
+  double _movementThresholdMeters(Position pos, _RoutePoint previous) {
+    final dynamicThreshold =
+        math.max(pos.accuracy, previous.accuracyMeters) * 1.5;
 
-    final last = _routePoints.last;
-    final distance = _haversineMeters(
-      last.latitude,
-      last.longitude,
-      pos.latitude,
-      pos.longitude,
+    return math.max(
+      _minRouteDistanceMeters,
+      math.min(_maxDynamicMovementThresholdMeters, dynamicThreshold),
     );
-    final seconds = DateTime.now().difference(last.recordedAt).inMilliseconds /
-        Duration.millisecondsPerSecond;
-    if (seconds <= 0 || distance < _minRouteDistanceMeters) return 0;
+  }
 
-    return (distance / seconds) * 3.6;
+  void _acceptRealGpsPoint(
+    Position pos, {
+    required double speedKmh,
+    required String message,
+  }) {
+    final point = _RoutePoint(
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      accuracyMeters: pos.accuracy,
+      source: 'Real GPS',
+      recordedAt: pos.timestamp.toLocal(),
+    );
+
+    _lastAcceptedGpsPoint = point;
+    _lastStationarySentAt = null;
+
+    setState(() {
+      _speedKmh = speedKmh;
+      _lastServerMsg = message;
+      _addRoutePoint(
+        latitude: point.latitude,
+        longitude: point.longitude,
+        accuracyMeters: point.accuracyMeters,
+        source: point.source,
+      );
+    });
+
+    _sendLocation(pos, speedKmh: speedKmh);
+  }
+
+  void _sendStationaryPingIfDue(_RoutePoint stablePoint, Position sample) {
+    final now = DateTime.now();
+    if (_lastStationarySentAt != null &&
+        now.difference(_lastStationarySentAt!) <
+            _stationaryServerPingInterval) {
+      return;
+    }
+
+    _lastStationarySentAt = now;
+    _sendLocation(
+      _positionFromRoutePoint(stablePoint, sample),
+      speedKmh: 0,
+    );
+  }
+
+  Position _positionFromRoutePoint(_RoutePoint point, Position sample) {
+    return Position(
+      latitude: point.latitude,
+      longitude: point.longitude,
+      timestamp: sample.timestamp,
+      accuracy: math.min(sample.accuracy, point.accuracyMeters),
+      altitude: sample.altitude,
+      heading: sample.heading,
+      speed: 0,
+      speedAccuracy: sample.speedAccuracy,
+      altitudeAccuracy: sample.altitudeAccuracy,
+      headingAccuracy: sample.headingAccuracy,
+    );
   }
 
   Future<void> _sendLocation(Position pos, {double? speedKmh}) async {
@@ -566,7 +672,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       );
       if (mounted) {
         setState(() {
-          _pointsSent++;
           _lastSentAt = DateTime.now();
           _lastServerMsg = res['message']?.toString() ?? 'OK';
         });
@@ -577,39 +682,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
-  }
-
-  bool _shouldAcceptGpsPosition(Position pos) {
-    if (pos.accuracy > _maxAcceptedGpsAccuracyMeters) {
-      setState(() {
-        _accuracyMeters = pos.accuracy;
-        _lastServerMsg =
-            'GPS kurang akurat (${pos.accuracy.toStringAsFixed(1)} m)';
-      });
-      return false;
-    }
-
-    if (_routePoints.isEmpty) return true;
-
-    final last = _routePoints.last;
-    final distance = _haversineMeters(
-      last.latitude,
-      last.longitude,
-      pos.latitude,
-      pos.longitude,
-    );
-    final seconds = DateTime.now().difference(last.recordedAt).inSeconds;
-    final impliedSpeed = seconds <= 0 ? 0 : (distance / seconds) * 3.6;
-
-    if (distance > 20 && impliedSpeed > _maxAcceptedJumpSpeedKmh) {
-      setState(() {
-        _lastServerMsg =
-            'GPS loncat, titik diabaikan (${impliedSpeed.toStringAsFixed(1)} km/h)';
-      });
-      return false;
-    }
-
-    return true;
   }
 
   void _addRoutePoint({
@@ -674,11 +746,16 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final bike = _bike;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F9),
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2F9E38),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         foregroundColor: Colors.white,
-        title: const Text('Dashboard Sepeda'),
+        title: const Text(
+          'Simulator Sepeda',
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
@@ -696,7 +773,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         ],
       ),
       body: _loadingBike
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF22C55E)))
           : bike == null
               ? _buildNoBikeView()
               : _buildDashboardView(bike),
@@ -743,32 +820,392 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   Widget _buildDashboardView(Bike bike) {
     final rental = _summary?.rental;
-    final displaySpeed =
-        rental == null ? 0.0 : (_speedKmh ?? rental.currentSpeedKmh ?? 0.0);
 
     return Stack(
       children: [
         Positioned.fill(
           child: _MiniRouteMap(
             points: List.unmodifiable(_routePoints),
+            latestAccuracyMeters: _accuracyMeters,
+            mapType: _mapType,
+            onMapTypeChanged: (type) => setState(() => _mapType = type),
+          ),
+        ),
+        _DashboardOverlay(
+          bike: bike,
+          rental: rental,
+          speedKmh: _speedKmh ?? 0,
+          accuracyMeters: _accuracyMeters,
+          networkType: _networkType,
+          batteryPercent: _batteryPercent,
+          streaming: _streaming,
+          isSimulating: _isSimulating,
+          simulationProgress: _simulationProgress,
+          currentInterval: _currentInterval,
+          currentMode: _currentMode,
+          pointsSent: _pointsSent,
+          lastSentAt: _lastSentAt,
+          locationMode: _locationMode,
+          now: _now,
+          lastServerMsg: _lastServerMsg,
+          onToggleStream: () =>
+              _streaming ? _stopStream() : _startStream(requestPermission: true),
+          onToggleSimulation: _toggleSimulation,
+          onSendManual: _sendManualCoordinate,
+          onIntervalChanged: (v) => setState(() => _currentInterval = v),
+            height: MediaQuery.of(context).size.height,
+            points: List.unmodifiable(_routePoints),
             latestAccuracyMeters:
                 _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
+            mapType: _mapType,
+            onMapTypeChanged: (value) => setState(() => _mapType = value),
           ),
         ),
         Positioned(
-          top: 0,
+          top: MediaQuery.of(context).padding.top + 16,
+          left: 16,
+          right: 16,
+          child: _buildTopOverlay(bike, isRented: true),
+        ),
+        if (rental != null && _isIdleAlertStatus(rental.status))
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 140,
+            left: 16,
+            right: 16,
+            child: _IdleAlertBanner(rental: rental),
+          ),
+        if (_checkingLocationAccess || !_locationAccessGranted)
+          Positioned(
+            top: MediaQuery.of(context).padding.top +
+                (_isIdleAlertStatus(rental.status) ? 230 : 140),
+            left: 16,
+            right: 16,
+            child: _LocationAccessBanner(
+              checking: _checkingLocationAccess,
+              status: _locationAccessStatus,
+              message: _locationAccessMessage,
+              onRequestPermission: () =>
+                  _ensureLocationReady(requestIfDenied: true),
+              onOpenSettings: _openLocationSettings,
+            ),
+          ),
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 140,
           left: 0,
           right: 0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.6),
-                  Colors.transparent,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xCC000000),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    (_speedKmh ?? rental.currentSpeedKmh ?? 0.0)
+                        .toStringAsFixed(1),
+                    style: const TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('km/h',
+                      style: TextStyle(fontSize: 18, color: Color(0xFF9CA3AF))),
                 ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: 16,
+          bottom: 220,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.my_location),
+              color: const Color(0xff1f2937),
+              onPressed: () {},
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [
+                BoxShadow(
+                    color: Colors.black26, blurRadius: 20, offset: Offset(0, 8))
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _ModernStatColumn(
+                      icon: Icons.timer_outlined,
+                      label: 'Durasi Sewa',
+                      value: _formatDuration(rental.startedAt, _now),
+                      iconColor: const Color(0xff10b981),
+                    ),
+                    Container(
+                        width: 1, height: 40, color: const Color(0xfff3f4f6)),
+                    _ModernStatColumn(
+                      icon: Icons.route_outlined,
+                      label: 'Jarak',
+                      value:
+                          '${(rental.totalDistanceKilometers).toStringAsFixed(2)} km',
+                      iconColor: const Color(0xff10b981),
+                    ),
+                    Container(
+                        width: 1, height: 40, color: const Color(0xfff3f4f6)),
+                    _ModernStatColumn(
+                      icon: Icons.attach_money,
+                      label: 'Estimasi Biaya',
+                      value: _formatRupiah(rental.totalCost),
+                      iconColor: const Color(0xff10b981),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopOverlay(Bike bike, {bool isRented = true}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Menu Button
+            Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 10,
+                      offset: Offset(0, 4)),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.tune_rounded),
+                color: const Color(0xff1f2937),
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) =>
+                        _buildAdvancedControlsModal(bike, _summary?.rental),
+                  );
+                },
+              ),
+            ),
+            // Logo
+            Column(
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.pedal_bike,
+                        color: Color(0xff10b981), size: 28),
+                    const SizedBox(width: 8),
+                    Text(
+                      'FlowBike',
+                      style: TextStyle(
+                        color:
+                            isRented ? const Color(0xff065f46) : Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Sewa Pintar. Lacak Akurat.',
+                  style: TextStyle(
+                      color: isRented
+                          ? const Color(0xff4b5563)
+                          : const Color(0xFF94A3B8),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            // Help/Status button
+            Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 10,
+                      offset: Offset(0, 4)),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.power_settings_new_rounded),
+                color: const Color(0xff1f2937),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Keluar dari Simulator?'),
+                      content: const Text(
+                          'Sesi penyewaan dan pelacakan GPS akan dihentikan jika Anda keluar.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Batal'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _logout();
+                          },
+                          child: const Text('Keluar',
+                              style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdvancedControlsModal(Bike bike, ActiveBikeRental? rental) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 24),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                    color: const Color(0xffd1d5db),
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const Text('Pengaturan Lanjutan',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+            const SizedBox(height: 16),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  _StatusBanner(
+                    streaming: _streaming,
+                    mode: _locationMode,
+                    sending: _sending,
+                    serverMessage: _lastServerMsg,
+                    lastGpsReadAt: _lastGpsReadAt,
+                    lastSentAt: _lastSentAt,
+                  ),
+                  const SizedBox(height: 12),
+                  QrRentalPanel(
+                    api: widget.api,
+                    hasAssignedBike: true,
+                    hasActiveRental: rental != null,
+                  ),
+                  const SizedBox(height: 12),
+                  _FieldTestChecklist(
+                    locationAccess: _locationAccessGranted,
+                    gpsEnabled: _locationAccessStatus !=
+                        LocationAccessStatus.serviceDisabled,
+                    autoStart: _streaming,
+                    networkType: _networkType,
+                    lastGpsAt: _lastGpsReadAt,
+                    lastServerAt: _lastSentAt,
+                    accuracyMeters: _accuracyMeters ??
+                        rental?.latestLocationPoint?.accuracyMeters,
+                    rentalActive: rental != null,
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _streaming
+                        ? () {
+                            Navigator.pop(context);
+                            _sendHeartbeat();
+                          }
+                        : null,
+                    icon: const Icon(Icons.favorite_rounded, size: 18),
+                    label: const Text('Kirim Heartbeat Manual'),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildDebugPanel(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDebugPanel() {
+    return _Panel(
+      padding: const EdgeInsets.all(12),
+      borderColor: const Color(0xFF99F6E4),
+      backgroundColor: const Color(0xFFF0FDFA),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F766E).withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFF0F766E),
+                ),
+>>>>>>> 85841e002c40e0ba54cda30f0445745c278a5aaf
               ),
             ),
             child: SafeArea(
@@ -1319,133 +1756,40 @@ class _RoutePoint {
   final DateTime recordedAt;
 }
 
-class _CompactStatsRow extends StatelessWidget {
-  const _CompactStatsRow({
-    required this.speedKmh,
-    required this.rentalActive,
-    required this.distanceKm,
-    required this.totalCost,
-  });
-
-  final double speedKmh;
-  final bool rentalActive;
-  final double distanceKm;
-  final int totalCost;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          flex: 4,
-          child: _Panel(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'SPEED',
-                  style: TextStyle(
-                    color: Color(0xFF667085),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      speedKmh.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF101828),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'km/h',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF667085),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          flex: 6,
-          child: _Panel(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            backgroundColor: const Color(0xFFF0FDFA),
-            borderColor: const Color(0xFF99F6E4),
-            child: Column(
-              children: [
-                _CompactInfoRow(
-                  label: 'DISTANCE',
-                  value: '${distanceKm.toStringAsFixed(2)} km',
-                  icon: Icons.route_outlined,
-                ),
-                const Divider(height: 12, color: Color(0xFFCCFBF1)),
-                _CompactInfoRow(
-                  label: 'TOTAL COST',
-                  value: _formatRupiah(totalCost),
-                  icon: Icons.payments_outlined,
-                  emphasized: true,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CompactInfoRow extends StatelessWidget {
-  const _CompactInfoRow({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.emphasized = false,
-  });
-
+class _ModernStatColumn extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
-  final IconData icon;
-  final bool emphasized;
+  final Color? iconColor;
+
+  const _ModernStatColumn({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.iconColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Icon(icon,
-            size: 14,
-            color:
-                emphasized ? const Color(0xFF0F766E) : const Color(0xFF667085)),
-        const SizedBox(width: 6),
+        Icon(icon, color: iconColor ?? const Color(0xff9ca3af), size: 24),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: Color(0xff1f2937),
+          ),
+        ),
+        const SizedBox(height: 2),
         Text(
           label,
           style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF667085)),
-        ),
-        const Spacer(),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: emphasized ? 14 : 12,
-            fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
-            color:
-                emphasized ? const Color(0xFF134E4A) : const Color(0xFF101828),
+            color: Color(0xff6b7280),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -1656,20 +2000,43 @@ class _MapLegendChip extends StatelessWidget {
   }
 }
 
+enum _BikeMapType {
+  standard('Standar'),
+  satellite('Satelit');
+
+  const _BikeMapType(this.label);
+
+  final String label;
+}
+
 class _MiniRouteMap extends StatelessWidget {
   const _MiniRouteMap({
     this.height = 170,
     required this.points,
     required this.latestAccuracyMeters,
+    required this.mapType,
+    required this.onMapTypeChanged,
   });
 
   final double height;
   final List<_RoutePoint> points;
   final double? latestAccuracyMeters;
+  final _BikeMapType mapType;
+  final ValueChanged<_BikeMapType> onMapTypeChanged;
+
+  static const _fallbackCenter = latlong.LatLng(-8.583235, 116.116768);
 
   @override
   Widget build(BuildContext context) {
+    final mapPoints = points
+        .map((point) => latlong.LatLng(point.latitude, point.longitude))
+        .toList(growable: false);
+    final latestPoint = mapPoints.isEmpty ? _fallbackCenter : mapPoints.last;
     final pointCount = points.length;
+    final isSatellite = mapType == _BikeMapType.satellite;
+    final routeColor =
+        isSatellite ? const Color(0xFF22D3EE) : const Color(0xFF0EA5E9);
+    final latestAccuracy = latestAccuracyMeters;
 
     return Container(
       decoration: const BoxDecoration(
@@ -1678,13 +2045,80 @@ class _MiniRouteMap extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(
-            child: CustomPaint(
-              painter: _MiniRoutePainter(points),
+            child: FlutterMap(
+              key: ValueKey(
+                'bike-map-${mapType.name}-$pointCount-'
+                '${latestPoint.latitude.toStringAsFixed(6)}-'
+                '${latestPoint.longitude.toStringAsFixed(6)}',
+              ),
+              options: MapOptions(
+                initialCenter: latestPoint,
+                initialZoom: pointCount == 0 ? 15 : 17,
+                minZoom: 5,
+                maxZoom: 19,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.drag |
+                      InteractiveFlag.pinchZoom |
+                      InteractiveFlag.doubleTapZoom,
+                ),
+              ),
+              children: [
+                _buildTileLayer(),
+                if (isSatellite) _buildLabelLayer(),
+                if (mapPoints.length >= 2)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: mapPoints,
+                        strokeWidth: 7,
+                        color: routeColor.withValues(alpha: .28),
+                      ),
+                      Polyline(
+                        points: mapPoints,
+                        strokeWidth: 4,
+                        color: routeColor,
+                      ),
+                    ],
+                  ),
+                if (latestAccuracy != null &&
+                    latestAccuracy > 0 &&
+                    mapPoints.isNotEmpty)
+                  CircleLayer(
+                    circles: [
+                      CircleMarker(
+                        point: latestPoint,
+                        radius: latestAccuracy.clamp(5, 100).toDouble(),
+                        useRadiusInMeter: true,
+                        color: const Color(0x3322C55E),
+                        borderColor: const Color(0xFF22C55E),
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
+                  ),
+                if (mapPoints.isNotEmpty)
+                  MarkerLayer(
+                    markers: [
+                      if (mapPoints.length > 1)
+                        _buildMarker(
+                          point: mapPoints.first,
+                          icon: Icons.trip_origin,
+                          color: const Color(0xFF38BDF8),
+                          size: 34,
+                        ),
+                      _buildMarker(
+                        point: latestPoint,
+                        icon: Icons.navigation_rounded,
+                        color: const Color(0xFF22C55E),
+                        size: 42,
+                      ),
+                    ],
+                  ),
+              ],
             ),
           ),
           Positioned(
             left: 12,
-            top: 10,
+            top: MediaQuery.of(context).padding.top + 100,
             child: _MapChip(
               icon: Icons.route_outlined,
               label: pointCount == 0 ? 'Jalur belum ada' : '$pointCount titik',
@@ -1692,7 +2126,7 @@ class _MiniRouteMap extends StatelessWidget {
           ),
           Positioned(
             right: 12,
-            top: 10,
+            top: MediaQuery.of(context).padding.top + 100,
             child: _MapChip(
               icon: Icons.gps_fixed,
               label: latestAccuracyMeters == null
@@ -1700,16 +2134,32 @@ class _MiniRouteMap extends StatelessWidget {
                   : '${latestAccuracyMeters!.toStringAsFixed(0)} m',
             ),
           ),
+          Positioned(
+            right: 12,
+            bottom: 42,
+            child: _MapTypeToggle(
+              value: mapType,
+              onChanged: onMapTypeChanged,
+            ),
+          ),
           if (pointCount < 2)
-            const Center(
+            Center(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
-                  'Jalur akan muncul setelah device mengirim beberapa titik GPS.',
+                  pointCount == 0
+                      ? 'Menunggu titik GPS valid dari perangkat.'
+                      : 'Jalur muncul setelah perangkat benar-benar bergerak.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Color(0xFFCBD5E1),
                     fontWeight: FontWeight.w600,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 8,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1718,124 +2168,116 @@ class _MiniRouteMap extends StatelessWidget {
       ),
     );
   }
+
+  TileLayer _buildTileLayer() {
+    if (mapType == _BikeMapType.satellite) {
+      return TileLayer(
+        urlTemplate:
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        userAgentPackageName: 'com.smartbike.mobile_bike',
+        maxNativeZoom: 19,
+      );
+    }
+
+    return TileLayer(
+      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      userAgentPackageName: 'com.smartbike.mobile_bike',
+      maxNativeZoom: 19,
+    );
+  }
+
+  TileLayer _buildLabelLayer() {
+    return TileLayer(
+      urlTemplate:
+          'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
+      subdomains: const ['a', 'b', 'c', 'd'],
+      userAgentPackageName: 'com.smartbike.mobile_bike',
+      maxNativeZoom: 19,
+    );
+  }
+
+  Marker _buildMarker({
+    required latlong.LatLng point,
+    required IconData icon,
+    required Color color,
+    required double size,
+  }) {
+    return Marker(
+      point: point,
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: .25),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(icon, color: color, size: size * .58),
+      ),
+    );
+  }
 }
 
-class _MiniRoutePainter extends CustomPainter {
-  const _MiniRoutePainter(this.points);
+class _MapTypeToggle extends StatelessWidget {
+  const _MapTypeToggle({
+    required this.value,
+    required this.onChanged,
+  });
 
-  final List<_RoutePoint> points;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = const Color(0xFF1E293B)
-      ..strokeWidth = 1;
-
-    const gridStep = 28.0;
-    for (var x = 0.0; x <= size.width; x += gridStep) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-    for (var y = 0.0; y <= size.height; y += gridStep) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    if (points.isEmpty) return;
-
-    final projected = _projectPoints(size);
-    if (projected.isEmpty) return;
-
-    if (projected.length >= 2) {
-      final glowPaint = Paint()
-        ..color = const Color(0x6638BDF8)
-        ..strokeWidth = 8
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke;
-      final routePaint = Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF38BDF8), Color(0xFF22C55E)],
-        ).createShader(Offset.zero & size)
-        ..strokeWidth = 4
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke;
-
-      final path = Path()..moveTo(projected.first.dx, projected.first.dy);
-      for (final point in projected.skip(1)) {
-        path.lineTo(point.dx, point.dy);
-      }
-      canvas.drawPath(path, glowPaint);
-      canvas.drawPath(path, routePaint);
-    }
-
-    final start = projected.first;
-    final latest = projected.last;
-    _drawPoint(canvas, start, const Color(0xFF38BDF8), 5);
-    _drawPoint(canvas, latest, const Color(0xFF22C55E), 7);
-
-    final latestAccuracy = points.last.accuracyMeters;
-    if (latestAccuracy > 0) {
-      final radius = latestAccuracy.clamp(8, 32).toDouble();
-      final accuracyPaint = Paint()
-        ..color = const Color(0x3322C55E)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(latest, radius, accuracyPaint);
-    }
-  }
-
-  List<Offset> _projectPoints(Size size) {
-    final minLat = points.map((p) => p.latitude).reduce(math.min);
-    final maxLat = points.map((p) => p.latitude).reduce(math.max);
-    final minLng = points.map((p) => p.longitude).reduce(math.min);
-    final maxLng = points.map((p) => p.longitude).reduce(math.max);
-
-    // Provide a wider span by default to show some zoom out effect
-    final latSpan = math.max(maxLat - minLat, 0.005);
-    final lngSpan = math.max(maxLng - minLng, 0.005);
-    const padding = 24.0;
-    final drawableWidth = math.max(size.width - (padding * 2), 1);
-    final drawableHeight = math.max(size.height - (padding * 2), 1);
-
-    final projected = points.map((point) {
-      final x =
-          padding + ((point.longitude - minLng) / lngSpan) * drawableWidth;
-      final y =
-          padding + ((maxLat - point.latitude) / latSpan) * drawableHeight;
-      return Offset(x, y);
-    }).toList();
-
-    if (projected.isNotEmpty) {
-      final last = projected.last;
-      final center = Offset(size.width / 2, size.height / 2);
-      final offset = center - last;
-      for (var i = 0; i < projected.length; i++) {
-        projected[i] += offset;
-      }
-    }
-
-    return projected;
-  }
-
-  void _drawPoint(Canvas canvas, Offset offset, Color color, double radius) {
-    final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(.25)
-      ..style = PaintingStyle.fill;
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    canvas.drawCircle(offset.translate(0, 2), radius + 2, shadowPaint);
-    canvas.drawCircle(offset, radius, fillPaint);
-    canvas.drawCircle(offset, radius, borderPaint);
-  }
+  final _BikeMapType value;
+  final ValueChanged<_BikeMapType> onChanged;
 
   @override
-  bool shouldRepaint(covariant _MiniRoutePainter oldDelegate) {
-    return oldDelegate.points != points;
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xE6020617),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF334155)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .18),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: _BikeMapType.values.map((type) {
+          final selected = type == value;
+          return InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () => onChanged(type),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? const Color(0xFF22C55E) : Colors.transparent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                type.label,
+                style: TextStyle(
+                  color: selected ? const Color(0xFF052E16) : Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
   }
 }
 
@@ -1922,32 +2364,6 @@ class _Panel extends StatelessWidget {
         ],
       ),
       child: child,
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFECFDF3),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFABEFC6)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFF027A48),
-          fontWeight: FontWeight.w800,
-          fontSize: 12,
-        ),
-      ),
     );
   }
 }
@@ -2059,17 +2475,16 @@ double _haversineMeters(
 
 double _toRadians(double degrees) => degrees * (math.pi / 180);
 
-String _rentalStatusLabel(String status) {
-  return switch (status) {
-    'active' => 'Aktif',
-    'idle_warning' => 'Peringatan Diam',
-    'idle_billing' => 'Biaya Diam',
-    'completed' => 'Selesai',
-    'cancelled' => 'Dibatalkan',
-    _ => status,
-  };
-}
-
 bool _isIdleAlertStatus(String status) {
   return status == 'idle_warning' || status == 'idle_billing';
+}
+
+String _formatDuration(DateTime? startedAt, DateTime now) {
+  if (startedAt == null) return '00:00:00';
+  final diff = now.difference(startedAt);
+  if (diff.isNegative) return '00:00:00';
+  final hours = diff.inHours.toString().padLeft(2, '0');
+  final minutes = (diff.inMinutes % 60).toString().padLeft(2, '0');
+  final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
+  return '$hours:$minutes:$seconds';
 }

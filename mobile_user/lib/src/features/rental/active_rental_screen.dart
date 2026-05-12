@@ -215,20 +215,24 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
     if (routeHistory != null) {
       _routePoints
         ..clear()
-        ..addAll(routeHistory);
+        ..addAll(_cleanRouteHistory(routeHistory));
+    }
+  }
+
+  List<LatLng> _cleanRouteHistory(List<LatLng> points) {
+    if (points.length < 2) {
+      return points;
     }
 
-    final latitude = rental.latitude;
-    final longitude = rental.longitude;
-    if (latitude == null || longitude == null) {
-      return;
+    final cleaned = <LatLng>[points.first];
+    for (final point in points.skip(1)) {
+      final distance = calculateDistance(cleaned.last, point);
+      if (distance <= 250) {
+        cleaned.add(point);
+      }
     }
 
-    final nextPoint = LatLng(latitude, longitude);
-    if (_routePoints.isEmpty ||
-        calculateDistance(_routePoints.last, nextPoint) >= 1) {
-      _routePoints.add(nextPoint);
-    }
+    return cleaned;
   }
 
   void _handleIdleStatus(Rental? rental) {
@@ -309,7 +313,9 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                   }
 
                   _closeIdleDialog();
-                  _showMessage('Sewa dilanjutkan. Biaya idle mulai berjalan.');
+                  _showMessage(
+                    'Peringatan dikonfirmasi. Lanjut bergerak agar biaya idle tidak berjalan.',
+                  );
                   await _loadRental(silent: true);
                 } on ApiException catch (error) {
                   if (mounted) {

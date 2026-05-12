@@ -83,6 +83,37 @@ class LocationBillingAndIdleTest extends TestCase
         $this->assertSame(0, $this->rental->distance_cost);
     }
 
+    public function test_stationary_gps_jitter_with_zero_speed_does_not_increase_billing(): void
+    {
+        Sanctum::actingAs($this->device);
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
+            'speed_kmh' => 0,
+            'accuracy_meters' => 12,
+            'recorded_at' => now()->subSeconds(30)->toISOString(),
+        ])->assertOk();
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.582600,
+            'longitude' => 116.116000,
+            'speed_kmh' => 0,
+            'accuracy_meters' => 12,
+            'recorded_at' => now()->toISOString(),
+        ])->assertOk()
+            ->assertJsonPath('message', 'Stationary GPS jitter ignored; not billed.');
+
+        $this->rental->refresh();
+        $this->assertSame('0.00', $this->rental->total_distance_meters);
+        $this->assertSame(0, $this->rental->distance_cost);
+        $this->assertDatabaseHas('rental_location_points', [
+            'rental_id' => $this->rental->id,
+            'ignored_reason' => 'stationary_jitter',
+            'is_valid_movement' => false,
+        ]);
+    }
+
     public function test_valid_movement_increases_distance_cost_and_speed_anomaly_is_ignored(): void
     {
         Sanctum::actingAs($this->device);
@@ -159,7 +190,15 @@ class LocationBillingAndIdleTest extends TestCase
         Sanctum::actingAs($this->user);
         $this->postJson("/api/rentals/{$this->rental->id}/idle/continue")
             ->assertOk()
-            ->assertJsonPath('data.status', Rental::STATUS_IDLE_BILLING);
+            ->assertJsonPath('data.status', Rental::STATUS_IDLE_WARNING);
+
+        $this->assertDatabaseHas('rental_idle_events', [
+            'rental_id' => $this->rental->id,
+            'event_type' => 'warning_acknowledged',
+        ]);
+
+        $this->rental->refresh()->update(['idle_warning_at' => now()->subSeconds(61)]);
+        app(IdleDetectionService::class)->moveWarningsToIdleBilling();
 
         $this->rental->refresh()->update(['last_idle_billing_at' => now()->subSeconds(301)]);
         app(IdleDetectionService::class)->applyIdleBillingDue();
