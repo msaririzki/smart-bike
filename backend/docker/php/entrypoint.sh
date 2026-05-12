@@ -8,9 +8,26 @@ if [ ! -s /var/www/html/.env ]; then
     cp /var/www/html/.env.example /var/www/html/.env
 fi
 
-APP_KEY_VALUE=$(grep -E '^APP_KEY=' /var/www/html/.env | cut -d '=' -f2)
-if [ -z "$APP_KEY_VALUE" ]; then
-    echo "==> [smart-bike] Generating APP_KEY"
+APP_KEY_VALUE=$(grep -E '^APP_KEY=' /var/www/html/.env | sed 's/^APP_KEY=//' | tr -d '"')
+if ! APP_KEY_VALUE="$APP_KEY_VALUE" php -r '
+    $key = getenv("APP_KEY_VALUE") ?: "";
+    if (str_starts_with($key, "base64:")) {
+        $decoded = base64_decode(substr($key, 7), true);
+        exit($decoded !== false && strlen($decoded) === 32 ? 0 : 1);
+    }
+    exit(strlen($key) === 32 ? 0 : 1);
+'; then
+    echo "==> [smart-bike] Generating valid APP_KEY"
+    php -r '
+        $path = "/var/www/html/.env";
+        $contents = file_exists($path) ? file_get_contents($path) : "";
+        if (preg_match("/^APP_KEY=.*/m", $contents)) {
+            $contents = preg_replace("/^APP_KEY=.*/m", "APP_KEY=", $contents, 1);
+        } else {
+            $contents .= (str_ends_with($contents, "\n") ? "" : "\n")."APP_KEY=\n";
+        }
+        file_put_contents($path, $contents);
+    '
     php artisan key:generate --force
 fi
 

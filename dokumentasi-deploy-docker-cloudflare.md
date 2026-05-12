@@ -127,6 +127,14 @@ php artisan key:generate --force
 
 `backend/.env` hanya di-mount sebagai file ke container. Compose sengaja tidak memakai `env_file: ./backend/.env` agar `APP_KEY` kosong dari env awal tidak menimpa key yang dibuat entrypoint.
 
+Kalau `APP_KEY` sempat rusak, misalnya nilainya menjadi dua key tergabung seperti `base64:...=base64:...=`, kosongkan ulang nilainya di `backend/.env`:
+
+```env
+APP_KEY=
+```
+
+Lalu jalankan ulang container `app` dan `queue`. Entrypoint akan mendeteksi key tidak valid dan membuat key baru yang panjangnya benar.
+
 ---
 
 ## Menjalankan Backend

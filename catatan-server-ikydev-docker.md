@@ -141,6 +141,8 @@ Catatan:
 
 `backend/.env` di-mount sebagai file ke container. Docker Compose tidak memuat seluruh isi `backend/.env` sebagai environment container supaya `APP_KEY` yang baru di-generate tidak tertimpa nilai kosong dari environment.
 
+Kalau `APP_KEY` pernah rusak karena dua key tergabung, kosongkan dulu nilainya menjadi `APP_KEY=`, lalu jalankan ulang service `app` dan `queue`. Entrypoint akan generate ulang key yang valid.
+
 ---
 
 ### 5. Jalankan Docker
