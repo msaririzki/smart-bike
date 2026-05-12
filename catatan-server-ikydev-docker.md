@@ -137,6 +137,10 @@ DB_PASSWORD=sama_dengan_DB_PASSWORD_di_root_env
 
 `APP_KEY` boleh kosong saat deploy pertama. Container akan menjalankan `php artisan key:generate --force`.
 
+Catatan:
+
+`backend/.env` di-mount sebagai file ke container. Docker Compose tidak memuat seluruh isi `backend/.env` sebagai environment container supaya `APP_KEY` yang baru di-generate tidak tertimpa nilai kosong dari environment.
+
 ---
 
 ### 5. Jalankan Docker

@@ -125,6 +125,8 @@ QUEUE_CONNECTION=database
 php artisan key:generate --force
 ```
 
+`backend/.env` hanya di-mount sebagai file ke container. Compose sengaja tidak memakai `env_file: ./backend/.env` agar `APP_KEY` kosong dari env awal tidak menimpa key yang dibuat entrypoint.
+
 ---
 
 ## Menjalankan Backend
