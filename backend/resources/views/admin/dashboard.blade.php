@@ -2,8 +2,8 @@
 
 @section('content')
     <style>
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .dash-card { background: #ffffff; border-radius: 0.75rem; padding: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); display: flex; flex-direction: column; position: relative; overflow: hidden; border: 1px solid #f1f5f9; transition: transform 0.2s, box-shadow 0.2s; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem; }
+        .dash-card { background: #ffffff; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); display: flex; flex-direction: column; position: relative; overflow: hidden; border: 1px solid #f1f5f9; transition: transform 0.2s, box-shadow 0.2s; }
         .dash-card:hover { transform: translateY(-0.25rem); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04); }
         .dash-card::before { content: ''; position: absolute; top: 0; left: 0; width: 0.35rem; height: 100%; background: #0f766e; }
         .dash-card.accent-blue::before { background: #3b82f6; }
@@ -11,47 +11,46 @@
         .dash-card.accent-amber::before { background: #f59e0b; }
         .dash-card.accent-green::before { background: #10b981; }
         .dash-card.accent-purple::before { background: #8b5cf6; }
-        
-        .dash-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
-        .dash-card-title { color: #64748b; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
-        .dash-card-icon { width: 2.25rem; height: 2.25rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; color: #0f766e; background: #ccfbf1; }
-        .dash-card-icon svg { width: 1.25rem; height: 1.25rem; }
+
+        .dash-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+        .dash-card-title { color: #64748b; font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
+        .dash-card-icon { width: 3rem; height: 3rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; color: #0f766e; background: #ccfbf1; }
         .dash-card.accent-blue .dash-card-icon { color: #3b82f6; background: #dbeafe; }
         .dash-card.accent-red .dash-card-icon { color: #ef4444; background: #fee2e2; }
         .dash-card.accent-amber .dash-card-icon { color: #d97706; background: #fef3c7; }
         .dash-card.accent-green .dash-card-icon { color: #10b981; background: #d1fae5; }
         .dash-card.accent-purple .dash-card-icon { color: #8b5cf6; background: #ede9fe; }
-        .dash-card-value { font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: 0; line-height: 1; }
-        
+        .dash-card-value { font-size: 2rem; font-weight: 700; color: #0f172a; margin: 0; line-height: 1; }
+
         .dash-map-panel { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow: hidden; }
         .dash-map-header { padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid #f1f5f9; }
         .dash-map-title { margin: 0; color: #0f172a; font-size: 1.25rem; font-weight: 600; }
         .dash-map-subtitle { margin: 0.25rem 0 0 0; color: #64748b; font-size: 0.875rem; }
-        .dash-map-canvas { height: 40vh; min-height: 300px; width: 100%; background: #eef2f6; }
+        .dash-map-canvas { height: 60vh; min-height: 400px; width: 100%; background: #eef2f6; }
 
-        
+
         @media (max-width: 768px) {
-            .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-            .dash-card { padding: 0.75rem; }
-            .dash-card-icon { width: 1.75rem; height: 1.75rem; border-radius: 0.375rem; }
-            .dash-card-icon svg { width: 1rem; height: 1rem; }
-            .dash-card-title { font-size: 0.65rem; }
-            .dash-card-value { font-size: 1.25rem; }
-            .dash-card-header { margin-bottom: 0.25rem; }
+            .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+            .dash-card { padding: 1rem; gap: 0.75rem; }
+            .dash-card-icon { width: 2.25rem; height: 2.25rem; border-radius: 0.5rem; }
+            .dash-card-icon svg { width: 1.25rem; height: 1.25rem; }
+            .dash-card-title { font-size: 0.75rem; }
+            .dash-card-value { font-size: 1.5rem; }
+            .dash-card-header { margin-bottom: 0; }
         }
         @media (max-width: 480px) {
-            .dashboard-grid { gap: 0.5rem; }
-            .dash-card { padding: 0.625rem; }
-            .dash-card-value { font-size: 1.125rem; }
+            .dashboard-grid { gap: 0.75rem; }
+            .dash-card { padding: 0.875rem; }
+            .dash-card-value { font-size: 1.25rem; }
         }
-        
+
         .trend { font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem; margin-top: 0.25rem; }
         .trend.up { color: #10b981; }
         .trend.down { color: #ef4444; }
-        
+
         .main-content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2.5rem; }
         @media (max-width: 900px) { .main-content-grid { grid-template-columns: 1fr; } }
-        
+
         .activity-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 1rem; }
         .activity-item { display: flex; gap: 1rem; align-items: flex-start; padding-bottom: 1rem; border-bottom: 1px solid #f1f5f9; }
         body.dark-mode .activity-item { border-bottom-color: #334155; }
@@ -60,7 +59,7 @@
         body.dark-mode .activity-icon { background: rgba(59, 130, 246, 0.2); }
         .activity-details { flex-grow: 1; font-size: 0.875rem; }
         .activity-time { color: #64748b; font-size: 0.75rem; margin-top: 0.25rem; }
-        
+
         .weather-widget { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; border-radius: 1rem; padding: 1.5rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         .weather-info h3 { margin: 0; font-size: 1.5rem; }
         .weather-info p { margin: 0.25rem 0 0; opacity: 0.9; font-size: 0.875rem; }
@@ -164,7 +163,7 @@
                 <canvas id="revenueChart" style="display: none;"></canvas>
             </div>
         </div>
-        
+
         <div class="analytic-panel" style="margin-bottom: 0;">
             <div class="analytic-header">
                 <h2 class="dash-map-title">Aktivitas Terbaru</h2>
@@ -212,7 +211,7 @@
             .replaceAll("'", '&#039;');
 
         if (mapElement && window.L) {
-            const map = L.map(mapElement).setView([-5.1477, 119.4327], 13);
+            const map = L.map(mapElement).setView([-8.5830, 116.1160], 14);
             const markers = new Map();
             let hasFittedMap = false;
             let currentBounds = [];
@@ -292,7 +291,7 @@
 
                 let warnedAboutOffline = false;
                 let warnedAboutBattery = false;
-                
+
                 nextBikes.forEach((bike) => {
                     const position = [bike.latitude, bike.longitude];
                     visibleCodes.add(bike.code);
@@ -309,7 +308,7 @@
                             L.marker(position, { icon: bikeIcon(bike) }).addTo(map).bindPopup(popupHtml(bike)),
                         );
                     }
-                    
+
                     // Toast logic
                     if (!bike.is_online && !warnedAboutOffline && window.showToast) {
                         window.showToast('Sepeda Offline', `Sepeda ${bike.code} terdeteksi offline.`, 'warning');
