@@ -15,7 +15,9 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  ApiClient(this._session);
+  ApiClient(this._session) {
+    print('ApiClient initialized with baseUrl: $baseUrl');
+  }
 
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',

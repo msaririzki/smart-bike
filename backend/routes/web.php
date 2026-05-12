@@ -43,3 +43,5 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::put('users/{user}/role', [UserController::class, 'updateRole'])->name('users.role.update');
     });
 });
+
+Route::get('/login', fn() => redirect()->route('admin.login'))->name('login');
