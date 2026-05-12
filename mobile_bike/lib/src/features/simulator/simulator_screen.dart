@@ -12,6 +12,7 @@ import '../../services/api_client.dart';
 import '../../services/gps_service.dart';
 import '../../services/session_store.dart';
 import 'manual_gps_panel.dart';
+import 'device_details_screen.dart';
 import 'mock_route_service.dart';
 import 'qr_rental_panel.dart';
 
@@ -675,7 +676,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F766E),
+        backgroundColor: const Color(0xFF2F9E38),
         foregroundColor: Colors.white,
         title: const Text('Dashboard Sepeda'),
         actions: [
@@ -745,202 +746,200 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final displaySpeed =
         rental == null ? 0.0 : (_speedKmh ?? rental.currentSpeedKmh ?? 0.0);
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        await _loadBike();
-        await _loadRentalSummary();
-      },
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _StatusBanner(
-            streaming: _streaming,
-            mode: _locationMode,
-            sending: _sending,
-            serverMessage: _lastServerMsg,
-            lastGpsReadAt: _lastGpsReadAt,
-            lastSentAt: _lastSentAt,
-          ),
-          if (rental != null && _isIdleAlertStatus(rental.status)) ...[
-            const SizedBox(height: 12),
-            _IdleAlertBanner(rental: rental),
-          ],
-          if (_checkingLocationAccess || !_locationAccessGranted) ...[
-            const SizedBox(height: 12),
-            _LocationAccessBanner(
-              checking: _checkingLocationAccess,
-              status: _locationAccessStatus,
-              message: _locationAccessMessage,
-              onRequestPermission: () => _ensureLocationReady(
-                requestIfDenied: true,
-              ),
-              onOpenSettings: _openLocationSettings,
-            ),
-          ],
-          const SizedBox(height: 12),
-          // MAP UTAMA (Besar di Atas)
-          _MiniRouteMap(
-            height: 380,
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: _MiniRouteMap(
             points: List.unmodifiable(_routePoints),
             latestAccuracyMeters:
                 _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
           ),
-          const SizedBox(height: 12),
-          QrRentalPanel(
-            api: widget.api,
-            hasAssignedBike: true,
-            hasActiveRental: rental != null,
-          ),
-          const SizedBox(height: 12),
-          // STATS KOMPAK (Kecepatan & Ringkasan Rental)
-          _CompactStatsRow(
-            speedKmh: displaySpeed,
-            rentalActive: rental != null,
-            distanceKm: rental?.totalDistanceKilometers ?? 0,
-            totalCost: rental?.totalCost ?? 0,
-          ),
-          const SizedBox(height: 12),
-          // DEVICE & RENTAL DETAIL (Kecil di Bawah)
-          _DeviceAndRentalSummary(
-            bike: bike,
-            rental: rental,
-            batteryPercent: _batteryPercent,
-            networkType: _networkType,
-            pointsSent: _pointsSent,
-            lastSentAt: _lastSentAt,
-            locationMode: _locationMode,
-            streaming: _streaming,
-            now: _now,
-          ),
-          const SizedBox(height: 12),
-          _FieldTestChecklist(
-            locationAccess: _locationAccessGranted,
-            gpsEnabled:
-                _locationAccessStatus != LocationAccessStatus.serviceDisabled,
-            autoStart: _streaming,
-            networkType: _networkType,
-            lastGpsAt: _lastGpsReadAt,
-            lastServerAt: _lastSentAt,
-            accuracyMeters:
-                _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
-            rentalActive: rental != null,
-          ),
-          const SizedBox(height: 12),
-          _buildControls(),
-          const SizedBox(height: 12),
-          _buildDebugPanel(),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildControls() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: 56,
-          child: FilledButton.icon(
-            onPressed: _streaming ? _stopStream : _startStream,
-            icon: Icon(
-              _streaming ? Icons.stop_circle_outlined : Icons.gps_fixed_rounded,
-            ),
-            label: Text(
-              _streaming ? 'Hentikan Sementara' : 'Aktifkan GPS Sekarang',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            style: FilledButton.styleFrom(
-              backgroundColor: _streaming
-                  ? const Color(0xFFDC2626)
-                  : const Color(0xFF0F766E),
-            ),
-          ),
         ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: _streaming ? _sendHeartbeat : null,
-          icon: const Icon(Icons.favorite_rounded, size: 18),
-          label: const Text('Kirim Heartbeat Manual'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDebugPanel() {
-    return _Panel(
-      padding: const EdgeInsets.all(12),
-      borderColor: const Color(0xFF99F6E4),
-      backgroundColor: const Color(0xFFF0FDFA),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F766E).withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.tune_rounded,
-                  color: Color(0xFF0F766E),
-                ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.6),
+                  Colors.transparent,
+                ],
               ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Panel Kontrol Debug',
-                      style: TextStyle(
-                        color: Color(0xFF134E4A),
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _StatusBanner(
+                    streaming: _streaming,
+                    mode: _locationMode,
+                    sending: _sending,
+                    serverMessage: _lastServerMsg,
+                    lastGpsReadAt: _lastGpsReadAt,
+                    lastSentAt: _lastSentAt,
+                  ),
+                  if (rental != null && _isIdleAlertStatus(rental.status)) ...[
+                    const SizedBox(height: 8),
+                    _IdleAlertBanner(rental: rental),
+                  ],
+                  if (_checkingLocationAccess || !_locationAccessGranted) ...[
+                    const SizedBox(height: 8),
+                    _LocationAccessBanner(
+                      checking: _checkingLocationAccess,
+                      status: _locationAccessStatus,
+                      message: _locationAccessMessage,
+                      onRequestPermission: () => _ensureLocationReady(
+                        requestIfDenied: true,
                       ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Manual GPS dan Mock Route untuk demo/testing.',
-                      style: TextStyle(color: Color(0xFF0F766E)),
+                      onOpenSettings: _openLocationSettings,
                     ),
                   ],
-                ),
+                  const SizedBox(height: 12),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _LegendDot(color: Color(0xFF38BDF8)),
+                      SizedBox(width: 5),
+                      Text(
+                        'Titik Awal',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                      ),
+                      SizedBox(width: 24),
+                      _LegendDot(color: Color(0xFF22C55E)),
+                      SizedBox(width: 5),
+                      Text(
+                        'Titik Terbaru',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 10),
-          const Row(
-            children: [
-              Icon(Icons.info_outline, size: 18, color: Color(0xFF0F766E)),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Panel ini hanya untuk demo/testing. Penggunaan nyata memakai GPS real yang aktif otomatis setelah device login.',
-                  style: TextStyle(
-                    color: Color(0xFF475467),
-                    fontSize: 12,
+        ),
+        Positioned(
+          bottom: 24,
+          left: 16,
+          right: 16,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
+                  child: Row(
+                    children: [
+                      _MetricItemLarge(
+                        label: 'SPEED',
+                        value: displaySpeed.toStringAsFixed(1),
+                        unit: 'km/h',
+                        icon: Icons.speed_rounded,
+                        color: const Color(0xFF2F9E38),
+                      ),
+                      Container(width: 1, height: 30, color: const Color(0xFFF2F4F7)),
+                      _MetricItemLarge(
+                        label: 'JARAK',
+                        value: (rental?.totalDistanceKilometers ?? 0).toStringAsFixed(2),
+                        unit: 'km',
+                        icon: Icons.route_rounded,
+                        color: const Color(0xFF38BDF8),
+                      ),
+                      Container(width: 1, height: 30, color: const Color(0xFFF2F4F7)),
+                      _MetricItemLarge(
+                        label: 'BIAYA',
+                        value: _formatRupiah(rental?.totalCost ?? 0).replaceAll('Rp', ''),
+                        unit: 'Rp',
+                        icon: Icons.payments_rounded,
+                        color: const Color(0xFFF59E0B),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: Color(0xFFF2F4F7)),
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DeviceDetailsScreen(
+                          api: widget.api,
+                          bike: bike,
+                          rental: rental,
+                          displaySpeed: displaySpeed,
+                          batteryPercent: _batteryPercent,
+                          networkType: _networkType,
+                          pointsSent: _pointsSent,
+                          lastSentAt: _lastSentAt,
+                          locationMode: _locationMode,
+                          streaming: _streaming,
+                          now: _now,
+                          locationAccessGranted: _locationAccessGranted,
+                          locationAccessStatus: _locationAccessStatus,
+                          lastGpsReadAt: _lastGpsReadAt,
+                          accuracyMeters: _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
+                        ),
+                      ),
+                    );
+                  },
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE8F5E9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.electric_bike_rounded, color: Color(0xFF2F9E38), size: 20),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Detail Perangkat & Rental',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF101828)),
+                              ),
+                              Text(
+                                '${bike.code} • Baterai $_batteryPercent%',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF667085), fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          ManualGpsPanel(
-            onCoordinateSend: _sendManualCoordinate,
-            onToggleSimulation: _toggleSimulation,
-            isSimulating: _isSimulating,
-            simulationProgress: _simulationProgress,
-            currentInterval: _currentInterval,
-            currentMode: _currentMode,
-            onIntervalChanged: (v) => setState(() => _currentInterval = v),
-            onModeChanged: (v) => setState(() => _currentMode = v),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -1263,7 +1262,7 @@ class _IdleAlertBanner extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .75),
+              color: Colors.white.withOpacity(.75),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -1503,20 +1502,30 @@ class _DeviceAndRentalSummary extends StatelessWidget {
           const Divider(height: 16),
           _MetricGridCompact(
             children: [
-              _MetricItemSmall(
+              _MetricItemLarge(
                   label: 'Baterai',
-                  value: '$batteryPercent%',
-                  icon: Icons.battery_std),
-              _MetricItemSmall(
+                  value: '$batteryPercent',
+                  unit: '%',
+                  icon: Icons.battery_std,
+                  color: const Color(0xFF667085)),
+              _MetricItemLarge(
                   label: 'Jaringan',
                   value: networkType,
-                  icon: Icons.network_check),
-              _MetricItemSmall(
-                  label: 'Titik', value: '$pointsSent', icon: Icons.upload),
-              _MetricItemSmall(
+                  unit: '',
+                  icon: Icons.network_check,
+                  color: const Color(0xFF667085)),
+              _MetricItemLarge(
+                  label: 'Titik',
+                  value: '$pointsSent',
+                  unit: '',
+                  icon: Icons.upload,
+                  color: const Color(0xFF667085)),
+              _MetricItemLarge(
                   label: 'Mode',
                   value: locationMode,
-                  icon: Icons.explore_outlined),
+                  unit: '',
+                  icon: Icons.explore_outlined,
+                  color: const Color(0xFF667085)),
             ],
           ),
         ],
@@ -1538,27 +1547,111 @@ class _MetricGridCompact extends StatelessWidget {
   }
 }
 
-class _MetricItemSmall extends StatelessWidget {
-  const _MetricItemSmall(
-      {required this.label, required this.value, required this.icon});
+class _MetricItemLarge extends StatelessWidget {
+  const _MetricItemLarge({
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.icon,
+    required this.color,
+  });
+
   final String label;
   final String value;
+  final String unit;
   final IconData icon;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, size: 16, color: const Color(0xFF667085)),
-        const SizedBox(height: 4),
-        Text(label,
-            style: const TextStyle(fontSize: 9, color: Color(0xFF667085))),
-        Text(value,
+    return Expanded(
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 12, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              children: [
+                if (unit == 'Rp')
+                  TextSpan(
+                    text: 'Rp ',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF101828).withOpacity(0.5),
+                    ),
+                  ),
+                TextSpan(
+                  text: value,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF101828),
+                  ),
+                ),
+                if (unit != 'Rp' && unit.isNotEmpty)
+                  TextSpan(
+                    text: ' $unit',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF667085),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapLegendChip extends StatelessWidget {
+  const _MapLegendChip({required this.color, required this.label});
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withOpacity(0.8),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _LegendDot(color: color),
+          const SizedBox(width: 8),
+          Text(
+            label,
             style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF101828))),
-      ],
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1579,13 +1672,9 @@ class _MiniRouteMap extends StatelessWidget {
     final pointCount = points.length;
 
     return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1E293B)),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F172A),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
           Positioned.fill(
@@ -1625,27 +1714,6 @@ class _MiniRouteMap extends StatelessWidget {
                 ),
               ),
             ),
-          const Positioned(
-            left: 12,
-            bottom: 10,
-            child: Row(
-              children: [
-                _LegendDot(color: Color(0xFF38BDF8)),
-                SizedBox(width: 5),
-                Text(
-                  'Awal',
-                  style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11),
-                ),
-                SizedBox(width: 12),
-                _LegendDot(color: Color(0xFF22C55E)),
-                SizedBox(width: 5),
-                Text(
-                  'Terbaru',
-                  style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -1721,24 +1789,36 @@ class _MiniRoutePainter extends CustomPainter {
     final minLng = points.map((p) => p.longitude).reduce(math.min);
     final maxLng = points.map((p) => p.longitude).reduce(math.max);
 
-    final latSpan = math.max(maxLat - minLat, 0.00001);
-    final lngSpan = math.max(maxLng - minLng, 0.00001);
+    // Provide a wider span by default to show some zoom out effect
+    final latSpan = math.max(maxLat - minLat, 0.005);
+    final lngSpan = math.max(maxLng - minLng, 0.005);
     const padding = 24.0;
     final drawableWidth = math.max(size.width - (padding * 2), 1);
     final drawableHeight = math.max(size.height - (padding * 2), 1);
 
-    return points.map((point) {
+    final projected = points.map((point) {
       final x =
           padding + ((point.longitude - minLng) / lngSpan) * drawableWidth;
       final y =
           padding + ((maxLat - point.latitude) / latSpan) * drawableHeight;
       return Offset(x, y);
     }).toList();
+
+    if (projected.isNotEmpty) {
+      final last = projected.last;
+      final center = Offset(size.width / 2, size.height / 2);
+      final offset = center - last;
+      for (var i = 0; i < projected.length; i++) {
+        projected[i] += offset;
+      }
+    }
+
+    return projected;
   }
 
   void _drawPoint(Canvas canvas, Offset offset, Color color, double radius) {
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: .25)
+      ..color = Colors.black.withOpacity(.25)
       ..style = PaintingStyle.fill;
     final fillPaint = Paint()
       ..color = color
