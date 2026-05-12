@@ -125,13 +125,30 @@ $env:API_BASE_URL="http://192.168.1.5:8000/api"
 npm run dev
 ```
 
-## Akun Demo
+## Akun Demo & Akses Aplikasi
+
+Gunakan kredensial berikut untuk melakukan pengujian (*testing*) pada masing-masing platform:
+
+### 1. Web Admin Panel (Backend)
+Gunakan akun ini untuk masuk ke dasbor admin di `http://localhost:8000/admin/login`
+
+| Role | Email | Password | Hak Akses |
+|---|---|---|---|
+| Superadmin | `superadmin@smartbike.test` | `password` | Akses penuh termasuk fitur Pengaturan Sistem |
+| Admin | `admin@smartbike.test` | `password` | Mengelola data sepeda, pengguna, dan memantau rental |
+
+### 2. Aplikasi Mobile User (Aplikasi Penyewa)
+Gunakan akun ini untuk masuk ke aplikasi Flutter bagi pengguna yang ingin meminjam/menyewa sepeda.
 
 | Role | Email | Password |
 |---|---|---|
-| Superadmin | `superadmin@smartbike.test` | `password` |
-| Admin | `admin@smartbike.test` | `password` |
 | User | `user@smartbike.test` | `password` |
+
+### 3. Aplikasi Mobile Bike (Simulator Perangkat IoT)
+Gunakan akun ini untuk masuk ke aplikasi Flutter simulator yang "dipasang" pada perangkat sepeda.
+
+| Role | Email | Password |
+|---|---|---|
 | Device | `device@smartbike.test` | `password` |
 
 ## API Endpoint

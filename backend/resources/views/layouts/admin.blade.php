@@ -12,7 +12,7 @@
         integrity="sha256-p4NxAoJBhIINfQouMjQkGOpJnIubd9F3PNP6EGGoB1Q=" crossorigin="">
     <style>
         body { margin: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f6f7f9; color: #1e293b; line-height: 1.5; }
-        header { background: #0f766e; color: white; padding: 12px 32px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); width: 100%; box-sizing: border-box; }
+        header { background: #0f766e; color: white; padding: 12px 32px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); width: 100%; box-sizing: border-box; position: sticky; top: 0; z-index: 100; }
         header .brand { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; margin-right: 24px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
         header .header-left { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
         nav { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
@@ -20,6 +20,7 @@
         .nav-item:hover, .nav-item.active { background: #115e59; color: white; box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); }
         .nav-dropdown { position: relative; }
         .dropdown-menu { display: none; position: absolute; top: 100%; right: 0; background: white; min-width: 220px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding: 8px; z-index: 50; flex-direction: column; gap: 4px; margin-top: 8px; }
+        .dropdown-menu::before { content: ''; position: absolute; top: -12px; left: 0; right: 0; height: 12px; background: transparent; }
         .nav-dropdown:hover .dropdown-menu { display: flex; }
         .dropdown-menu a { color: #334155; padding: 10px 12px; border-radius: 6px; font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 10px; text-decoration: none; transition: background 0.2s; }
         .dropdown-menu a:hover, .dropdown-menu a.active { background: #f1f5f9; color: #0f766e; box-shadow: none; }

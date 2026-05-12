@@ -4,6 +4,7 @@
     <style>
         .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin-bottom: 2rem; }
         .dash-card { background: #ffffff; border-radius: 0.75rem; padding: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); display: flex; flex-direction: column; position: relative; overflow: hidden; border: 1px solid #f1f5f9; transition: transform 0.2s, box-shadow 0.2s; }
+        .dashboard-grid.collapsed .dash-card:nth-child(n+5) { display: none; }
         .dash-card:hover { transform: translateY(-0.25rem); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04); }
         .dash-card::before { content: ''; position: absolute; top: 0; left: 0; width: 0.35rem; height: 100%; background: #0f766e; }
         .dash-card.accent-blue::before { background: #3b82f6; }
@@ -23,11 +24,34 @@
         .dash-card.accent-purple .dash-card-icon { color: #8b5cf6; background: #ede9fe; }
         .dash-card-value { font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: 0; line-height: 1; }
 
-        .dash-map-panel { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow: hidden; }
-        .dash-map-header { padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid #f1f5f9; }
-        .dash-map-title { margin: 0; color: #0f172a; font-size: 1.25rem; font-weight: 600; }
-        .dash-map-subtitle { margin: 0.25rem 0 0 0; color: #64748b; font-size: 0.875rem; }
-        .dash-map-canvas { height: 40vh; min-height: 300px; width: 100%; background: #eef2f6; }
+        .dash-map-panel { background: white; border-radius: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); overflow: hidden; display: flex; flex-direction: column; }
+        .dash-map-header { padding: 1.75rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid #e2e8f0; background: linear-gradient(to bottom, #ffffff, #f8fafc); }
+        .dash-map-title { margin: 0; color: #0f172a; font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
+        .dash-map-title svg { stroke: #0f766e; background: #ccfbf1; border-radius: 0.5rem; padding: 0.25rem; width: 2rem; height: 2rem; }
+        .dash-map-subtitle { margin: 0.5rem 0 0 0; color: #64748b; font-size: 0.95rem; }
+        .dash-map-canvas { height: 50vh; min-height: 400px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
+        .map-actions { display: flex; align-items: center; gap: 1.25rem; }
+        .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
+        .leaflet-popup-content { margin: 0; width: 320px !important; }
+        .map-popup { padding: 0; font-family: inherit; }
+        .map-popup-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.25rem; background: linear-gradient(135deg, #0f766e, #14b8a6); color: white; }
+        .map-popup-title { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.025em; }
+        .map-popup-subtitle { margin: 0.25rem 0 0 0; font-size: 0.875rem; opacity: 0.9; }
+        .map-popup-header .badge { background: rgba(255, 255, 255, 0.2); color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; border: 1px solid rgba(255, 255, 255, 0.3); backdrop-filter: blur(4px); }
+        .map-popup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .map-popup-item { display: flex; flex-direction: column; gap: 0.25rem; }
+        .map-popup-label { font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+        .map-popup-value { font-size: 0.95rem; color: #0f172a; font-weight: 600; }
+        .map-popup-battery { height: 6px; background: #e2e8f0; border-radius: 9999px; overflow: hidden; margin-top: 0.25rem; width: 100%; }
+        .map-popup-battery span { display: block; height: 100%; background: #10b981; border-radius: 9999px; }
+        .map-popup-battery.low span { background: #ef4444; }
+        .map-popup-details { padding: 1.25rem; font-size: 0.875rem; color: #475569; }
+        .map-popup-details p { margin: 0 0 0.5rem 0; }
+        .map-popup-details p:last-child { margin: 0; }
+        .map-popup-details strong { color: #0f172a; }
+        .map-popup-footer { display: flex; justify-content: space-between; padding: 1rem 1.25rem; background: white; border-top: 1px solid #f1f5f9; }
+        .map-popup-footer a { color: #0f766e; font-weight: 600; font-size: 0.875rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s; }
+        .map-popup-footer a:hover { color: #0f172a; text-decoration: underline; }
 
 
         @media (max-width: 768px) {
@@ -67,9 +91,13 @@
     </style>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h1 style="margin: 0; color: #0f172a; font-size: 1.75rem;">Dasbor Ringkasan</h1>
+        <button id="toggleCardsBtn" type="button" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-weight: 500; transition: all 0.2s; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+            <span id="toggleCardsText">Lihat Lainnya</span>
+            <svg id="toggleCardsIcon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
     </div>
 
-    <div class="dashboard-grid">
+    <div class="dashboard-grid collapsed" id="dashboardGrid">
         <div class="dash-card">
             <div class="dash-card-header">
                 <h3 class="dash-card-title">Total Sepeda</h3>
@@ -153,6 +181,27 @@
         </div>
     </div>
 
+    <div class="dash-map-panel" style="margin-bottom: 2.5rem;">
+        <div class="dash-map-header">
+            <div>
+                <h2 class="dash-map-title">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Peta Lokasi Sepeda
+                </h2>
+                <p class="dash-map-subtitle">Peta otomatis diperbarui. Klik penanda untuk melihat ringkasan sepeda dan membuka halaman detail.</p>
+            </div>
+            <div class="map-actions">
+                <span style="font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600;" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
+                <button class="button secondary" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="bike-map-center" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">Pusatkan Peta</button>
+            </div>
+        </div>
+
+        <div id="bike-map-empty" class="map-empty" @if($mapBikes->isNotEmpty()) hidden @endif>
+            Belum ada sepeda yang memiliki data lokasi.
+        </div>
+        <div id="bike-map" class="dash-map-canvas" @if($mapBikes->isEmpty()) hidden @endif></div>
+    </div>
+
     <div class="main-content-grid">
         <div class="analytic-panel" style="margin-bottom: 0;">
             <div class="analytic-header">
@@ -173,24 +222,6 @@
                 <p class="muted" style="text-align: center;">Tidak ada aktivitas terbaru yang dapat ditampilkan.</p>
             </div>
         </div>
-    </div>
-
-    <div class="dash-map-panel">
-        <div class="dash-map-header">
-            <div>
-                <h2 class="dash-map-title">Peta Lokasi Sepeda</h2>
-                <p class="dash-map-subtitle">Peta otomatis diperbarui. Klik penanda untuk melihat ringkasan sepeda dan membuka halaman detail.</p>
-            </div>
-            <div class="map-actions">
-                <span style="font-size: 0.875rem; color: #64748b;" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
-                <button class="button secondary" style="padding: 0.5rem 1rem;" type="button" id="bike-map-center">Pusatkan Peta</button>
-            </div>
-        </div>
-
-        <div id="bike-map-empty" class="map-empty" @if($mapBikes->isNotEmpty()) hidden @endif>
-            Belum ada sepeda yang memiliki data lokasi.
-        </div>
-        <div id="bike-map" class="dash-map-canvas" @if($mapBikes->isEmpty()) hidden @endif></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -275,11 +306,13 @@
                             </div>
                         </div>
 
-                        <p><strong>Perangkat:</strong> ${escapeHtml(bike.device ?? '-')}</p>
-                        <p><strong>Rental aktif:</strong> ${escapeHtml(rentalText)}</p>
+                        <div class="map-popup-details">
+                            <p><strong>Perangkat:</strong> ${escapeHtml(bike.device ?? '-')}</p>
+                            <p><strong>Rental aktif:</strong> ${escapeHtml(rentalText)}</p>
+                        </div>
 
                         <div class="map-popup-footer">
-                            <a href="${escapeHtml(bike.detail_url)}">Detail Sepeda</a>
+                            <a href="${escapeHtml(bike.detail_url)}">Detail Sepeda &rarr;</a>
                             ${rentalLink}
                         </div>
                     </div>
@@ -380,6 +413,24 @@
             setInterval(refreshBikes, 10000);
         } else if (mapElement) {
             mapElement.innerHTML = '<div class="map-empty">Peta belum bisa dimuat. Periksa koneksi internet untuk membuka peta.</div>';
+        }
+
+        const toggleCardsBtn = document.getElementById('toggleCardsBtn');
+        const dashboardGrid = document.getElementById('dashboardGrid');
+        const toggleCardsText = document.getElementById('toggleCardsText');
+        const toggleCardsIcon = document.getElementById('toggleCardsIcon');
+
+        if (toggleCardsBtn && dashboardGrid) {
+            toggleCardsBtn.addEventListener('click', () => {
+                dashboardGrid.classList.toggle('collapsed');
+                if (dashboardGrid.classList.contains('collapsed')) {
+                    toggleCardsText.textContent = 'Lihat Lainnya';
+                    toggleCardsIcon.innerHTML = '<path d="M6 9l6 6 6-6"/>';
+                } else {
+                    toggleCardsText.textContent = 'Lebih Sedikit';
+                    toggleCardsIcon.innerHTML = '<path d="M18 15l-6-6-6 6"/>';
+                }
+            });
         }
 
         // Charts Logic

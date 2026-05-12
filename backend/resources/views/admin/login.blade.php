@@ -33,7 +33,7 @@
                 <img src="{{ asset('images/flowbike-logo-landscape.png') }}" alt="FlowBike" style="max-width: 80%; height: auto;">
             </div>
             <h1 class="login-title">Masuk ke Akun</h1>
-            <p class="login-subtitle">Demo: superadmin@smartbike.test / password</p>
+            <p class="login-subtitle">Masukkan email dan kata sandi Anda untuk melanjutkan</p>
         </div>
 
         <form method="post" action="{{ route('admin.login.store') }}">
