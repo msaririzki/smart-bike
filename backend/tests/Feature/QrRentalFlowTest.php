@@ -75,6 +75,16 @@ class QrRentalFlowTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_device_cannot_generate_qr_for_unavailable_assigned_bike(): void
+    {
+        $this->bike->update(['status' => 'maintenance']);
+
+        Sanctum::actingAs($this->deviceUser);
+
+        $this->postJson('/api/device/rental-qr')
+            ->assertUnprocessable();
+    }
+
     public function test_user_can_start_rental_from_valid_qr(): void
     {
         Sanctum::actingAs($this->deviceUser);
@@ -152,6 +162,24 @@ class QrRentalFlowTest extends TestCase
 
         Sanctum::actingAs($device2);
         $qr = $this->postJson('/api/device/rental-qr')->json('data');
+
+        Sanctum::actingAs($this->user);
+        $this->postJson('/api/rentals/start-from-qr', ['token' => $qr['token']])
+            ->assertUnprocessable();
+    }
+
+    public function test_qr_is_rejected_when_bike_assignment_changes(): void
+    {
+        Sanctum::actingAs($this->deviceUser);
+        $qr = $this->postJson('/api/device/rental-qr')->json('data');
+
+        $newDevice = User::query()->create([
+            'name' => 'Replacement Device',
+            'email' => 'replacement-device@test.example',
+            'password' => 'password',
+            'role' => 'device',
+        ]);
+        $this->bike->update(['assigned_device_user_id' => $newDevice->id]);
 
         Sanctum::actingAs($this->user);
         $this->postJson('/api/rentals/start-from-qr', ['token' => $qr['token']])
