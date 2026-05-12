@@ -12,6 +12,10 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    private const LOMBOK_LATITUDE_RANGE = [-8.95, -8.20];
+
+    private const LOMBOK_LONGITUDE_RANGE = [115.75, 116.75];
+
     public function __invoke(): View
     {
         $activeRentalStatuses = [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING];
@@ -47,6 +51,8 @@ class DashboardController extends Controller
             ->with(['assignedDevice:id,name,email', 'activeRental.user:id,name,email', 'latestHeartbeat'])
             ->whereNotNull('current_latitude')
             ->whereNotNull('current_longitude')
+            ->whereBetween('current_latitude', self::LOMBOK_LATITUDE_RANGE)
+            ->whereBetween('current_longitude', self::LOMBOK_LONGITUDE_RANGE)
             ->orderBy('code')
             ->get()
             ->map(fn (Bike $bike): array => [

@@ -211,7 +211,7 @@
             .replaceAll("'", '&#039;');
 
         if (mapElement && window.L) {
-            const map = L.map(mapElement).setView([-5.1477, 119.4327], 13);
+            const map = L.map(mapElement).setView([-8.5830, 116.1160], 14);
             const markers = new Map();
             let hasFittedMap = false;
             let currentBounds = [];
