@@ -43,6 +43,7 @@ class MapWidget extends StatefulWidget {
     this.userLongitude,
     this.latestLocationLabel = 'Lokasi sepeda terakhir',
     this.routeLabel = 'Jalur dari perangkat sepeda',
+    this.routeColor,
     this.onRoutePointTap,
     this.onSpotTap,
     this.bikeLabel,
@@ -67,7 +68,7 @@ class MapWidget extends StatefulWidget {
 
   final String latestLocationLabel;
   final String routeLabel;
-
+  final Color? routeColor;
   final void Function(int index, LatLng point)? onRoutePointTap;
   final void Function(PopularSpot spot)? onSpotTap;
 
@@ -129,9 +130,12 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     );
     _bounceAnimation = TweenSequence<double>([
       TweenSequenceItem(
-          tween: Tween(begin: -30.0, end: 0.0)
-              .chain(CurveTween(curve: Curves.bounceOut)),
-          weight: 70),
+        tween: Tween(
+          begin: -30.0,
+          end: 0.0,
+        ).chain(CurveTween(curve: Curves.bounceOut)),
+        weight: 70,
+      ),
       TweenSequenceItem(tween: Tween(begin: 0.0, end: -4.0), weight: 15),
       TweenSequenceItem(tween: Tween(begin: -4.0, end: 0.0), weight: 15),
     ]).animate(_bounceController!);
@@ -153,8 +157,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
     _userPulseAnimation = Tween<double>(begin: 0.3, end: 0.08).animate(
-      CurvedAnimation(
-          parent: _userPulseController!, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _userPulseController!, curve: Curves.easeInOut),
     );
   }
 
@@ -177,8 +180,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 2000),
     );
     _routeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _routeAnimController!, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _routeAnimController!, curve: Curves.easeInOut),
     );
     _routeAnimController!.forward();
   }
@@ -219,8 +221,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     super.didUpdateWidget(old);
 
     // Smooth bike position transition
-    if (old.latitude != widget.latitude ||
-        old.longitude != widget.longitude) {
+    if (old.latitude != widget.latitude || old.longitude != widget.longitude) {
       final oldPos = LatLng(old.latitude, old.longitude);
       final newPos = LatLng(widget.latitude, widget.longitude);
       final dist = calculateDistance(oldPos, newPos);
@@ -359,10 +360,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
   Widget _buildMap(LatLng bikePos) {
     return FlutterMap(
       mapController: _mapController,
-      options: MapOptions(
-        initialCenter: bikePos,
-        initialZoom: 16,
-      ),
+      options: MapOptions(initialCenter: bikePos, initialZoom: 16),
       children: [
         _buildTileLayer(),
         if (widget.mapType == MapType.hybrid) _buildHybridLabelLayer(),
@@ -455,8 +453,9 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       animation: _routeAnimation!,
       builder: (context, _) {
         final totalPoints = _animatedRoutePoints.length;
-        final visibleCount =
-            (_routeAnimation!.value * totalPoints).round().clamp(2, totalPoints);
+        final visibleCount = (_routeAnimation!.value * totalPoints)
+            .round()
+            .clamp(2, totalPoints);
         final visiblePoints = _animatedRoutePoints.sublist(0, visibleCount);
 
         return PolylineLayer(
@@ -465,8 +464,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
               points: visiblePoints,
               color: const Color(0xff3b82f6),
               strokeWidth: 5,
-              borderColor:
-                  const Color(0xff1d4ed8).withValues(alpha: 0.4),
+              borderColor: const Color(0xff1d4ed8).withValues(alpha: 0.4),
               borderStrokeWidth: 2,
             ),
           ],
@@ -481,13 +479,16 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       polylines: [
         Polyline(
           points: widget.routePoints,
-          color: isSatellite
-              ? const Color(0xff38bdf8)
-              : const Color(0xff0d9488),
+          color:
+              widget.routeColor ??
+              (isSatellite ? const Color(0xff38bdf8) : const Color(0xff0d9488)),
           strokeWidth: 4,
-          borderColor: isSatellite
-              ? const Color(0xff0284c7).withValues(alpha: 0.4)
-              : const Color(0xff0f766e).withValues(alpha: 0.3),
+          borderColor:
+              (widget.routeColor ??
+                      (isSatellite
+                          ? const Color(0xff0284c7)
+                          : const Color(0xff0f766e)))
+                  .withValues(alpha: 0.3),
           borderStrokeWidth: 2,
         ),
       ],
@@ -519,11 +520,13 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
-                child:
-                    const Icon(Icons.store, color: Colors.white, size: 16),
+                child: const Icon(Icons.store, color: Colors.white, size: 16),
               ),
-              const Icon(Icons.arrow_drop_down,
-                  color: Color(0xffef4444), size: 16),
+              const Icon(
+                Icons.arrow_drop_down,
+                color: Color(0xffef4444),
+                size: 16,
+              ),
             ],
           ),
         ),
@@ -542,8 +545,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              border:
-                  Border.all(color: const Color(0xff0f766e), width: 3),
+              border: Border.all(color: const Color(0xff0f766e), width: 3),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x33000000),
@@ -553,8 +555,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
               ],
             ),
             child: const Center(
-              child:
-                  Icon(Icons.flag, color: Color(0xff0f766e), size: 14),
+              child: Icon(Icons.flag, color: Color(0xff0f766e), size: 14),
             ),
           ),
         ),
@@ -622,8 +623,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     decoration: BoxDecoration(
                       color: const Color(0xff8b5cf6),
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: Colors.white, width: 2.5),
+                      border: Border.all(color: Colors.white, width: 2.5),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x44000000),
@@ -632,8 +632,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                         ),
                       ],
                     ),
-                    child:
-                        Icon(spot.icon, color: Colors.white, size: 18),
+                    child: Icon(spot.icon, color: Colors.white, size: 18),
                   ),
                   const Icon(
                     Icons.arrow_drop_down,
@@ -666,18 +665,12 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
 
   /// User's own location: blue pulsing dot
   Widget _buildUserMarker() {
-    final userPos =
-        LatLng(widget.userLatitude!, widget.userLongitude!);
+    final userPos = LatLng(widget.userLatitude!, widget.userLongitude!);
 
     if (_userPulseAnimation == null) {
       return MarkerLayer(
         markers: [
-          Marker(
-            point: userPos,
-            width: 24,
-            height: 24,
-            child: _buildUserDot(),
-          ),
+          Marker(point: userPos, width: 24, height: 24, child: _buildUserDot()),
         ],
       );
     }
@@ -699,9 +692,9 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xff3b82f6).withValues(
-                        alpha: _userPulseAnimation!.value,
-                      ),
+                      color: const Color(
+                        0xff3b82f6,
+                      ).withValues(alpha: _userPulseAnimation!.value),
                     ),
                   ),
                   _buildUserDot(),

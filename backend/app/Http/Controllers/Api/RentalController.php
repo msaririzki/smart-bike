@@ -56,6 +56,19 @@ class RentalController extends Controller
         ]);
     }
 
+    public function show(Request $request, Rental $rental): JsonResponse
+    {
+        abort_unless((int) $rental->user_id === (int) $request->user()->id, 404);
+
+        return response()->json([
+            'data' => $rental->load(['bike', 'locationPoints' => function ($query): void {
+                $query
+                    ->where('is_valid_movement', true)
+                    ->orderBy('recorded_at', 'asc');
+            }]),
+        ]);
+    }
+
     public function finish(Request $request, Rental $rental): JsonResponse
     {
         return response()->json([
@@ -68,6 +81,19 @@ class RentalController extends Controller
         return response()->json([
             'data' => $this->rentals->continueIdle($request->user(), $rental),
         ]);
+    }
+
+    public function destroy(Request $request, Rental $rental): JsonResponse
+    {
+        abort_unless((int) $rental->user_id === (int) $request->user()->id, 404);
+
+        if (in_array($rental->status, [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING])) {
+            abort(400, 'Rental aktif tidak dapat dihapus.');
+        }
+
+        $rental->delete();
+
+        return response()->json(['message' => 'Riwayat rental berhasil dihapus.']);
     }
 
     public function startFromQr(Request $request): JsonResponse

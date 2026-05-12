@@ -27,8 +27,10 @@ Route::middleware(['auth:sanctum', 'role:user'])->group(function (): void {
     Route::get('/rentals/history', [RentalController::class, 'history']);
     Route::get('/rentals/idle-settings', [RentalController::class, 'idleSettings']);
     Route::get('/rentals/{rental}/location-points', [RentalController::class, 'locationPoints']);
+    Route::get('/rentals/{rental}', [RentalController::class, 'show']);
     Route::post('/rentals/{rental}/finish', [RentalController::class, 'finish']);
     Route::post('/rentals/{rental}/idle/continue', [RentalController::class, 'continueIdle']);
+    Route::delete('/rentals/{rental}', [RentalController::class, 'destroy']);
 });
 
 Route::middleware(['auth:sanctum', 'role:device'])->prefix('device')->group(function (): void {
