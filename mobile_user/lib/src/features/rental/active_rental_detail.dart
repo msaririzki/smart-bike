@@ -14,6 +14,8 @@ class ActiveRentalDetail extends StatelessWidget {
     required this.routePoints,
     required this.isFinishing,
     required this.onFinish,
+    this.idleBillingAmount,
+    this.idleBillingIntervalSeconds,
     super.key,
   });
 
@@ -23,6 +25,8 @@ class ActiveRentalDetail extends StatelessWidget {
   final List<LatLng> routePoints;
   final bool isFinishing;
   final VoidCallback onFinish;
+  final int? idleBillingAmount;
+  final int? idleBillingIntervalSeconds;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +39,14 @@ class ActiveRentalDetail extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _StatusHeader(status: rental.status),
+        if (rental.status == 'idle_billing') ...[
+          const SizedBox(height: 10),
+          _IdleBillingExplanation(
+            currency: currency,
+            billingAmount: idleBillingAmount,
+            intervalSeconds: idleBillingIntervalSeconds,
+          ),
+        ],
         const SizedBox(height: 16),
         _BikePanel(code: bike?.code ?? 'Bike', name: bike?.name ?? 'Sepeda'),
         const SizedBox(height: 16),
@@ -488,6 +500,91 @@ class _MetricCard extends StatelessWidget {
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: const Color(0xff667085)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IdleBillingExplanation extends StatelessWidget {
+  const _IdleBillingExplanation({
+    required this.currency,
+    this.billingAmount,
+    this.intervalSeconds,
+  });
+
+  final NumberFormat currency;
+  final int? billingAmount;
+  final int? intervalSeconds;
+
+  @override
+  Widget build(BuildContext context) {
+    String rateText = 'Biaya idle sedang berjalan.';
+    if (billingAmount != null && billingAmount! > 0) {
+      final formatted = currency.format(billingAmount);
+      if (intervalSeconds != null && intervalSeconds! > 0) {
+        final intervalLabel = intervalSeconds! >= 60
+            ? '${intervalSeconds! ~/ 60} menit'
+            : '$intervalSeconds detik';
+        rateText = 'Biaya idle sedang berjalan, $formatted per $intervalLabel.';
+      } else {
+        rateText = 'Biaya idle sedang berjalan, $formatted per interval.';
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.red.shade50,
+            Colors.orange.shade50,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Colors.red.shade200.withValues(alpha: 0.6),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red.shade100,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.monetization_on_outlined,
+              size: 22,
+              color: Colors.red.shade700,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Idle Billing Aktif',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Colors.red.shade800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  rateText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.red.shade700,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
