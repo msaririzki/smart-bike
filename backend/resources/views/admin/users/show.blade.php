@@ -44,25 +44,27 @@
     @endif
 
     <h2>Histori Rental Pengguna</h2>
-    <table>
-        <thead>
-            <tr><th>ID</th><th>Sepeda</th><th>Status</th><th>Mulai</th><th>Selesai</th><th>Jarak</th><th>Total Biaya</th><th></th></tr>
-        </thead>
-        <tbody>
-            @forelse($targetUser->rentals as $rental)
-                <tr>
-                    <td>{{ $rental->id }}</td>
-                    <td>{{ $rental->bike?->code ?? '-' }}</td>
-                    <td><span class="badge {{ $rental->status }}">{{ $adminStatusLabels[$rental->status] ?? $rental->status }}</span></td>
-                    <td>{{ $rental->started_at }}</td>
-                    <td>{{ $rental->ended_at ?? '-' }}</td>
-                    <td>{{ number_format($rental->total_distance_meters, 2) }} m</td>
-                    <td>Rp{{ number_format($rental->total_cost, 0, ',', '.') }}</td>
-                    <td><a href="{{ route('admin.rentals.show', $rental) }}">Lihat Detail</a></td>
-                </tr>
-            @empty
-                <tr><td colspan="8" class="muted">Belum ada histori rental.</td></tr>
-            @endforelse
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Sepeda</th><th>Status</th><th>Mulai</th><th>Selesai</th><th>Jarak</th><th>Total Biaya</th><th></th></tr>
+            </thead>
+            <tbody>
+                @forelse($targetUser->rentals as $rental)
+                    <tr>
+                        <td><strong>#{{ $rental->id }}</strong></td>
+                        <td>{{ $rental->bike?->code ?? '-' }}</td>
+                        <td><span class="badge {{ $rental->status }}">{{ $adminStatusLabels[$rental->status] ?? $rental->status }}</span></td>
+                        <td>{{ $rental->started_at }}</td>
+                        <td>{{ $rental->ended_at ?? '-' }}</td>
+                        <td>{{ number_format($rental->total_distance_meters, 2) }} m</td>
+                        <td>Rp{{ number_format($rental->total_cost, 0, ',', '.') }}</td>
+                        <td><a href="{{ route('admin.rentals.show', $rental) }}" class="button secondary" style="padding: 6px 12px; font-size: 13px;">Lihat Detail</a></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="8" class="muted">Belum ada histori rental.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
 @endsection
