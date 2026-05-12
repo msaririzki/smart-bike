@@ -29,7 +29,7 @@
         .dash-map-title { margin: 0; color: #0f172a; font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
         .dash-map-title svg { stroke: #0f766e; background: #ccfbf1; border-radius: 0.5rem; padding: 0.25rem; width: 2rem; height: 2rem; }
         .dash-map-subtitle { margin: 0.5rem 0 0 0; color: #64748b; font-size: 0.95rem; }
-        .dash-map-canvas { height: 50vh; min-height: 400px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
+        .dash-map-canvas { height: 70vh; min-height: 550px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
         .map-actions { display: flex; align-items: center; gap: 1.25rem; }
         .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
         .leaflet-popup-content { margin: 0; width: 320px !important; }
@@ -88,6 +88,16 @@
         .weather-widget { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; border-radius: 1rem; padding: 1.5rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         .weather-info h3 { margin: 0; font-size: 1.5rem; }
         .weather-info p { margin: 0.25rem 0 0; opacity: 0.9; font-size: 0.875rem; }
+        /* Popup Animation */
+        .animated-popup .leaflet-popup-content-wrapper,
+        .animated-popup .leaflet-popup-tip {
+            animation: popupScaleFade 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            transform-origin: bottom center;
+        }
+        @keyframes popupScaleFade {
+            0% { opacity: 0; transform: scale(0.85) translateY(10px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
     </style>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h1 style="margin: 0; color: #0f172a; font-size: 1.75rem;">Dasbor Ringkasan</h1>
@@ -339,7 +349,7 @@
                     } else {
                         markers.set(
                             bike.code,
-                            L.marker(position, { icon: bikeIcon(bike) }).addTo(map).bindPopup(popupHtml(bike)),
+                            L.marker(position, { icon: bikeIcon(bike) }).addTo(map).bindPopup(popupHtml(bike), { autoPan: false, className: 'animated-popup' }),
                         );
                     }
 
