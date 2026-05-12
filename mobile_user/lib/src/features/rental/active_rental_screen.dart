@@ -32,6 +32,7 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
   Rental? _rental;
   int? _routeRentalId;
   int? _shownIdleWarningRentalId;
+  int? _shownIdleBillingRentalId;
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isFinishing = false;
@@ -237,6 +238,7 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
 
     if (rental?.status == 'idle_warning') {
       final rentalId = rental!.id;
+      _shownIdleBillingRentalId = null;
       if (!_idleDialogOpen &&
           !_isFinishing &&
           _shownIdleWarningRentalId != rentalId) {
@@ -246,7 +248,20 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
       return;
     }
 
+    if (rental?.status == 'idle_billing') {
+      final rentalId = rental!.id;
+      _shownIdleWarningRentalId = null;
+      if (!_idleDialogOpen &&
+          !_isFinishing &&
+          _shownIdleBillingRentalId != rentalId) {
+        _shownIdleBillingRentalId = rentalId;
+        _showIdleBillingDialog(rental);
+      }
+      return;
+    }
+
     _shownIdleWarningRentalId = null;
+    _shownIdleBillingRentalId = null;
 
     if (_idleDialogOpen) {
       Navigator.of(context, rootNavigator: true).pop();
@@ -344,6 +359,43 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
     ).whenComplete(() => _idleDialogOpen = false);
   }
 
+  void _showIdleBillingDialog(Rental rental) {
+    _idleDialogOpen = true;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          icon: const Icon(
+            Icons.warning_amber_rounded,
+            color: Color(0xffdc2626),
+            size: 42,
+          ),
+          title: const Text('Biaya Diam Berjalan'),
+          content: Text(
+            'Sepeda masih tidak bergerak. Biaya idle sekarang berjalan dan total biaya idle saat ini ${_currency.format(rental.idleCost)}.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Tutup'),
+            ),
+            FilledButton(
+              onPressed: _isFinishing
+                  ? null
+                  : () async {
+                      Navigator.of(dialogContext).pop();
+                      await _finishRental();
+                    },
+              child: const Text('Selesaikan Sewa'),
+            ),
+          ],
+        );
+      },
+    ).whenComplete(() => _idleDialogOpen = false);
+  }
+
   void _showMessage(String message) {
     if (!mounted) {
       return;
@@ -386,15 +438,28 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                   if (rental == null)
                     const _NoActiveRental()
                   else
-                    ActiveRentalDetail(
-                      rental: rental,
-                      currency: _currency,
-                      duration: _durationFor(rental),
-                      routePoints: List.unmodifiable(_routePoints),
-                      isFinishing: _isFinishing,
-                      onFinish: () => _finishRental(),
-                      idleBillingAmount: _idleBillingAmount,
-                      idleBillingIntervalSeconds: _idleBillingIntervalSeconds,
+                    Column(
+                      children: [
+                        if (_isIdleAlertStatus(rental.status))
+                          _IdleAlertBanner(
+                            rental: rental,
+                            currency: _currency,
+                            idleBillingAmount: _idleBillingAmount,
+                            idleBillingIntervalSeconds:
+                                _idleBillingIntervalSeconds,
+                          ),
+                        ActiveRentalDetail(
+                          rental: rental,
+                          currency: _currency,
+                          duration: _durationFor(rental),
+                          routePoints: List.unmodifiable(_routePoints),
+                          isFinishing: _isFinishing,
+                          onFinish: () => _finishRental(),
+                          idleBillingAmount: _idleBillingAmount,
+                          idleBillingIntervalSeconds:
+                              _idleBillingIntervalSeconds,
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -410,6 +475,98 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
 
     final duration = _now.difference(startedAt);
     return duration.isNegative ? Duration.zero : duration;
+  }
+}
+
+class _IdleAlertBanner extends StatelessWidget {
+  const _IdleAlertBanner({
+    required this.rental,
+    required this.currency,
+    this.idleBillingAmount,
+    this.idleBillingIntervalSeconds,
+  });
+
+  final Rental rental;
+  final NumberFormat currency;
+  final int? idleBillingAmount;
+  final int? idleBillingIntervalSeconds;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBilling = rental.status == 'idle_billing';
+    final background = isBilling
+        ? const Color(0xfffff1f3)
+        : const Color(0xfffffaeb);
+    final border = isBilling
+        ? const Color(0xfffda29b)
+        : const Color(0xfffedf89);
+    final color = isBilling ? const Color(0xffb42318) : const Color(0xffb54708);
+    final title = isBilling
+        ? 'Biaya diam sedang berjalan'
+        : 'Sepeda diam terlalu lama';
+    final rate = _idleRateText();
+    final message = isBilling
+        ? 'Segera lanjutkan perjalanan atau selesaikan sewa. Biaya idle saat ini ${currency.format(rental.idleCost)}.'
+        : 'Pilih lanjutkan di dialog atau selesaikan sewa agar denda diam tidak berjalan.';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: background,
+        border: Border.all(color: border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isBilling
+                ? Icons.warning_amber_rounded
+                : Icons.notifications_active_rounded,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(message),
+                if (rate != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    rate,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _idleRateText() {
+    final amount = idleBillingAmount;
+    if (amount == null || amount <= 0) return null;
+
+    final formatted = currency.format(amount);
+    final interval = idleBillingIntervalSeconds;
+    if (interval == null || interval <= 0) {
+      return 'Tarif idle: $formatted per interval.';
+    }
+
+    final intervalText = interval >= 60
+        ? '${interval ~/ 60} menit'
+        : '$interval detik';
+    return 'Tarif idle: $formatted per $intervalText.';
   }
 }
 
@@ -459,4 +616,8 @@ class _NoActiveRental extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _isIdleAlertStatus(String status) {
+  return status == 'idle_warning' || status == 'idle_billing';
 }

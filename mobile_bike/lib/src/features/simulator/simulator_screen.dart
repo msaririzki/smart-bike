@@ -74,6 +74,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   bool _checkingLocationAccess = true;
   bool _locationAccessGranted = false;
   bool _autoStartAttempted = false;
+  bool _idleDialogOpen = false;
+  String? _lastIdleAlertKey;
   LocationAccessStatus _locationAccessStatus = LocationAccessStatus.denied;
   String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
   final List<_RoutePoint> _routePoints = [];
@@ -135,9 +137,62 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         }
         _activeRentalId = nextRentalId;
       });
+      _handleIdleAlert(summary.rental);
     } catch (e) {
       if (!silent) _showMessage('Gagal memuat ringkasan rental: $e');
     }
+  }
+
+  void _handleIdleAlert(ActiveBikeRental? rental) {
+    if (!mounted) return;
+
+    if (rental == null || !_isIdleAlertStatus(rental.status)) {
+      _lastIdleAlertKey = null;
+      if (_idleDialogOpen) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _idleDialogOpen = false;
+      }
+      return;
+    }
+
+    final alertKey = '${rental.id}:${rental.status}';
+    if (_idleDialogOpen || _lastIdleAlertKey == alertKey) return;
+
+    _lastIdleAlertKey = alertKey;
+    _showIdleAlertDialog(rental);
+  }
+
+  void _showIdleAlertDialog(ActiveBikeRental rental) {
+    _idleDialogOpen = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        final isBilling = rental.status == 'idle_billing';
+        return AlertDialog(
+          icon: Icon(
+            isBilling
+                ? Icons.warning_amber_rounded
+                : Icons.notifications_active_rounded,
+            color:
+                isBilling ? const Color(0xFFB42318) : const Color(0xFFB54708),
+            size: 42,
+          ),
+          title: Text(isBilling ? 'Biaya Diam Berjalan' : 'Sepeda Diam'),
+          content: Text(
+            isBilling
+                ? 'Sepeda masih tidak bergerak. Biaya idle sedang berjalan dan akan tampil juga di aplikasi pengguna.'
+                : 'Sepeda berhenti terlalu lama. Pastikan pengguna melihat peringatan di aplikasi atau segera lanjutkan perjalanan.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Saya Mengerti'),
+            ),
+          ],
+        );
+      },
+    ).whenComplete(() => _idleDialogOpen = false);
   }
 
   void _listenNetwork() {
@@ -706,6 +761,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             lastGpsReadAt: _lastGpsReadAt,
             lastSentAt: _lastSentAt,
           ),
+          if (rental != null && _isIdleAlertStatus(rental.status)) ...[
+            const SizedBox(height: 12),
+            _IdleAlertBanner(rental: rental),
+          ],
           if (_checkingLocationAccess || !_locationAccessGranted) ...[
             const SizedBox(height: 12),
             _LocationAccessBanner(
@@ -756,12 +815,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           const SizedBox(height: 12),
           _FieldTestChecklist(
             locationAccess: _locationAccessGranted,
-            gpsEnabled: _locationAccessStatus != LocationAccessStatus.serviceDisabled,
+            gpsEnabled:
+                _locationAccessStatus != LocationAccessStatus.serviceDisabled,
             autoStart: _streaming,
             networkType: _networkType,
             lastGpsAt: _lastGpsReadAt,
             lastServerAt: _lastSentAt,
-            accuracyMeters: _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
+            accuracyMeters:
+                _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
             rentalActive: rental != null,
           ),
           const SizedBox(height: 12),
@@ -1172,6 +1233,77 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
+class _IdleAlertBanner extends StatelessWidget {
+  const _IdleAlertBanner({required this.rental});
+
+  final ActiveBikeRental rental;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBilling = rental.status == 'idle_billing';
+    final background =
+        isBilling ? const Color(0xFFFEF3F2) : const Color(0xFFFFFAEB);
+    final border =
+        isBilling ? const Color(0xFFFECDCA) : const Color(0xFFFEDF89);
+    final iconColor =
+        isBilling ? const Color(0xFFB42318) : const Color(0xFFB54708);
+    final title =
+        isBilling ? 'Biaya idle sedang berjalan' : 'Sepeda diam terlalu lama';
+    final message = isBilling
+        ? 'Peringatan sudah naik menjadi denda diam. Total biaya idle: ${_formatRupiah(rental.idleCost)}.'
+        : 'Minta pengguna mengecek aplikasi mobile_user atau lanjutkan perjalanan agar denda diam tidak berjalan.';
+
+    return _Panel(
+      borderColor: border,
+      backgroundColor: background,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .75),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              isBilling
+                  ? Icons.warning_amber_rounded
+                  : Icons.notifications_active_rounded,
+              color: iconColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: iconColor,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: Color(0xFF475467),
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RoutePoint {
   const _RoutePoint({
     required this.latitude,
@@ -1295,11 +1427,17 @@ class _CompactInfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: emphasized ? const Color(0xFF0F766E) : const Color(0xFF667085)),
+        Icon(icon,
+            size: 14,
+            color:
+                emphasized ? const Color(0xFF0F766E) : const Color(0xFF667085)),
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF667085)),
+          style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF667085)),
         ),
         const Spacer(),
         Text(
@@ -1307,7 +1445,8 @@ class _CompactInfoRow extends StatelessWidget {
           style: TextStyle(
             fontSize: emphasized ? 14 : 12,
             fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
-            color: emphasized ? const Color(0xFF134E4A) : const Color(0xFF101828),
+            color:
+                emphasized ? const Color(0xFF134E4A) : const Color(0xFF101828),
           ),
         ),
       ],
@@ -1346,11 +1485,15 @@ class _DeviceAndRentalSummary extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.pedal_bike_rounded, size: 18, color: Color(0xFF0F766E)),
+              const Icon(Icons.pedal_bike_rounded,
+                  size: 18, color: Color(0xFF0F766E)),
               const SizedBox(width: 8),
               Text(
                 '${bike.code} - ${bike.name}',
-                style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF101828), fontSize: 13),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF101828),
+                    fontSize: 13),
               ),
               const Spacer(),
               if (rental != null)
@@ -1360,10 +1503,20 @@ class _DeviceAndRentalSummary extends StatelessWidget {
           const Divider(height: 16),
           _MetricGridCompact(
             children: [
-              _MetricItemSmall(label: 'Baterai', value: '$batteryPercent%', icon: Icons.battery_std),
-              _MetricItemSmall(label: 'Jaringan', value: networkType, icon: Icons.network_check),
-              _MetricItemSmall(label: 'Titik', value: '$pointsSent', icon: Icons.upload),
-              _MetricItemSmall(label: 'Mode', value: locationMode, icon: Icons.explore_outlined),
+              _MetricItemSmall(
+                  label: 'Baterai',
+                  value: '$batteryPercent%',
+                  icon: Icons.battery_std),
+              _MetricItemSmall(
+                  label: 'Jaringan',
+                  value: networkType,
+                  icon: Icons.network_check),
+              _MetricItemSmall(
+                  label: 'Titik', value: '$pointsSent', icon: Icons.upload),
+              _MetricItemSmall(
+                  label: 'Mode',
+                  value: locationMode,
+                  icon: Icons.explore_outlined),
             ],
           ),
         ],
@@ -1386,7 +1539,8 @@ class _MetricGridCompact extends StatelessWidget {
 }
 
 class _MetricItemSmall extends StatelessWidget {
-  const _MetricItemSmall({required this.label, required this.value, required this.icon});
+  const _MetricItemSmall(
+      {required this.label, required this.value, required this.icon});
   final String label;
   final String value;
   final IconData icon;
@@ -1397,8 +1551,13 @@ class _MetricItemSmall extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: const Color(0xFF667085)),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF667085))),
-        Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF101828))),
+        Text(label,
+            style: const TextStyle(fontSize: 9, color: Color(0xFF667085))),
+        Text(value,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF101828))),
       ],
     );
   }
@@ -1652,7 +1811,6 @@ class _LegendDot extends StatelessWidget {
   }
 }
 
-
 class _Panel extends StatelessWidget {
   const _Panel({
     required this.child,
@@ -1830,4 +1988,8 @@ String _rentalStatusLabel(String status) {
     'cancelled' => 'Dibatalkan',
     _ => status,
   };
+}
+
+bool _isIdleAlertStatus(String status) {
+  return status == 'idle_warning' || status == 'idle_billing';
 }
