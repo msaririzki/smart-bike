@@ -1,4 +1,4 @@
-# Dokumentasi Deploy Backend Smart Bike dengan Docker dan Cloudflare Tunnel
+﻿# Dokumentasi Deploy Backend Smart Bike dengan Docker dan Cloudflare Tunnel
 
 Tanggal: 12 Mei 2026  
 Scope: backend Laravel, admin web, API mobile  
@@ -22,7 +22,7 @@ Arsitektur deploy:
 
 ```text
 HP mobile_user / mobile_bike
--> https://api.domainkamu.com
+-> https://bike.ikydev.site
 -> Cloudflare Tunnel
 -> server tanpa IP publik
 -> Nginx container
@@ -77,12 +77,12 @@ Edit:
 
 ```env
 COMPOSE_PROJECT_NAME=smart-bike
-WEB_PORT=8001
+WEB_PORT=8005
 DB_DATABASE=smart_bike_rental
 DB_USERNAME=smart_bike
 DB_PASSWORD=password_database_yang_kuat
 MYSQL_ROOT_PASSWORD=password_root_yang_kuat
-DB_PORT_EXTERNAL=3307
+DB_PORT_EXTERNAL=3311
 RUN_SEED_ON_DEPLOY=false
 ```
 
@@ -103,7 +103,7 @@ Edit `backend/.env`:
 APP_NAME="Smart Bike Rental"
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://api.domainkamu.com
+APP_URL=https://bike.ikydev.site
 
 DB_CONNECTION=mariadb
 DB_HOST=db
@@ -149,19 +149,19 @@ docker compose logs -f web
 Backend bisa diakses dari server:
 
 ```text
-http://localhost:8001
+http://localhost:8005
 ```
 
 Admin:
 
 ```text
-http://localhost:8001/admin
+http://localhost:8005/admin
 ```
 
 API:
 
 ```text
-http://localhost:8001/api
+http://localhost:8005/api
 ```
 
 ---
@@ -217,14 +217,14 @@ Di Cloudflare Zero Trust:
 4. Tambahkan Public Hostname:
 
 ```text
-Hostname: api.domainkamu.com
-Service: http://localhost:8001
+Hostname: bike.ikydev.site
+Service: http://localhost:8005
 ```
 
 Mobile app nanti memakai:
 
 ```text
-https://api.domainkamu.com/api
+https://bike.ikydev.site/api
 ```
 
 ### Opsi B: Cloudflared via Docker Compose
@@ -258,27 +258,27 @@ Ya, `mobile_user` dan `mobile_bike` bisa konek ke domain.
 Saat run/build Flutter, gunakan:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=https://api.domainkamu.com/api
+flutter run --dart-define=API_BASE_URL=https://bike.ikydev.site/api
 ```
 
 Untuk build APK:
 
 ```bash
-flutter build apk --dart-define=API_BASE_URL=https://api.domainkamu.com/api
+flutter build apk --dart-define=API_BASE_URL=https://bike.ikydev.site/api
 ```
 
 Untuk `mobile_user`:
 
 ```bash
 cd mobile_user
-flutter build apk --dart-define=API_BASE_URL=https://api.domainkamu.com/api
+flutter build apk --dart-define=API_BASE_URL=https://bike.ikydev.site/api
 ```
 
 Untuk `mobile_bike`:
 
 ```bash
 cd mobile_bike
-flutter build apk --dart-define=API_BASE_URL=https://api.domainkamu.com/api
+flutter build apk --dart-define=API_BASE_URL=https://bike.ikydev.site/api
 ```
 
 Jangan pakai `127.0.0.1` untuk HP fisik karena itu mengarah ke HP sendiri, bukan server.
@@ -379,7 +379,7 @@ docker compose logs app
 Buka:
 
 ```text
-http://localhost:8001/admin
+http://localhost:8005/admin
 ```
 
 ### Mobile tidak bisa konek
@@ -387,13 +387,14 @@ http://localhost:8001/admin
 Pastikan app dibuild dengan:
 
 ```text
---dart-define=API_BASE_URL=https://api.domainkamu.com/api
+--dart-define=API_BASE_URL=https://bike.ikydev.site/api
 ```
 
 Pastikan endpoint bisa dibuka:
 
 ```text
-https://api.domainkamu.com/api/bikes
+https://bike.ikydev.site/api/bikes
 ```
 
 Endpoint tertentu butuh login token, jadi response unauthenticated masih normal.
+
