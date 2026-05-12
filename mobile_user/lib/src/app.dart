@@ -5,6 +5,7 @@ import 'features/home/home_screen.dart';
 import 'features/splash/splash_screen.dart';
 import 'services/api_client.dart';
 import 'services/session_store.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 class SmartBikeUserApp extends StatefulWidget {
   const SmartBikeUserApp({super.key});
@@ -61,10 +62,73 @@ class _SmartBikeUserAppState extends State<SmartBikeUserApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xff0f766e),
+          seedColor: AppColors.primaryLight,
           brightness: Brightness.light,
+          surface: Colors.white,
         ),
+        scaffoldBackgroundColor: const Color(0xFFEDF5F0),
+        fontFamily: 'Inter',
         useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          centerTitle: false,
+          backgroundColor: Color(0xFFEDF5F0),
+          foregroundColor: Color(0xff111827),
+          titleTextStyle: TextStyle(
+            color: Color(0xff111827),
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+          ),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          indicatorColor: const Color(0xffdcfce7),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return TextStyle(
+              color: selected
+                  ? AppColors.primaryLight
+                  : const Color(0xff6b7280),
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              letterSpacing: 0,
+            );
+          }),
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return IconThemeData(
+              color: selected
+                  ? AppColors.primaryLight
+                  : const Color(0xff6b7280),
+              size: 24,
+            );
+          }),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primaryLight,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: const Color(0xffd1d5db),
+            disabledForegroundColor: const Color(0xff6b7280),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xff111827),
+            side: const BorderSide(color: Color(0xffe5e7eb)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
         ),

@@ -3,17 +3,25 @@ import 'package:intl/intl.dart';
 import '../../models/rental_history.dart';
 import '../../services/api_client.dart';
 import 'rental_detail_screen.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({required this.api, super.key});
+  const HistoryScreen({
+    required this.api,
+    this.showScaffold = true,
+    this.bottomPadding = 20,
+    super.key,
+  });
 
   final ApiClient api;
+  final bool showScaffold;
+  final double bottomPadding;
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  State<HistoryScreen> createState() => HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class HistoryScreenState extends State<HistoryScreen> {
   List<RentalHistory>? _history;
   bool _isLoading = true;
   String? _error;
@@ -29,7 +37,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadHistory();
+    loadHistory();
     _scrollController.addListener(_onScroll);
   }
 
@@ -40,14 +48,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       if (_hasMore && !_isLoadMoreLoading && !_isLoading) {
         _loadMore();
       }
     }
   }
 
-  Future<void> _loadHistory() async {
+  Future<void> loadHistory() async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -58,8 +67,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final data = await widget.api.rentalHistory(page: 1);
       final rawList = data['data'] as List<dynamic>;
-      final history = rawList.map((item) => RentalHistory.fromJson(item as Map<String, dynamic>)).toList();
-      
+      final history = rawList
+          .map((item) => RentalHistory.fromJson(item as Map<String, dynamic>))
+          .toList();
+
       if (mounted) {
         setState(() {
           _history = history;
@@ -95,7 +106,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final nextPage = _currentPage + 1;
       final data = await widget.api.rentalHistory(page: nextPage);
       final rawList = data['data'] as List<dynamic>;
-      final nextHistory = rawList.map((item) => RentalHistory.fromJson(item as Map<String, dynamic>)).toList();
+      final nextHistory = rawList
+          .map((item) => RentalHistory.fromJson(item as Map<String, dynamic>))
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -116,6 +129,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.showScaffold) {
+      return _buildBody();
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xfff7fbf8),
       appBar: AppBar(
@@ -128,40 +145,41 @@ class _HistoryScreenState extends State<HistoryScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            onPressed: _isLoading ? null : _loadHistory,
+            onPressed: _isLoading ? null : loadHistory,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
-      body: _isLoading
-          ? const _ShimmerLoadingView()
-          : _error != null
-              ? RefreshIndicator(
-                  onRefresh: _loadHistory,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: SizedBox(
-                      height: MediaQuery.of(context).size.height - 100,
-                      child: _ErrorView(message: _error!, onRetry: _loadHistory),
-                    ),
-                  ),
-                )
-              : _history == null || _history!.isEmpty
-                  ? RefreshIndicator(
-                      onRefresh: _loadHistory,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: SizedBox(
-                          height: MediaQuery.of(context).size.height - 100,
-                          child: const _EmptyView(),
-                        ),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadHistory,
-                      child: _buildFilteredList(),
-                    ),
+      body: _buildBody(),
     );
+  }
+
+  Widget _buildBody() {
+    return _isLoading
+        ? const _ShimmerLoadingView()
+        : _error != null
+        ? RefreshIndicator(
+            onRefresh: loadHistory,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height - 100,
+                child: _ErrorView(message: _error!, onRetry: loadHistory),
+              ),
+            ),
+          )
+        : _history == null || _history!.isEmpty
+        ? RefreshIndicator(
+            onRefresh: loadHistory,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height - 100,
+                child: const _EmptyView(),
+              ),
+            ),
+          )
+        : RefreshIndicator(onRefresh: loadHistory, child: _buildFilteredList());
   }
 
   Widget _buildFilteredList() {
@@ -178,7 +196,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           final weekAgo = now.subtract(const Duration(days: 7));
           if (item.startedAt.isBefore(weekAgo)) return false;
         } else if (_periodFilter == 'ThisMonth') {
-          if (item.startedAt.month != now.month || item.startedAt.year != now.year) {
+          if (item.startedAt.month != now.month ||
+              item.startedAt.year != now.year) {
             return false;
           }
         }
@@ -196,7 +215,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
             children: [
               _HistorySummaryHeader(history: _history!),
               _buildFilterBar(),
-              const Expanded(child: _EmptyView(message: 'Tidak ada data yang cocok dengan filter.')),
+              const Expanded(
+                child: _EmptyView(
+                  message: 'Tidak ada data yang cocok dengan filter.',
+                ),
+              ),
             ],
           ),
         ),
@@ -205,8 +228,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return ListView.separated(
       controller: _scrollController,
-      padding: const EdgeInsets.all(20),
-      itemCount: filteredHistory.length + 3, // Summary + Filters + Items + Loading Indicator
+      padding: EdgeInsets.fromLTRB(20, 12, 20, widget.bottomPadding),
+      itemCount:
+          filteredHistory.length +
+          3, // Summary + Filters + Items + Loading Indicator
       separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -215,14 +240,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
         if (index == 1) {
           return _buildFilterBar();
         }
-        
+
         if (index == filteredHistory.length + 2) {
-          return _hasMore 
-            ? const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              )
-            : const SizedBox(height: 40);
+          return _hasMore
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : const SizedBox(height: 40);
         }
 
         final itemIndex = index - 2;
@@ -253,7 +280,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       children: [
         const Text(
           'Filter Status',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xff64748b)),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: Color(0xff64748b),
+          ),
         ),
         const SizedBox(height: 8),
         SingleChildScrollView(
@@ -283,7 +314,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
         const SizedBox(height: 16),
         const Text(
           'Filter Periode',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xff64748b)),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: Color(0xff64748b),
+          ),
         ),
         const SizedBox(height: 8),
         SingleChildScrollView(
@@ -324,79 +359,51 @@ class _HistorySummaryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalKm = history.fold(0.0, (sum, e) => sum + e.totalDistanceKilometers);
+    final totalKm = history.fold(
+      0.0,
+      (sum, e) => sum + e.totalDistanceKilometers,
+    );
     final totalRentals = history.length;
     final totalCo2Gram = totalKm * 120;
-    final co2Text = totalCo2Gram >= 1000 ? '${(totalCo2Gram / 1000).toStringAsFixed(1)} kg' : '${totalCo2Gram.toStringAsFixed(0)} g';
+    final co2Text = totalCo2Gram >= 1000
+        ? '${(totalCo2Gram / 1000).toStringAsFixed(1)} kg'
+        : '${totalCo2Gram.toStringAsFixed(0)} g';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xff269276), Color(0xff18846e)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xff269276).withValues(alpha: 0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xffe5e7eb)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _StatItem(label: 'Jarak', value: totalKm.toStringAsFixed(1), unit: 'km'),
+              _StatItem(
+                label: 'Jarak',
+                value: totalKm.toStringAsFixed(1),
+                unit: 'km',
+              ),
               _StatDivider(),
               _StatItem(label: 'Sewa', value: '$totalRentals', unit: 'kali'),
               _StatDivider(),
               _StatItem(label: 'Estimasi', value: co2Text, unit: 'CO2'),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Divider(color: Colors.white24, height: 1),
+          const Divider(height: 30),
+          const Text(
+            'Aktivitas 7 Hari',
+            style: TextStyle(
+              color: Color(0xff6b7280),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Aktivitas 7 Hari',
-                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(height: 55, child: _WeeklyBarChart(history: history)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      'Badges',
-                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    _AchievementBadgesCompact(history: history),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: 12),
+          SizedBox(height: 74, child: _WeeklyBarChart(history: history)),
         ],
       ),
     );
@@ -406,72 +413,48 @@ class _HistorySummaryHeader extends StatelessWidget {
 class _StatDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(width: 1, height: 24, color: Colors.white10);
+    return Container(
+      width: 1,
+      height: 34,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      color: const Color(0xffe5e7eb),
+    );
   }
 }
 
 class _StatItem extends StatelessWidget {
-  const _StatItem({required this.label, required this.value, required this.unit});
+  const _StatItem({
+    required this.label,
+    required this.value,
+    required this.unit,
+  });
   final String label, value, unit;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
-        ),
-        Text(
-          unit,
-          style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9, letterSpacing: 0.5),
-        ),
-      ],
-    );
-  }
-}
-
-class _AchievementBadgesCompact extends StatelessWidget {
-  const _AchievementBadgesCompact({required this.history});
-  final List<RentalHistory> history;
-
-  @override
-  Widget build(BuildContext context) {
-    final totalKm = history.fold(0.0, (sum, e) => sum + e.totalDistanceKilometers);
-    final totalRentals = history.length;
-    
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        if (totalKm > 10) _CompactBadge(icon: Icons.terrain_rounded, color: Colors.amber),
-        if (totalRentals > 5) _CompactBadge(icon: Icons.stars_rounded, color: Colors.orange),
-        if (totalKm > 0) _CompactBadge(icon: Icons.directions_bike_rounded, color: Colors.blue),
-      ],
-    );
-  }
-}
-
-class _CompactBadge extends StatelessWidget {
-  const _CompactBadge({required this.icon, required this.color});
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(left: 6),
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.2),
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xff111827),
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$label - $unit',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xff6b7280), fontSize: 12),
+          ),
+        ],
       ),
-      child: Icon(icon, color: Colors.white, size: 14),
     );
   }
 }
@@ -493,17 +476,16 @@ class _HistoryCard extends StatelessWidget {
     final timeFormat = DateFormat('HH:mm');
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xfff1f5f9), width: 1.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xffe5e7eb)),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(8),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
@@ -565,7 +547,11 @@ class _HistoryCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(Icons.timer_outlined, size: 12, color: Color(0xff94a3b8)),
+                        const Icon(
+                          Icons.timer_outlined,
+                          size: 12,
+                          color: Color(0xff94a3b8),
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           history.durationString,
@@ -646,26 +632,32 @@ class _ShimmerLoadingView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Row(
-            children: List.generate(3, (index) => Container(
-              margin: const EdgeInsets.only(right: 8),
-              width: 80,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+            children: List.generate(
+              3,
+              (index) => Container(
+                margin: const EdgeInsets.only(right: 8),
+                width: 80,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-            )),
+            ),
           ),
           const SizedBox(height: 24),
-          ...List.generate(5, (index) => Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            height: 100,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+          ...List.generate(
+            5,
+            (index) => Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              height: 100,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -686,7 +678,11 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 48, color: Colors.red),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: Colors.red,
+            ),
             const SizedBox(height: 16),
             Text(
               message,
@@ -694,10 +690,7 @@ class _ErrorView extends StatelessWidget {
               style: const TextStyle(color: Color(0xff475569)),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: onRetry,
-              child: const Text('Coba Lagi'),
-            ),
+            ElevatedButton(onPressed: onRetry, child: const Text('Coba Lagi')),
           ],
         ),
       ),
@@ -763,6 +756,7 @@ class _FilterChip extends StatelessWidget {
     );
   }
 }
+
 class _WeeklyBarChart extends StatelessWidget {
   const _WeeklyBarChart({required this.history});
 
@@ -774,17 +768,21 @@ class _WeeklyBarChart extends StatelessWidget {
     final now = DateTime.now();
     final dayData = List.generate(7, (index) {
       final date = now.subtract(Duration(days: 6 - index));
-      final dayRentals = history.where((e) => 
-        e.startedAt.year == date.year && 
-        e.startedAt.month == date.month && 
-        e.startedAt.day == date.day
+      final dayRentals = history.where(
+        (e) =>
+            e.startedAt.year == date.year &&
+            e.startedAt.month == date.month &&
+            e.startedAt.day == date.day,
       );
-      
+
       // Calculate total duration in minutes for that day
       double totalMinutes = 0;
       for (var r in dayRentals) {
         if (r.endedAt != null) {
-          totalMinutes += r.endedAt!.difference(r.startedAt).inMinutes.toDouble();
+          totalMinutes += r.endedAt!
+              .difference(r.startedAt)
+              .inMinutes
+              .toDouble();
         }
       }
       return totalMinutes;
@@ -793,50 +791,46 @@ class _WeeklyBarChart extends StatelessWidget {
     final maxVal = dayData.reduce((a, b) => a > b ? a : b);
     final displayMax = maxVal < 30 ? 30.0 : maxVal; // Min height for scale
 
-    return SizedBox(
-      height: 60,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(7, (index) {
-          final date = now.subtract(Duration(days: 6 - index));
-          final dayName = DateFormat('E', 'id_ID').format(date).substring(0, 1);
-          final heightFactor = dayData[index] / displayMax;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(7, (index) {
+        final date = now.subtract(Duration(days: 6 - index));
+        final dayName = DateFormat('E', 'id_ID').format(date).substring(0, 1);
+        final heightFactor = dayData[index] / displayMax;
+        final isToday = index == 6;
 
-          return Column(
+        return Expanded(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Container(
-                width: 14,
-                height: (heightFactor * 60).clamp(10, 60).toDouble(),
+                width: 12,
+                height: (heightFactor * 44).clamp(8, 44).toDouble(),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: index == 6 
-                      ? [Colors.white, Colors.white.withValues(alpha: 0.8)]
-                      : [Colors.white.withValues(alpha: 0.4), Colors.white.withValues(alpha: 0.1)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                  color: isToday
+                      ? AppColors.primaryLight
+                      : const Color(0xffd1d5db),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(4),
                   ),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-                  boxShadow: index == 6 ? [
-                    BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, 2))
-                  ] : null,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 dayName,
                 style: TextStyle(
-                  color: index == 6 ? Colors.white : Colors.white60,
-                  fontSize: 10,
-                  fontWeight: index == 6 ? FontWeight.bold : FontWeight.normal,
+                  color: isToday
+                      ? AppColors.primaryLight
+                      : const Color(0xff6b7280),
+                  fontSize: 11,
+                  fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
                 ),
               ),
             ],
-          );
-        }),
-      ),
+          ),
+        );
+      }),
     );
   }
 }
-

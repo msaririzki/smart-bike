@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 enum MapType {
   standard('Standar'),
@@ -197,11 +198,11 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
           points: widget.routePoints,
           color: isSatellite
               ? const Color(0xff38bdf8)
-              : const Color(0xff0d9488),
+              : AppColors.primaryDark,
           strokeWidth: 4,
           borderColor: isSatellite
               ? const Color(0xff0284c7).withValues(alpha: 0.4)
-              : const Color(0xff0f766e).withValues(alpha: 0.3),
+              : AppColors.primaryDark.withValues(alpha: 0.3),
           borderStrokeWidth: 2,
         ),
       ],
@@ -258,7 +259,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xff0f766e), width: 3),
+              border: Border.all(color: AppColors.primaryDark, width: 3),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x33000000),
@@ -268,7 +269,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
               ],
             ),
             child: const Center(
-              child: Icon(Icons.flag, color: Color(0xff0f766e), size: 14),
+              child: Icon(Icons.flag, color: AppColors.primaryDark, size: 14),
             ),
           ),
         ),
@@ -291,7 +292,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
             onTap: () => widget.onRoutePointTap?.call(i, point),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xff0d9488),
+                color: AppColors.primaryDark,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
                 boxShadow: const [
@@ -359,8 +360,8 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
           point: pos,
           radius: widget.accuracyRadius,
           useRadiusInMeter: true,
-          color: const Color(0xff0d9488).withValues(alpha: 0.08),
-          borderColor: const Color(0xff0d9488).withValues(alpha: 0.25),
+          color: AppColors.primaryDark.withValues(alpha: 0.08),
+          borderColor: AppColors.primaryDark.withValues(alpha: 0.25),
           borderStrokeWidth: 1.5,
         ),
       ],
@@ -394,7 +395,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     width: 40,
                     height: 40,
                     decoration: const BoxDecoration(
-                      color: Color(0xff0f766e),
+                      color: AppColors.primaryDark,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
@@ -446,7 +447,7 @@ class _MapSourceChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: const Color(0xff0f766e)),
+          Icon(icon, size: 15, color: AppColors.primaryDark),
           const SizedBox(width: 6),
           Flexible(
             child: Text(

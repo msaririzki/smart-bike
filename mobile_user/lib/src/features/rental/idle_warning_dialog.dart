@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 class IdleWarningDialog extends StatelessWidget {
   const IdleWarningDialog({
@@ -289,12 +290,12 @@ class IdleWarningDialog extends StatelessWidget {
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xff0f766e), Color(0xff0d9488)],
+                          colors: [AppColors.primaryDark, AppColors.primaryDark],
                         ),
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xff0f766e).withValues(
+                            color: AppColors.primaryDark.withValues(
                               alpha: 0.35,
                             ),
                             blurRadius: 12,

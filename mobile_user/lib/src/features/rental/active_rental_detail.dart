@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../../models/rental.dart';
 import 'idle_badge_widget.dart';
 import 'map_widget.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 class ActiveRentalDetail extends StatelessWidget {
   const ActiveRentalDetail({
@@ -75,7 +76,7 @@ class ActiveRentalDetail extends StatelessWidget {
             Text(
               'Jalur di peta adalah ringkasan titik GPS yang dikirim perangkat sepeda.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: const Color(0xff0f766e),
+                color: AppColors.primaryDark,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -275,7 +276,7 @@ class _BikePanel extends StatelessWidget {
         children: [
           const CircleAvatar(
             backgroundColor: Color(0xffccfbf1),
-            child: Icon(Icons.pedal_bike, color: Color(0xff0f766e)),
+            child: Icon(Icons.pedal_bike, color: AppColors.primaryDark),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -285,7 +286,7 @@ class _BikePanel extends StatelessWidget {
                 Text(
                   code,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: const Color(0xff0f766e),
+                    color: AppColors.primaryDark,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -492,7 +493,7 @@ class _ConnectionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: const Color(0xff0f766e)),
+        Icon(icon, size: 18, color: AppColors.primaryDark),
         const SizedBox(width: 10),
         Expanded(
           child: Text(label, style: Theme.of(context).textTheme.labelMedium),
@@ -568,7 +569,7 @@ class _MetricCard extends StatelessWidget {
           Icon(
             icon,
             color: emphasized
-                ? const Color(0xff0f766e)
+                ? AppColors.primaryDark
                 : const Color(0xff475467),
           ),
           const Spacer(),

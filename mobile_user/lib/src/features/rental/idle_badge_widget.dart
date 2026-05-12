@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 enum RentalStatus { active, idleWarning, idleBilling, other }
 
@@ -86,7 +87,7 @@ class _StatusBadgeState extends State<StatusBadge>
     final (label, gradient, textColor, icon, glowColor) = switch (parsed) {
       RentalStatus.active => (
           'AKTIF',
-          const [Color(0xff059669), Color(0xff10b981)],
+          const [Color(0xff059669), AppColors.primaryLight],
           Colors.white,
           Icons.play_circle_outline,
           const Color(0xff059669),
