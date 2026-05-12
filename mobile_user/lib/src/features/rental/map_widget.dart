@@ -350,7 +350,8 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
         // User location blue dot
         if (widget.userLatitude != null && widget.userLongitude != null)
           _buildUserMarker(),
-        _buildBikeMarker(bikePos),
+        // Bike marker — only show when backend has real GPS data
+        if (widget.bikeLabel != null) _buildBikeMarker(bikePos),
       ],
     );
   }

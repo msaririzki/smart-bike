@@ -18,7 +18,8 @@ class MapTestScreen extends StatefulWidget {
 }
 
 class _MapTestScreenState extends State<MapTestScreen> {
-  static const _fallbackPosition = LatLng(-8.5830, 116.1163);
+  // Default map center (Mataram) — only used when no data at all
+  static const _defaultCenter = LatLng(-8.5830, 116.1163);
 
   static final _popularSpots = [
     const PopularSpot(name: 'Taman Kota Mataram', position: LatLng(-8.5810, 116.1150), icon: Icons.park, category: 'Taman'),
@@ -30,17 +31,17 @@ class _MapTestScreenState extends State<MapTestScreen> {
     const PopularSpot(name: 'Taman Sangkareang', position: LatLng(-8.5830, 116.1118), icon: Icons.nature_people, category: 'Taman'),
   ];
 
-  // Bike position from backend
-  LatLng _bikePosition = _fallbackPosition;
+  // Bike position from backend — NULL when no GPS data yet
+  LatLng? _bikePosition;
   List<LatLng> _pathHistory = [];
   double _bikeSpeed = 0;
   double _totalDistance = 0;
   String _rentalStatus = '';
   int? _rentalId;
-  DateTime? _lastGpsUpdate;
   String _bikeName = '';
+  bool _hasBikeCoords = false;
 
-  // User's own location
+  // User's own location (blue dot)
   LatLng? _userPosition;
   StreamSubscription<Position>? _userPosStream;
 
@@ -50,16 +51,10 @@ class _MapTestScreenState extends State<MapTestScreen> {
 
   // UI state
   MapType _mapType = MapType.standard;
-  String _locationName = 'Mendeteksi lokasi...';
+  String _locationName = 'Menunggu data sepeda...';
   Duration _elapsed = Duration.zero;
   Timer? _clockTimer;
   DateTime? _rentalStartedAt;
-
-  // Navigation
-  List<LatLng> _navigationRoute = [];
-  bool _isLoadingRoute = false;
-  PopularSpot? _activeSpot;
-  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -127,6 +122,7 @@ class _MapTestScreenState extends State<MapTestScreen> {
           _bikeSpeed = rental.currentSpeedKmh;
           _totalDistance = rental.totalDistanceMeters;
           _bikeName = bike != null ? '${bike.code} - ${bike.name}' : '';
+          _hasBikeCoords = hasCoords;
           if (hasCoords) {
             _bikePosition = LatLng(bike!.latitude!, bike.longitude!);
           }
@@ -136,9 +132,9 @@ class _MapTestScreenState extends State<MapTestScreen> {
           }
         });
 
-        if (hasCoords) _updateLocationName(_bikePosition);
+        if (hasCoords) _updateLocationName(_bikePosition!);
 
-        // Fetch path history
+        // Fetch path history from backend (recorded by mobile_bike)
         if (_rentalId != null) {
           try {
             final points = await widget.api.rentalLocationPoints(_rentalId!);
@@ -156,7 +152,13 @@ class _MapTestScreenState extends State<MapTestScreen> {
             _bikeSpeed = 0;
             _totalDistance = 0;
             _pathHistory = [];
+            _bikePosition = null;
+            _hasBikeCoords = false;
+            _rentalStartedAt = null;
+            _elapsed = Duration.zero;
+            _locationName = 'Menunggu data sepeda...';
           });
+          _clockTimer?.cancel();
         }
       }
     } catch (_) {
@@ -178,54 +180,25 @@ class _MapTestScreenState extends State<MapTestScreen> {
     if (mounted) setState(() => _locationName = name);
   }
 
-  // ── Navigation ──
+  // ── Spot info (view only, no navigation) ──
 
-  Future<void> _onSpotTap(PopularSpot spot) async {
-    setState(() { _isLoadingRoute = true; _activeSpot = spot; });
-
-    final result = await RoutingService.getRoute(origin: _bikePosition, destination: spot.position);
-    if (!mounted) return;
-
-    if (result != null) {
-      setState(() { _navigationRoute = result.points; _isLoadingRoute = false; });
-      if (!mounted) return;
-      showModalBottomSheet(
-        context: context,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        builder: (_) => _SpotRouteDetail(
-          spot: spot,
-          distanceMeters: result.distanceMeters,
-          durationSeconds: result.durationSeconds,
-          onNavigate: () { Navigator.pop(context); setState(() => _isNavigating = true); },
-          onClearRoute: () { setState(() { _navigationRoute = []; _activeSpot = null; }); Navigator.pop(context); },
-        ),
-      );
-    } else {
-      setState(() => _isLoadingRoute = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal mendapatkan rute. Cek koneksi internet.')));
-    }
-  }
-
-  void _onRoutePointTap(int index, LatLng point) {
-    final dist = totalRouteDistance(_pathHistory.isEmpty ? [_bikePosition] : _pathHistory.sublist(0, min(index + 1, _pathHistory.length)));
+  void _onSpotTap(PopularSpot spot) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => _RoutePointDetail(index: index, point: point, distanceFromStart: dist, isCurrentPosition: false),
+      builder: (_) => _SpotInfoSheet(spot: spot, bikePosition: _bikePosition),
     );
   }
-
-  int min(int a, int b) => a < b ? a : b;
 
   @override
   Widget build(BuildContext context) {
     final hasRental = _rentalId != null;
+    // Map center: bike position > user position > default
+    final mapCenter = _bikePosition ?? _userPosition ?? _defaultCenter;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isNavigating && _activeSpot != null
-            ? 'Menuju ${_activeSpot!.name}'
-            : hasRental ? 'Rental Aktif' : 'Live Map'),
+        title: Text(hasRental ? 'Lokasi Sepeda' : 'Live Map'),
         actions: [
           if (hasRental)
             Padding(
@@ -239,84 +212,76 @@ class _MapTestScreenState extends State<MapTestScreen> {
           ),
         ],
       ),
-      body: Stack(
+      body: Column(
         children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _MapTypeDropdown(value: _mapType, onChanged: (t) => setState(() => _mapType = t)),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                  child: MapWidget(
-                    latitude: _bikePosition.latitude,
-                    longitude: _bikePosition.longitude,
-                    routePoints: _pathHistory.isEmpty ? [_bikePosition] : _pathHistory,
-                    pathHistory: _pathHistory,
-                    accuracyRadius: 15,
-                    mapType: _mapType,
-                    popularSpots: _popularSpots,
-                    navigationRoute: _navigationRoute,
-                    userLatitude: _userPosition?.latitude,
-                    userLongitude: _userPosition?.longitude,
-                    onRoutePointTap: _onRoutePointTap,
-                    onSpotTap: _onSpotTap,
-                    lastUpdateTime: _lastGpsUpdate,
-                  ),
-                ),
-              ),
-              if (!hasRental)
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xfffff7ed),
-                    border: Border.all(color: const Color(0xfffbbf24)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.info_outline, size: 16, color: Color(0xfff59e0b)),
-                      SizedBox(width: 8),
-                      Expanded(child: Text('Belum ada rental aktif. Mulai sewa sepeda dari Home.', style: TextStyle(fontSize: 12, color: Color(0xff92400e)))),
-                    ],
-                  ),
-                ),
-              _InfoPanel(
-                locationName: _locationName,
-                distance: _totalDistance,
-                speed: _bikeSpeed,
-                elapsed: _elapsed,
-                activeSpot: _activeSpot,
-                isNavigating: _isNavigating,
-                bikeName: _bikeName,
-                hasRental: hasRental,
-              ),
-              _BottomBar(
-                isNavigating: _isNavigating,
-                hasNavRoute: _navigationRoute.isNotEmpty,
-                onClearNav: () => setState(() { _navigationRoute = []; _activeSpot = null; _isNavigating = false; }),
-              ),
-            ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _MapTypeDropdown(value: _mapType, onChanged: (t) => setState(() => _mapType = t)),
           ),
-          if (_isLoadingRoute)
-            Container(
-              color: Colors.black26,
-              child: const Center(
-                child: Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('Mencari rute terbaik...'),
-                    ]),
-                  ),
-                ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: MapWidget(
+                latitude: mapCenter.latitude,
+                longitude: mapCenter.longitude,
+                routePoints: _pathHistory,
+                pathHistory: _pathHistory,
+                accuracyRadius: _hasBikeCoords ? 15 : 0,
+                mapType: _mapType,
+                popularSpots: _popularSpots,
+                userLatitude: _userPosition?.latitude,
+                userLongitude: _userPosition?.longitude,
+                onSpotTap: _onSpotTap,
+                // Only show bike marker when we have real GPS data from backend
+                bikeLabel: _hasBikeCoords ? _bikeName : null,
               ),
             ),
+          ),
+          // Status messages
+          if (!hasRental)
+            _StatusBanner(
+              icon: Icons.info_outline,
+              text: 'Belum ada rental aktif. Mulai sewa sepeda dari Home.',
+              bgColor: const Color(0xfffff7ed),
+              borderColor: const Color(0xfffbbf24),
+              iconColor: const Color(0xfff59e0b),
+              textColor: const Color(0xff92400e),
+            ),
+          if (hasRental && !_hasBikeCoords)
+            _StatusBanner(
+              icon: Icons.gps_off,
+              text: 'Menunggu data GPS dari perangkat sepeda...',
+              bgColor: const Color(0xfff0f9ff),
+              borderColor: const Color(0xff93c5fd),
+              iconColor: const Color(0xff3b82f6),
+              textColor: const Color(0xff1e40af),
+            ),
+          _InfoPanel(
+            locationName: _locationName,
+            distance: _totalDistance,
+            speed: _bikeSpeed,
+            elapsed: _elapsed,
+            bikeName: _bikeName,
+            hasRental: hasRental,
+            hasBikeCoords: _hasBikeCoords,
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(color: const Color(0xfff0fdfa), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xff99f6e4))),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Icon(Icons.info_outline, size: 14, color: Color(0xff0f766e)),
+                const SizedBox(width: 8),
+                Text(
+                  hasRental
+                      ? 'Data lokasi dikirim oleh perangkat sepeda (mobile_bike)'
+                      : 'Ketuk tempat populer di peta untuk info jarak',
+                  style: const TextStyle(fontSize: 11, color: Color(0xff0f766e), fontWeight: FontWeight.w500),
+                ),
+              ]),
+            ),
+          ),
         ],
       ),
     );
@@ -373,15 +338,14 @@ class _MapTypeDropdown extends StatelessWidget {
 }
 
 class _InfoPanel extends StatelessWidget {
-  const _InfoPanel({required this.locationName, required this.distance, required this.speed, required this.elapsed, this.activeSpot, this.isNavigating = false, this.bikeName = '', this.hasRental = false});
+  const _InfoPanel({required this.locationName, required this.distance, required this.speed, required this.elapsed, this.bikeName = '', this.hasRental = false, this.hasBikeCoords = false});
   final String locationName;
   final double distance;
   final double speed;
   final Duration elapsed;
-  final PopularSpot? activeSpot;
-  final bool isNavigating;
   final String bikeName;
   final bool hasRental;
+  final bool hasBikeCoords;
 
   @override
   Widget build(BuildContext context) {
@@ -392,7 +356,7 @@ class _InfoPanel extends StatelessWidget {
       child: Column(
         children: [
           Row(children: [
-            const Icon(Icons.location_on, size: 16, color: Color(0xff0f766e)),
+            Icon(hasBikeCoords ? Icons.location_on : Icons.location_off, size: 16, color: Color(hasBikeCoords ? 0xff0f766e : 0xff9ca3af)),
             const SizedBox(width: 6),
             Expanded(child: Text(locationName.isEmpty ? 'Memuat lokasi...' : locationName, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
           ]),
@@ -401,32 +365,22 @@ class _InfoPanel extends StatelessWidget {
             Row(children: [
               const Icon(Icons.pedal_bike, size: 14, color: Color(0xff0f766e)),
               const SizedBox(width: 6),
-              Text(bikeName, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: const Color(0xff0f766e), fontWeight: FontWeight.w600)),
+              Flexible(child: Text(bikeName, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: const Color(0xff0f766e), fontWeight: FontWeight.w600))),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(color: const Color(0xffd1fae5), borderRadius: BorderRadius.circular(4)),
-                child: const Text('Data dari perangkat sepeda', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xff065f46))),
+                child: const Text('Perangkat sepeda', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xff065f46))),
               ),
             ]),
           ],
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: _InfoItem(icon: Icons.straighten, label: 'Jarak', value: distance >= 1000 ? '${(distance / 1000).toStringAsFixed(2)} km' : '${distance.toStringAsFixed(0)} m')),
-            Expanded(child: _InfoItemRolling(icon: Icons.speed, label: 'Kecepatan', value: speed.toStringAsFixed(1), suffix: 'km/h')),
-            Expanded(child: _InfoItem(icon: Icons.timer_outlined, label: 'Durasi', value: _fmt(elapsed))),
-          ]),
-          if (activeSpot != null) ...[
+          if (hasRental) ...[
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: const Color(0xffede9fe), borderRadius: BorderRadius.circular(8)),
-              child: Row(children: [
-                Icon(activeSpot!.icon, size: 16, color: const Color(0xff7c3aed)),
-                const SizedBox(width: 8),
-                Expanded(child: Text(isNavigating ? 'Menuju ${activeSpot!.name}' : 'Rute ke ${activeSpot!.name}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xff7c3aed)))),
-              ]),
-            ),
+            Row(children: [
+              Expanded(child: _InfoItem(icon: Icons.straighten, label: 'Jarak', value: distance >= 1000 ? '${(distance / 1000).toStringAsFixed(2)} km' : '${distance.toStringAsFixed(0)} m')),
+              Expanded(child: _InfoItemRolling(icon: Icons.speed, label: 'Kecepatan', value: speed.toStringAsFixed(1), suffix: 'km/h')),
+              Expanded(child: _InfoItem(icon: Icons.timer_outlined, label: 'Durasi', value: _fmt(elapsed))),
+            ]),
           ],
         ],
       ),
@@ -471,77 +425,35 @@ class _InfoItemRolling extends StatelessWidget {
   }
 }
 
-class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.isNavigating, required this.hasNavRoute, required this.onClearNav});
-  final bool isNavigating; final bool hasNavRoute; final VoidCallback onClearNav;
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({required this.icon, required this.text, required this.bgColor, required this.borderColor, required this.iconColor, required this.textColor});
+  final IconData icon; final String text; final Color bgColor; final Color borderColor; final Color iconColor; final Color textColor;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: bgColor, border: Border.all(color: borderColor), borderRadius: BorderRadius.circular(8)),
       child: Row(children: [
-        if (hasNavRoute) ...[
-          Expanded(child: FilledButton.icon(
-            onPressed: onClearNav,
-            icon: const Icon(Icons.close),
-            label: Text(isNavigating ? 'Batal Navigasi' : 'Hapus Rute'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xffdc2626), padding: const EdgeInsets.symmetric(vertical: 14)),
-          )),
-        ] else
-          Expanded(child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(color: const Color(0xfff0fdfa), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xff99f6e4))),
-            child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.touch_app, size: 16, color: Color(0xff0f766e)),
-              SizedBox(width: 8),
-              Text('Ketuk tempat populer di peta untuk navigasi', style: TextStyle(fontSize: 12, color: Color(0xff0f766e), fontWeight: FontWeight.w500)),
-            ]),
-          )),
+        Icon(icon, size: 16, color: iconColor),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: TextStyle(fontSize: 12, color: textColor))),
       ]),
     );
   }
 }
 
-// ── Bottom Sheet Widgets ──
-
-class _RoutePointDetail extends StatelessWidget {
-  const _RoutePointDetail({required this.index, required this.point, required this.distanceFromStart, required this.isCurrentPosition});
-  final int index; final LatLng point; final double distanceFromStart; final bool isCurrentPosition;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffd0d5dd), borderRadius: BorderRadius.circular(2)))),
-        const SizedBox(height: 16),
-        Row(children: [
-          Container(width: 40, height: 40, decoration: BoxDecoration(color: isCurrentPosition ? const Color(0xff0f766e) : const Color(0xfff0fdfa), shape: BoxShape.circle, border: Border.all(color: const Color(0xff0d9488), width: 2)),
-            child: Icon(isCurrentPosition ? Icons.my_location : Icons.circle, size: 18, color: isCurrentPosition ? Colors.white : const Color(0xff0d9488))),
-          const SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Titik Perjalanan', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text(isCurrentPosition ? 'Posisi saat ini' : 'Sudah dilewati', style: TextStyle(color: isCurrentPosition ? const Color(0xff0f766e) : const Color(0xff667085), fontWeight: FontWeight.w500)),
-          ])),
-        ]),
-        const SizedBox(height: 16), const Divider(), const SizedBox(height: 12),
-        FutureBuilder<String>(future: RoutingService.reverseGeocode(point), builder: (ctx, snap) => _DetailRow(icon: Icons.location_on, label: 'Lokasi', value: snap.data ?? 'Memuat...')),
-        const SizedBox(height: 10),
-        _DetailRow(icon: Icons.straighten, label: 'Jarak dari start', value: distanceFromStart >= 1000 ? '${(distanceFromStart / 1000).toStringAsFixed(2)} km' : '${distanceFromStart.toStringAsFixed(0)} m'),
-        const SizedBox(height: 16),
-      ]),
-    );
-  }
-}
-
-class _SpotRouteDetail extends StatelessWidget {
-  const _SpotRouteDetail({required this.spot, required this.distanceMeters, required this.durationSeconds, required this.onNavigate, required this.onClearRoute});
-  final PopularSpot spot; final double distanceMeters; final double durationSeconds; final VoidCallback onNavigate; final VoidCallback onClearRoute;
+/// Info sheet when tapping a popular spot — view only, shows distance from bike
+class _SpotInfoSheet extends StatelessWidget {
+  const _SpotInfoSheet({required this.spot, this.bikePosition});
+  final PopularSpot spot;
+  final LatLng? bikePosition;
 
   @override
   Widget build(BuildContext context) {
-    final minutes = (durationSeconds / 60).ceil();
+    final dist = bikePosition != null ? calculateDistance(bikePosition!, spot.position) : null;
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -552,22 +464,21 @@ class _SpotRouteDetail extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(spot.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: const Color(0xffede9fe), borderRadius: BorderRadius.circular(6)),
               child: Text(spot.category, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xff7c3aed)))),
           ])),
         ]),
         const SizedBox(height: 16), const Divider(), const SizedBox(height: 12),
-        _DetailRow(icon: Icons.route, label: 'Jarak tempuh', value: distanceMeters >= 1000 ? '${(distanceMeters / 1000).toStringAsFixed(2)} km' : '${distanceMeters.toStringAsFixed(0)} m'),
-        const SizedBox(height: 10),
-        _DetailRow(icon: Icons.access_time, label: 'Estimasi waktu', value: '$minutes menit bersepeda'),
-        const SizedBox(height: 20),
-        Row(children: [
-          Expanded(child: FilledButton.icon(onPressed: onNavigate, icon: const Icon(Icons.navigation), label: const Text('Mulai Navigasi'), style: FilledButton.styleFrom(backgroundColor: const Color(0xff8b5cf6), padding: const EdgeInsets.symmetric(vertical: 14)))),
-          const SizedBox(width: 12),
-          FilledButton.tonalIcon(onPressed: onClearRoute, icon: const Icon(Icons.close), label: const Text('Batal'), style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16))),
-        ]),
-        const SizedBox(height: 8),
+        _DetailRow(icon: Icons.location_on, label: 'Koordinat', value: '${spot.position.latitude.toStringAsFixed(4)}, ${spot.position.longitude.toStringAsFixed(4)}'),
+        if (dist != null) ...[
+          const SizedBox(height: 10),
+          _DetailRow(icon: Icons.straighten, label: 'Jarak dari sepeda', value: dist >= 1000 ? '${(dist / 1000).toStringAsFixed(2)} km' : '${dist.toStringAsFixed(0)} m'),
+        ] else ...[
+          const SizedBox(height: 10),
+          const _DetailRow(icon: Icons.info_outline, label: 'Info', value: 'Belum ada data lokasi sepeda'),
+        ],
+        const SizedBox(height: 16),
       ]),
     );
   }
