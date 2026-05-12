@@ -1,6 +1,6 @@
 # Implementation Plan — Anggota 3: Adi Saputra (Idle Warning UI)
 
-**Branch:** `feature/idle-warning-ui`  
+**Branch:** `feature/idle-warning-ui`
 **File utama:** `mobile_user/lib/src/features/rental/idle_warning_dialog.dart`
 
 ---

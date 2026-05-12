@@ -1,7 +1,7 @@
 # 📋 Pembagian Tugas Tim — Smart Bike Rental
 
-**Mata Kuliah:** Mobile Computing — Universitas Bina Bangsa  
-**Repo:** https://github.com/msaririzki/smart-bike  
+**Mata Kuliah:** Mobile Computing — Universitas Bina Bangsa
+**Repo:** https://github.com/msaririzki/smart-bike
 **Project Lead:** M. Sari Rizki (msaririzki)
 
 ---

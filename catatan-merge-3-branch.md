@@ -1,7 +1,7 @@
 # Catatan Merge 3 Branch Fitur
 
-Tanggal catatan: 7 Mei 2026  
-Target branch: `main`  
+Tanggal catatan: 7 Mei 2026
+Target branch: `main`
 Status: ketiga branch sudah digabung dan sudah dipush ke `origin/main`.
 
 Branch yang sudah masuk:
@@ -380,4 +380,3 @@ Checklist ini sebaiknya dilakukan setelah semua orang pull `main` terbaru.
 4. Adi uji idle warning dengan status dari backend.
 5. Setelah manual test sukses, tim lanjut ke fitur history rental dan route history.
 6. Setelah itu baru polish UI dan persiapan demo.
-

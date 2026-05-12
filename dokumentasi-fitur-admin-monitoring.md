@@ -1,7 +1,7 @@
 # Dokumentasi Fitur Admin Smart Bike
 
-Tanggal: 11 Mei 2026  
-Commit acuan: `d34ad01584c7c0ec69b74f20c70f88ef16b9016a`  
+Tanggal: 11 Mei 2026
+Commit acuan: `d34ad01584c7c0ec69b74f20c70f88ef16b9016a`
 Commit message: `Add admin bike monitoring features`
 
 ---
