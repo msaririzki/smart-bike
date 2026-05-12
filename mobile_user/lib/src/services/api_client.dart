@@ -95,6 +95,11 @@ class ApiClient {
     await _post('/rentals/$rentalId/idle/continue', body: {});
   }
 
+  Future<Rental> startRentalFromQr(String token) async {
+    final json = await _post('/rentals/start-from-qr', body: {'token': token});
+    return Rental.fromJson(json['data'] as Map<String, dynamic>);
+  }
+
   /// Ambil setting idle dari backend (durasi warning, biaya, interval).
   Future<Map<String, dynamic>> idleSettings() async {
     final json = await _get('/rentals/idle-settings');
