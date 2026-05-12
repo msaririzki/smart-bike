@@ -19,7 +19,6 @@ class RentalDetailScreen extends StatefulWidget {
 
 class _RentalDetailScreenState extends State<RentalDetailScreen> {
   late RentalHistory _currentHistory;
-  bool _isLoading = true;
 
   @override
   void initState() {

@@ -272,7 +272,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final list = _history!.where((item) {
       // Search Filter
       if (_searchQuery.isNotEmpty) {
-        final code = item.bike?.code?.toLowerCase() ?? '';
+        final code = item.bike?.code.toLowerCase() ?? '';
         if (!code.contains(_searchQuery.toLowerCase())) {
           return false;
         }
