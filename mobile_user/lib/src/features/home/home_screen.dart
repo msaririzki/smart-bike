@@ -119,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Test Peta',
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const MapTestScreen()),
+              MaterialPageRoute(builder: (_) => MapTestScreen(api: widget.api)),
             ),
             icon: const Icon(Icons.map),
           ),

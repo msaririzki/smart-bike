@@ -24,6 +24,7 @@ Route::middleware(['auth:sanctum', 'role:user'])->group(function (): void {
     Route::post('/rentals/start', [RentalController::class, 'start']);
     Route::get('/rentals/active', [RentalController::class, 'active']);
     Route::get('/rentals/history', [RentalController::class, 'history']);
+    Route::get('/rentals/{rental}/location-points', [RentalController::class, 'locationPoints']);
     Route::post('/rentals/{rental}/finish', [RentalController::class, 'finish']);
     Route::post('/rentals/{rental}/idle/continue', [RentalController::class, 'continueIdle']);
 });

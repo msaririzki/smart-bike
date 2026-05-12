@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/bike.dart';
 import '../models/rental.dart';
+import '../models/rental_location_point.dart';
 import 'session_store.dart';
 
 class ApiException implements Exception {
@@ -83,6 +84,14 @@ class ApiClient {
   Future<Rental> finishRental(int rentalId) async {
     final json = await _post('/rentals/$rentalId/finish', body: {});
     return Rental.fromJson(json['data'] as Map<String, dynamic>);
+  }
+
+  Future<List<RentalLocationPoint>> rentalLocationPoints(int rentalId) async {
+    final json = await _get('/rentals/$rentalId/location-points');
+    return (json['data'] as List<dynamic>)
+        .map((item) =>
+            RentalLocationPoint.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Map<String, dynamic>> _get(String path) async {

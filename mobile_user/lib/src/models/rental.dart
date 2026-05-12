@@ -9,6 +9,8 @@ class Rental {
     required this.idleCost,
     required this.totalCost,
     this.bike,
+    this.startedAt,
+    this.currentSpeedKmh = 0,
   });
 
   final int id;
@@ -18,6 +20,8 @@ class Rental {
   final int idleCost;
   final int totalCost;
   final Bike? bike;
+  final DateTime? startedAt;
+  final double currentSpeedKmh;
 
   factory Rental.fromJson(Map<String, dynamic> json) {
     return Rental(
@@ -30,6 +34,10 @@ class Rental {
       bike: json['bike'] == null
           ? null
           : Bike.fromJson(json['bike'] as Map<String, dynamic>),
+      startedAt: json['started_at'] == null
+          ? null
+          : DateTime.tryParse(json['started_at'] as String),
+      currentSpeedKmh: _toDouble(json['current_speed_kmh']) ?? 0,
     );
   }
 }

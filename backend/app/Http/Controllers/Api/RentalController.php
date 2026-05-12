@@ -27,7 +27,7 @@ class RentalController extends Controller
     public function active(Request $request): JsonResponse
     {
         $rental = Rental::query()
-            ->with('bike')
+            ->with(['bike', 'latestLocationPoint'])
             ->where('user_id', $request->user()->id)
             ->whereIn('status', [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING])
             ->latest('started_at')
@@ -58,6 +58,16 @@ class RentalController extends Controller
     {
         return response()->json([
             'data' => $this->rentals->continueIdle($request->user(), $rental),
+        ]);
+    }
+
+    public function locationPoints(Request $request, Rental $rental): JsonResponse
+    {
+        return response()->json([
+            'data' => $rental->locationPoints()
+                ->where('is_valid_movement', true)
+                ->orderBy('recorded_at')
+                ->get(['id', 'latitude', 'longitude', 'speed_kmh', 'accuracy_meters', 'recorded_at']),
         ]);
     }
 }

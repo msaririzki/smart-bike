@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'user_id',
@@ -37,6 +38,8 @@ class Rental extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    protected $appends = ['current_speed_kmh'];
+
     protected function casts(): array
     {
         return [
@@ -65,6 +68,11 @@ class Rental extends Model
         return $this->hasMany(RentalLocationPoint::class);
     }
 
+    public function latestLocationPoint(): HasOne
+    {
+        return $this->hasOne(RentalLocationPoint::class)->latestOfMany('recorded_at');
+    }
+
     public function idleEvents(): HasMany
     {
         return $this->hasMany(RentalIdleEvent::class);
@@ -74,4 +82,10 @@ class Rental extends Model
     {
         return $this->hasMany(RentalBillingLog::class);
     }
+
+    public function getCurrentSpeedKmhAttribute(): float
+    {
+        return (float) ($this->latestLocationPoint?->speed_kmh ?? 0);
+    }
 }
+
