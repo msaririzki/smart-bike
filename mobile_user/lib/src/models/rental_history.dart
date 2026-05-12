@@ -11,6 +11,7 @@ class RentalHistory {
     required this.startedAt,
     this.endedAt,
     this.bike,
+    this.locationPoints = const [],
   });
 
   final int id;
@@ -22,6 +23,7 @@ class RentalHistory {
   final DateTime startedAt;
   final DateTime? endedAt;
   final Bike? bike;
+  final List<RentalLocationPoint> locationPoints;
 
   double get totalDistanceKilometers => totalDistanceMeters / 1000;
 
@@ -66,6 +68,31 @@ class RentalHistory {
       bike: json['bike'] == null
           ? null
           : Bike.fromJson(json['bike'] as Map<String, dynamic>),
+      locationPoints: json['location_points'] == null
+          ? const []
+          : (json['location_points'] as List)
+              .map((e) => RentalLocationPoint.fromJson(e as Map<String, dynamic>))
+              .toList(),
+    );
+  }
+}
+
+class RentalLocationPoint {
+  const RentalLocationPoint({
+    required this.latitude,
+    required this.longitude,
+    required this.recordedAt,
+  });
+
+  final double latitude;
+  final double longitude;
+  final DateTime recordedAt;
+
+  factory RentalLocationPoint.fromJson(Map<String, dynamic> json) {
+    return RentalLocationPoint(
+      latitude: _toDouble(json['latitude']) ?? 0.0,
+      longitude: _toDouble(json['longitude']) ?? 0.0,
+      recordedAt: _toDateTime(json['recorded_at']) ?? DateTime.now(),
     );
   }
 }

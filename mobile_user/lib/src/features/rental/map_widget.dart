@@ -40,6 +40,7 @@ class MapWidget extends StatefulWidget {
     this.navigationRoute = const [],
     this.latestLocationLabel = 'Lokasi sepeda terakhir',
     this.routeLabel = 'Jalur dari perangkat sepeda',
+    this.routeColor,
     this.onRoutePointTap,
     this.onSpotTap,
   });
@@ -54,6 +55,7 @@ class MapWidget extends StatefulWidget {
   final List<LatLng> navigationRoute;
   final String latestLocationLabel;
   final String routeLabel;
+  final Color? routeColor;
   final void Function(int index, LatLng point)? onRoutePointTap;
   final void Function(PopularSpot spot)? onSpotTap;
 
@@ -195,13 +197,12 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       polylines: [
         Polyline(
           points: widget.routePoints,
-          color: isSatellite
-              ? const Color(0xff38bdf8)
-              : const Color(0xff0d9488),
+          color: widget.routeColor ??
+              (isSatellite ? const Color(0xff38bdf8) : const Color(0xff0d9488)),
           strokeWidth: 4,
-          borderColor: isSatellite
-              ? const Color(0xff0284c7).withValues(alpha: 0.4)
-              : const Color(0xff0f766e).withValues(alpha: 0.3),
+          borderColor: (widget.routeColor ??
+                  (isSatellite ? const Color(0xff0284c7) : const Color(0xff0f766e)))
+              .withValues(alpha: 0.3),
           borderStrokeWidth: 2,
         ),
       ],

@@ -100,6 +100,15 @@ class ApiClient {
     return json['data'] as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> rentalDetail(int rentalId) async {
+    final json = await _get('/rentals/$rentalId');
+    return json['data'] as Map<String, dynamic>;
+  }
+
+  Future<void> deleteRental(int rentalId) async {
+    await _delete('/rentals/$rentalId');
+  }
+
   Future<Map<String, dynamic>> _get(String path) async {
     final response = await http.get(
       Uri.parse('$baseUrl$path'),
@@ -117,6 +126,14 @@ class ApiClient {
       Uri.parse('$baseUrl$path'),
       headers: await _headers(authenticated: authenticated),
       body: jsonEncode(body),
+    );
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> _delete(String path) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl$path'),
+      headers: await _headers(),
     );
     return _decode(response);
   }

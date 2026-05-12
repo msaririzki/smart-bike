@@ -1,15 +1,52 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import '../../models/rental_history.dart';
+import '../../services/api_client.dart';
+import '../rental/map_widget.dart';
 
-class RentalDetailScreen extends StatelessWidget {
-  const RentalDetailScreen({required this.history, super.key});
+class RentalDetailScreen extends StatefulWidget {
+  const RentalDetailScreen({required this.history, required this.api, super.key});
 
   final RentalHistory history;
+  final ApiClient api;
+
+  @override
+  State<RentalDetailScreen> createState() => _RentalDetailScreenState();
+}
+
+class _RentalDetailScreenState extends State<RentalDetailScreen> {
+  late RentalHistory _currentHistory;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentHistory = widget.history;
+    _loadDetails();
+  }
+
+  Future<void> _loadDetails() async {
+    try {
+      final data = await widget.api.rentalDetail(widget.history.id);
+      if (mounted) {
+        setState(() {
+          _currentHistory = RentalHistory.fromJson(data);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final history = _currentHistory;
     final currency = NumberFormat.currency(
       locale: 'id_ID',
       symbol: 'Rp',
@@ -40,6 +77,8 @@ class RentalDetailScreen extends StatelessWidget {
           children: [
             _BikeHeader(history: history, dateFormat: dateFormat),
             const SizedBox(height: 24),
+            _RentalRouteMap(history: history),
+            const SizedBox(height: 24),
             _RideMetricsGrid(history: history),
             const SizedBox(height: 24),
             _TripTimeline(history: history, timeFormat: timeFormat),
@@ -59,7 +98,64 @@ class RentalDetailScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _ShareSheet(history: history),
+      builder: (context) => _ShareSheet(history: _currentHistory),
+    );
+  }
+}
+
+class _RentalRouteMap extends StatelessWidget {
+  const _RentalRouteMap({required this.history});
+  final RentalHistory history;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = history.locationPoints
+        .map((e) => latlong.LatLng(e.latitude, e.longitude))
+        .toList();
+
+    if (points.isEmpty) {
+      return Container(
+        height: 180,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xfff1f5f3),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xffe3ebe7), style: BorderStyle.none),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.map_outlined, color: const Color(0xff23866f).withValues(alpha: 0.3), size: 48),
+            const SizedBox(height: 12),
+            Text(
+              'Peta rute tidak tersedia\n(Total jarak: ${history.totalDistanceKilometers.toStringAsFixed(1)} km)',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: const Color(0xff23866f).withValues(alpha: 0.5), fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      height: 220,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xffe3ebe7)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: MapWidget(
+          latitude: points.last.latitude,
+          longitude: points.last.longitude,
+          routePoints: points,
+          routeColor: Colors.blue, // Perintah: Rute warna biru
+          latestLocationLabel: 'Titik Finish',
+          routeLabel: 'Rute Perjalanan',
+        ),
+      ),
     );
   }
 }
@@ -144,7 +240,7 @@ class _RideMetricsGrid extends StatelessWidget {
           Row(
             children: [
               _MetricItem(
-                label: 'Kecepatan',
+                label: 'Rata-rata Kecepatan',
                 value: history.averageSpeed.toStringAsFixed(1),
                 unit: 'km/j',
                 icon: Icons.speed_rounded,
@@ -396,7 +492,7 @@ class _StatusBadge extends StatelessWidget {
     final bgColor = isCompleted ? const Color(0xffe8f7f2) : const Color(0xffffecef);
 
     return GestureDetector(
-      onTap: status.toLowerCase() == 'active' ? () {
+      onTap: status.toLowerCase() == 'active' || status.toLowerCase() == 'idle_warning' || status.toLowerCase() == 'idle_billing' ? () {
         Navigator.of(context).popUntil((route) => route.isFirst);
       } : null,
       child: Container(
@@ -446,7 +542,7 @@ class _GreenImpactCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Estimasi Dampak Lingkungan',
+                  'Estimasi CO2',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
@@ -618,7 +714,7 @@ class _ShareSheet extends StatelessWidget {
 Sepeda: ${history.bike?.code ?? 'N/A'}
 Jarak: ${history.totalDistanceKilometers.toStringAsFixed(2)} km
 Durasi: ${history.durationString}
-Kalori: ${history.caloriesBurned.toStringAsFixed(0)} kkal
+Est. Kalori: ${history.caloriesBurned.toStringAsFixed(0)} kkal
 Total Biaya: Rp${NumberFormat('#,###', 'id_ID').format(history.totalCost)}
 
 #SmartBike #EcoFriendly #Cycling
@@ -704,7 +800,7 @@ class _MeshWavePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
-    final path = Path();
+    final path = ui.Path();
     for (int i = 0; i < 5; i++) {
       path.moveTo(0, size.height * (0.2 + i * 0.15));
       path.quadraticBezierTo(
