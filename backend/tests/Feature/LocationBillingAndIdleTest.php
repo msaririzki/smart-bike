@@ -174,6 +174,50 @@ class LocationBillingAndIdleTest extends TestCase
             ->assertJsonPath('data.rental.current_speed_kmh', 12.5);
     }
 
+    public function test_device_location_update_restores_stale_offline_status_during_active_rental(): void
+    {
+        $this->bike->update([
+            'status' => 'offline',
+            'is_online' => false,
+        ]);
+
+        Sanctum::actingAs($this->device);
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
+            'speed_kmh' => 0,
+            'accuracy_meters' => 8,
+            'recorded_at' => now()->toISOString(),
+        ])->assertOk();
+
+        $this->bike->refresh();
+        $this->assertSame('in_use', $this->bike->status);
+        $this->assertTrue($this->bike->is_online);
+    }
+
+    public function test_device_qr_request_restores_stale_offline_status_when_available(): void
+    {
+        $this->rental->update([
+            'status' => Rental::STATUS_COMPLETED,
+            'ended_at' => now(),
+        ]);
+        $this->bike->update([
+            'status' => 'offline',
+            'is_online' => false,
+        ]);
+
+        Sanctum::actingAs($this->device);
+
+        $this->postJson('/api/device/rental-qr')
+            ->assertCreated()
+            ->assertJsonPath('data.bike.code', 'BIKE-GPS');
+
+        $this->bike->refresh();
+        $this->assertSame('available', $this->bike->status);
+        $this->assertTrue($this->bike->is_online);
+    }
+
     public function test_idle_warning_idle_billing_and_resume_after_valid_movement(): void
     {
         $this->rental->update(['last_movement_at' => now()->subSeconds(301)]);

@@ -21,6 +21,7 @@ class LocationProcessingService
         private readonly PricingConfigService $pricing,
         private readonly BillingService $billing,
         private readonly IdleDetectionService $idleDetection,
+        private readonly BikeStatusService $bikeStatus,
     ) {}
 
     public function process(User $deviceUser, array $data): array
@@ -37,13 +38,19 @@ class LocationProcessingService
                 ->latest('started_at')
                 ->first();
 
-            $bike->update([
+            $bikeUpdates = [
                 'current_latitude' => $data['latitude'],
                 'current_longitude' => $data['longitude'],
                 'last_accuracy' => $data['accuracy_meters'] ?? null,
                 'is_online' => true,
                 'last_seen_at' => now(),
-            ]);
+            ];
+
+            if ($bike->status === 'offline') {
+                $bikeUpdates['status'] = $rental ? 'in_use' : 'available';
+            }
+
+            $bike->update($bikeUpdates);
 
             if (! $rental) {
                 $point = $this->storePoint($bike, null, $data, $recordedAt, 'no_active_rental');
