@@ -35,8 +35,8 @@
         .leaflet-popup-content { margin: 0; width: 320px !important; }
         .map-popup { padding: 0; font-family: inherit; }
         .map-popup-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.25rem; background: linear-gradient(135deg, #0f766e, #14b8a6); color: white; }
-        .map-popup-title { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.025em; }
-        .map-popup-subtitle { margin: 0.25rem 0 0 0; font-size: 0.875rem; opacity: 0.9; }
+        .map-popup-title { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.025em; color: #ffffff !important; }
+        .map-popup-subtitle { margin: 0.25rem 0 0 0; font-size: 0.875rem; color: rgba(255, 255, 255, 0.9) !important; }
         .map-popup-header .badge { background: rgba(255, 255, 255, 0.2); color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; border: 1px solid rgba(255, 255, 255, 0.3); backdrop-filter: blur(4px); }
         .map-popup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
         .map-popup-item { display: flex; flex-direction: column; gap: 0.25rem; }
