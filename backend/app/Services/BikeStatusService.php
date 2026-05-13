@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Bike;
 use App\Models\DeviceHeartbeat;
+use App\Models\Rental;
 use App\Models\User;
 
 class BikeStatusService
@@ -34,6 +35,10 @@ class BikeStatusService
             $updates['battery_percent'] = $data['battery_percent'];
         }
 
+        if ($bike->status === 'offline') {
+            $updates['status'] = $this->onlineOperationalStatus($bike);
+        }
+
         $bike->update($updates);
 
         return $bike->refresh();
@@ -46,6 +51,20 @@ class BikeStatusService
         return Bike::query()
             ->where('is_online', true)
             ->where('last_seen_at', '<', now()->subSeconds($timeout))
-            ->update(['is_online' => false, 'status' => 'offline']);
+            ->update(['is_online' => false]);
+    }
+
+    public function onlineOperationalStatus(Bike $bike): string
+    {
+        $hasActiveRental = Rental::query()
+            ->where('bike_id', $bike->id)
+            ->whereIn('status', [
+                Rental::STATUS_ACTIVE,
+                Rental::STATUS_IDLE_WARNING,
+                Rental::STATUS_IDLE_BILLING,
+            ])
+            ->exists();
+
+        return $hasActiveRental ? 'in_use' : 'available';
     }
 }

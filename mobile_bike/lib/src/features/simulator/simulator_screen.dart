@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlong;
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../models/bike.dart';
 import '../../models/device_rental_summary.dart';
@@ -73,7 +74,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   int? _activeRentalId;
   String _lastServerMsg = 'Belum ada pengiriman';
   String _simulationProgress = '';
-  int _currentInterval = 5;
+  int _currentInterval = GpsService.trackingInterval.inSeconds;
   SimulationMode _currentMode = SimulationMode.loop;
   String _locationMode = 'Belum aktif';
   bool _checkingLocationAccess = true;
@@ -85,7 +86,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
   final List<_RoutePoint> _routePoints = [];
   _RoutePoint? _lastAcceptedGpsPoint;
+  _PendingLocationUpdate? _pendingLocationUpdate;
   DateTime? _lastStationarySentAt;
+  DateTime? _lastServerRecordedAt;
   _BikeMapType _mapType = _BikeMapType.standard;
 
   bool get _hasActiveRental => _summary?.rental != null;
@@ -93,6 +96,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(WakelockPlus.enable());
     _loadBike();
     _loadRentalSummary();
     _ensureLocationReady(requestIfDenied: true, showMessage: false);
@@ -112,6 +116,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   @override
   void dispose() {
     _stopStream();
+    unawaited(WakelockPlus.disable());
     _networkSub?.cancel();
     _batteryTimer?.cancel();
     _summaryTimer?.cancel();
@@ -338,13 +343,13 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   void _startRealGpsRefresh() {
     _realGpsRefreshTimer?.cancel();
     _realGpsRefreshTimer = Timer.periodic(
-      Duration(seconds: _currentInterval),
+      GpsService.trackingInterval,
       (_) => _refreshRealGpsPosition(),
     );
   }
 
   Future<void> _refreshRealGpsPosition() async {
-    if (!_streaming || _isSimulating || _sending) return;
+    if (!_streaming || _isSimulating) return;
 
     final currentPosition = await _gps.getCurrentPosition();
     if (!mounted || currentPosition == null) return;
@@ -353,7 +358,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   void _handleRealGpsPosition(Position pos) {
-    final sampledAt = pos.timestamp.toLocal();
+    final sampledAt = _effectiveGpsSampleTime(pos);
 
     setState(() {
       _accuracyMeters = pos.accuracy;
@@ -378,7 +383,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
     final previous = _lastAcceptedGpsPoint;
     if (previous == null) {
-      _acceptRealGpsPoint(pos, speedKmh: 0, message: 'Baseline GPS disimpan.');
+      _acceptRealGpsPoint(
+        pos,
+        sampledAt: sampledAt,
+        speedKmh: 0,
+        message: 'Baseline GPS disimpan.',
+      );
       return;
     }
 
@@ -392,10 +402,15 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         Duration.millisecondsPerSecond;
     final impliedSpeedKmh = seconds <= 0 ? 0.0 : (distance / seconds) * 3.6;
     final movementThreshold = _movementThresholdMeters(pos, previous);
+    final displaySpeedKmh = _displaySpeedKmh(pos, impliedSpeedKmh);
+
+    setState(() => _speedKmh = displaySpeedKmh);
 
     if (distance < movementThreshold) {
       setState(() {
-        _speedKmh = 0;
+        if (displaySpeedKmh < _minReliableSpeedKmh) {
+          _speedKmh = 0;
+        }
         _lastServerMsg =
             'GPS stabil: perpindahan ${distance.toStringAsFixed(1)} m dianggap diam';
       });
@@ -412,10 +427,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return;
     }
 
-    final speedKmh = _displaySpeedKmh(pos, impliedSpeedKmh);
     _acceptRealGpsPoint(
       pos,
-      speedKmh: speedKmh,
+      sampledAt: sampledAt,
+      speedKmh: displaySpeedKmh,
       message: 'GPS valid, pergerakan ${distance.toStringAsFixed(1)} m.',
     );
   }
@@ -437,6 +452,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _positionSub = null;
     _realGpsRefreshTimer?.cancel();
     _realGpsRefreshTimer = null;
+    _pendingLocationUpdate = null;
   }
 
   void _startHeartbeat() {
@@ -588,6 +604,28 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     return impliedSpeedKmh >= _minReliableSpeedKmh ? impliedSpeedKmh : 0;
   }
 
+  DateTime _effectiveGpsSampleTime(Position pos) {
+    final now = DateTime.now();
+    final gpsTime = pos.timestamp.toLocal();
+    final tooOld = now.difference(gpsTime).abs() > const Duration(seconds: 10);
+
+    if (tooOld || gpsTime.isAfter(now.add(const Duration(seconds: 2)))) {
+      return now;
+    }
+
+    return gpsTime;
+  }
+
+  DateTime _nextServerRecordedAt(DateTime candidate) {
+    final last = _lastServerRecordedAt;
+    if (last != null && !candidate.isAfter(last)) {
+      candidate = last.add(const Duration(milliseconds: 1));
+    }
+
+    _lastServerRecordedAt = candidate;
+    return candidate;
+  }
+
   double _movementThresholdMeters(Position pos, _RoutePoint previous) {
     final dynamicThreshold =
         math.max(pos.accuracy, previous.accuracyMeters) * 1.5;
@@ -600,6 +638,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _acceptRealGpsPoint(
     Position pos, {
+    required DateTime sampledAt,
     required double speedKmh,
     required String message,
   }) {
@@ -608,7 +647,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       longitude: pos.longitude,
       accuracyMeters: pos.accuracy,
       source: 'Real GPS',
-      recordedAt: pos.timestamp.toLocal(),
+      recordedAt: sampledAt,
     );
 
     _lastAcceptedGpsPoint = point;
@@ -658,8 +697,24 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     );
   }
 
-  Future<void> _sendLocation(Position pos, {double? speedKmh}) async {
-    if (_sending) return;
+  Future<void> _sendLocation(
+    Position pos, {
+    double? speedKmh,
+    DateTime? recordedAt,
+  }) async {
+    final effectiveRecordedAt = _nextServerRecordedAt(
+      recordedAt ?? _effectiveGpsSampleTime(pos),
+    );
+
+    if (_sending) {
+      _pendingLocationUpdate = _PendingLocationUpdate(
+        position: pos,
+        speedKmh: speedKmh,
+        recordedAt: effectiveRecordedAt,
+      );
+      return;
+    }
+
     setState(() => _sending = true);
     try {
       final res = await widget.api.sendLocationUpdate(
@@ -668,7 +723,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         speedKmh: speedKmh ?? (pos.speed * 3.6),
         accuracyMeters: pos.accuracy,
         networkType: _networkType,
-        recordedAt: pos.timestamp.toLocal(),
+        recordedAt: effectiveRecordedAt,
       );
       if (mounted) {
         setState(() {
@@ -681,6 +736,17 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       if (mounted) setState(() => _lastServerMsg = 'Error: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
+      final pending = _pendingLocationUpdate;
+      if (pending != null && mounted) {
+        _pendingLocationUpdate = null;
+        unawaited(
+          _sendLocation(
+            pending.position,
+            speedKmh: pending.speedKmh,
+            recordedAt: pending.recordedAt,
+          ),
+        );
+      }
     }
   }
 
@@ -1753,6 +1819,18 @@ class _RoutePoint {
   final double longitude;
   final double accuracyMeters;
   final String source;
+  final DateTime recordedAt;
+}
+
+class _PendingLocationUpdate {
+  const _PendingLocationUpdate({
+    required this.position,
+    required this.recordedAt,
+    this.speedKmh,
+  });
+
+  final Position position;
+  final double? speedKmh;
   final DateTime recordedAt;
 }
 
