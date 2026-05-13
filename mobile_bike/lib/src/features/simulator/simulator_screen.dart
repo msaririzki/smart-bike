@@ -39,6 +39,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   static const double _minRouteDistanceMeters = 10;
   static const double _maxDynamicMovementThresholdMeters = 35;
   static const double _minReliableSpeedKmh = 2;
+  static const Duration _gpsWarmupDuration = Duration(seconds: 6);
+  static const int _gpsWarmupMinSamples = 3;
+  static const double _speedRiseLimitKmhPerSecond = 5;
+  static const double _speedFallLimitKmhPerSecond = 8;
   static const Duration _stationaryServerPingInterval = Duration(seconds: 15);
   static const int _maxRoutePoints = 120;
 
@@ -86,9 +90,16 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   _PendingLocationUpdate? _pendingLocationUpdate;
   DateTime? _lastStationarySentAt;
   DateTime? _lastServerRecordedAt;
+  DateTime? _gpsWarmupStartedAt;
+  DateTime? _lastSpeedSampleAt;
+  int _gpsWarmupSampleCount = 0;
+  bool _gpsWarmupComplete = false;
+  double _smoothedSpeedKmh = 0;
   _BikeMapType _mapType = _BikeMapType.standard;
 
   bool get _hasActiveRental => _summary?.rental != null;
+  bool get _isGpsWarmupActive =>
+      _hasActiveRental && !_gpsWarmupComplete && _gpsWarmupStartedAt != null;
 
   @override
   void initState() {
@@ -141,10 +152,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         _summary = summary;
         _bike = summary.bike ?? _bike;
         final nextRentalId = summary.rental?.id;
-        if (_activeRentalId != null && nextRentalId != _activeRentalId) {
-          _routePoints.clear();
-          _lastAcceptedGpsPoint = null;
-          _lastStationarySentAt = null;
+        if (nextRentalId != _activeRentalId) {
+          _resetRealtimeTrackingState();
         }
         _activeRentalId = nextRentalId;
       });
@@ -356,6 +365,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _handleRealGpsPosition(Position pos) {
     final sampledAt = _effectiveGpsSampleTime(pos);
+    final rentalActive = _hasActiveRental;
 
     setState(() {
       _accuracyMeters = pos.accuracy;
@@ -372,11 +382,15 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return;
     }
 
-    if (!_hasActiveRental) {
+    if (!rentalActive) {
+      _resetSpeedSmoothing();
       setState(() => _speedKmh = 0);
       _sendLocation(pos, speedKmh: 0);
       return;
     }
+
+    _startGpsWarmupIfNeeded(sampledAt);
+    _gpsWarmupSampleCount++;
 
     final previous = _lastAcceptedGpsPoint;
     if (previous == null) {
@@ -384,7 +398,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         pos,
         sampledAt: sampledAt,
         speedKmh: 0,
-        message: 'Baseline GPS disimpan.',
+        serverSpeedKmh: 0,
+        message: 'Mengunci GPS awal.',
       );
       return;
     }
@@ -399,9 +414,26 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         Duration.millisecondsPerSecond;
     final impliedSpeedKmh = seconds <= 0 ? 0.0 : (distance / seconds) * 3.6;
     final movementThreshold = _movementThresholdMeters(pos, previous);
-    final displaySpeedKmh = _displaySpeedKmh(pos, impliedSpeedKmh);
+    final targetSpeedKmh = _targetDisplaySpeedKmh(pos, impliedSpeedKmh);
+    final clearMovement = distance >= movementThreshold &&
+        impliedSpeedKmh >= _minReliableSpeedKmh &&
+        impliedSpeedKmh <= _maxAcceptedJumpSpeedKmh;
+    final warmupReady = _updateGpsWarmupState(sampledAt, clearMovement);
+    final displaySpeedKmh =
+        warmupReady ? _smoothDisplaySpeed(targetSpeedKmh, sampledAt) : 0.0;
 
     setState(() => _speedKmh = displaySpeedKmh);
+
+    if (!warmupReady) {
+      setState(() {
+        _lastServerMsg =
+            'Mengunci GPS awal (${_gpsWarmupSampleCount.clamp(1, _gpsWarmupMinSamples)}/$_gpsWarmupMinSamples)';
+      });
+      if (distance < movementThreshold) {
+        _sendStationaryPingIfDue(previous, pos);
+      }
+      return;
+    }
 
     if (distance < movementThreshold) {
       setState(() {
@@ -428,6 +460,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       pos,
       sampledAt: sampledAt,
       speedKmh: displaySpeedKmh,
+      serverSpeedKmh: targetSpeedKmh,
       message: 'GPS valid, pergerakan ${distance.toStringAsFixed(1)} m.',
     );
   }
@@ -568,16 +601,94 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _sendLocation(pos);
   }
 
-  double _displaySpeedKmh(Position pos, double impliedSpeedKmh) {
+  double _targetDisplaySpeedKmh(Position pos, double impliedSpeedKmh) {
     final gpsSpeedKmh =
         pos.speed.isFinite && pos.speed > 0 ? pos.speed * 3.6 : 0.0;
+    final gpsReliable = gpsSpeedKmh >= _minReliableSpeedKmh &&
+        gpsSpeedKmh <= _maxAcceptedJumpSpeedKmh;
+    final impliedReliable = impliedSpeedKmh >= _minReliableSpeedKmh &&
+        impliedSpeedKmh <= _maxAcceptedJumpSpeedKmh;
 
-    if (gpsSpeedKmh >= _minReliableSpeedKmh &&
-        gpsSpeedKmh <= _maxAcceptedJumpSpeedKmh) {
+    if (gpsReliable && impliedReliable) {
+      final delta = (gpsSpeedKmh - impliedSpeedKmh).abs();
+      if (delta <= 10) {
+        return (gpsSpeedKmh * .65) + (impliedSpeedKmh * .35);
+      }
       return gpsSpeedKmh;
     }
 
-    return impliedSpeedKmh >= _minReliableSpeedKmh ? impliedSpeedKmh : 0;
+    if (gpsReliable) return gpsSpeedKmh;
+    if (impliedReliable) return impliedSpeedKmh;
+    return 0;
+  }
+
+  double _smoothDisplaySpeed(double targetSpeedKmh, DateTime sampledAt) {
+    final target = targetSpeedKmh < _minReliableSpeedKmh ? 0.0 : targetSpeedKmh;
+    final previous = _smoothedSpeedKmh;
+    final lastSampleAt = _lastSpeedSampleAt;
+    final seconds = lastSampleAt == null
+        ? GpsService.trackingInterval.inMilliseconds /
+            Duration.millisecondsPerSecond
+        : math.max(
+            sampledAt.difference(lastSampleAt).inMilliseconds /
+                Duration.millisecondsPerSecond,
+            .2,
+          );
+    final alpha = target >= previous ? .55 : .72;
+    final blended = previous + ((target - previous) * alpha);
+    final maxDelta = (target >= previous
+            ? _speedRiseLimitKmhPerSecond
+            : _speedFallLimitKmhPerSecond) *
+        seconds;
+    final limited = previous + (blended - previous).clamp(-maxDelta, maxDelta);
+    final next = limited < .8 ? 0.0 : limited;
+
+    _smoothedSpeedKmh = next;
+    _lastSpeedSampleAt = sampledAt;
+
+    return next;
+  }
+
+  void _startGpsWarmupIfNeeded(DateTime sampledAt) {
+    _gpsWarmupStartedAt ??= sampledAt;
+  }
+
+  bool _updateGpsWarmupState(DateTime sampledAt, bool clearMovement) {
+    if (_gpsWarmupComplete) return true;
+
+    if (clearMovement && _gpsWarmupSampleCount >= 2) {
+      _gpsWarmupComplete = true;
+      return true;
+    }
+
+    final startedAt = _gpsWarmupStartedAt ?? sampledAt;
+    final enoughSamples = _gpsWarmupSampleCount >= _gpsWarmupMinSamples;
+    final enoughTime = sampledAt.difference(startedAt) >= _gpsWarmupDuration;
+
+    if (enoughSamples && enoughTime) {
+      _gpsWarmupComplete = true;
+      return true;
+    }
+
+    return false;
+  }
+
+  void _resetSpeedSmoothing() {
+    _smoothedSpeedKmh = 0;
+    _lastSpeedSampleAt = null;
+  }
+
+  void _resetRealtimeTrackingState() {
+    _routePoints.clear();
+    _lastAcceptedGpsPoint = null;
+    _pendingLocationUpdate = null;
+    _lastStationarySentAt = null;
+    _lastServerRecordedAt = null;
+    _gpsWarmupStartedAt = null;
+    _gpsWarmupSampleCount = 0;
+    _gpsWarmupComplete = false;
+    _resetSpeedSmoothing();
+    _speedKmh = 0;
   }
 
   DateTime _effectiveGpsSampleTime(Position pos) {
@@ -616,6 +727,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     Position pos, {
     required DateTime sampledAt,
     required double speedKmh,
+    required double serverSpeedKmh,
     required String message,
   }) {
     final point = _RoutePoint(
@@ -640,7 +752,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       );
     });
 
-    _sendLocation(pos, speedKmh: speedKmh);
+    _sendLocation(pos, speedKmh: serverSpeedKmh);
   }
 
   void _sendStationaryPingIfDue(_RoutePoint stablePoint, Position sample) {
@@ -913,22 +1025,40 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 borderRadius: BorderRadius.circular(32),
                 border: Border.all(color: const Color(0xFF334155)),
               ),
-              child: Row(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(
-                    (_speedKmh ?? rental?.currentSpeedKmh ?? 0.0)
-                        .toStringAsFixed(1),
-                    style: const TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        (_speedKmh ?? rental?.currentSpeedKmh ?? 0.0)
+                            .toStringAsFixed(1),
+                        style: const TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('km/h',
+                          style: TextStyle(
+                              fontSize: 18, color: Color(0xFF9CA3AF))),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  const Text('km/h',
-                      style: TextStyle(fontSize: 18, color: Color(0xFF9CA3AF))),
+                  ),
+                  if (_isGpsWarmupActive) ...[
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Mengunci GPS',
+                      style: TextStyle(
+                        color: Color(0xFFE2E8F0),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
