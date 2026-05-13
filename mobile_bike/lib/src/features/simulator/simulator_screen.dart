@@ -14,8 +14,6 @@ import '../../models/device_rental_summary.dart';
 import '../../services/api_client.dart';
 import '../../services/gps_service.dart';
 import '../../services/session_store.dart';
-import 'manual_gps_panel.dart';
-import 'device_details_screen.dart';
 import 'mock_route_service.dart';
 import 'qr_rental_panel.dart';
 
@@ -73,7 +71,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   DateTime _now = DateTime.now();
   int? _activeRentalId;
   String _lastServerMsg = 'Belum ada pengiriman';
-  String _simulationProgress = '';
   int _currentInterval = GpsService.trackingInterval.inSeconds;
   SimulationMode _currentMode = SimulationMode.loop;
   String _locationMode = 'Belum aktif';
@@ -469,24 +466,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _heartbeatTimer = null;
   }
 
-  void _sendManualCoordinate(double lat, double lng) {
-    _sendCoordinate(
-      latitude: lat,
-      longitude: lng,
-      speedKmh: 0,
-      accuracyMeters: 0,
-      mode: 'Manual GPS',
-    );
-  }
-
-  void _toggleSimulation() {
-    if (_isSimulating) {
-      _stopSimulation();
-    } else {
-      _startSimulation();
-    }
-  }
-
   void _startSimulation() {
     _stopRealGps();
     _mockService.reset();
@@ -546,14 +525,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     if (mounted) {
       setState(() {
         _isSimulating = false;
-        _simulationProgress = '';
       });
     }
   }
 
   void _updateSimulationProgress() {
-    _simulationProgress =
-        'Simulasi Rute: Titik ${_mockService.currentIndex + 1}/${_mockService.totalPoints}';
   }
 
   void _sendCoordinate({
@@ -897,36 +873,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             onMapTypeChanged: (type) => setState(() => _mapType = type),
           ),
         ),
-        _DashboardOverlay(
-          bike: bike,
-          rental: rental,
-          speedKmh: _speedKmh ?? 0,
-          accuracyMeters: _accuracyMeters,
-          networkType: _networkType,
-          batteryPercent: _batteryPercent,
-          streaming: _streaming,
-          isSimulating: _isSimulating,
-          simulationProgress: _simulationProgress,
-          currentInterval: _currentInterval,
-          currentMode: _currentMode,
-          pointsSent: _pointsSent,
-          lastSentAt: _lastSentAt,
-          locationMode: _locationMode,
-          now: _now,
-          lastServerMsg: _lastServerMsg,
-          onToggleStream: () =>
-              _streaming ? _stopStream() : _startStream(requestPermission: true),
-          onToggleSimulation: _toggleSimulation,
-          onSendManual: _sendManualCoordinate,
-          onIntervalChanged: (v) => setState(() => _currentInterval = v),
-            height: MediaQuery.of(context).size.height,
-            points: List.unmodifiable(_routePoints),
-            latestAccuracyMeters:
-                _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
-            mapType: _mapType,
-            onMapTypeChanged: (value) => setState(() => _mapType = value),
-          ),
-        ),
         Positioned(
           top: MediaQuery.of(context).padding.top + 16,
           left: 16,
@@ -943,7 +889,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         if (_checkingLocationAccess || !_locationAccessGranted)
           Positioned(
             top: MediaQuery.of(context).padding.top +
-                (_isIdleAlertStatus(rental.status) ? 230 : 140),
+                ((rental != null && _isIdleAlertStatus(rental.status)) ? 230 : 140),
             left: 16,
             right: 16,
             child: _LocationAccessBanner(
@@ -973,7 +919,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Text(
-                    (_speedKmh ?? rental.currentSpeedKmh ?? 0.0)
+                    (_speedKmh ?? rental?.currentSpeedKmh ?? 0.0)
                         .toStringAsFixed(1),
                     style: const TextStyle(
                         fontSize: 48,
@@ -1023,34 +969,46 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _ModernStatColumn(
-                      icon: Icons.timer_outlined,
-                      label: 'Durasi Sewa',
-                      value: _formatDuration(rental.startedAt, _now),
-                      iconColor: const Color(0xff10b981),
+                if (rental != null)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _ModernStatColumn(
+                        icon: Icons.timer_outlined,
+                        label: 'Durasi Sewa',
+                        value: _formatDuration(rental.startedAt, _now),
+                        iconColor: const Color(0xff10b981),
+                      ),
+                      Container(
+                          width: 1, height: 40, color: const Color(0xfff3f4f6)),
+                      _ModernStatColumn(
+                        icon: Icons.route_outlined,
+                        label: 'Jarak',
+                        value:
+                            '${(rental.totalDistanceKilometers).toStringAsFixed(2)} km',
+                        iconColor: const Color(0xff10b981),
+                      ),
+                      Container(
+                          width: 1, height: 40, color: const Color(0xfff3f4f6)),
+                      _ModernStatColumn(
+                        icon: Icons.attach_money,
+                        label: 'Estimasi Biaya',
+                        value: _formatRupiah(rental.totalCost),
+                        iconColor: const Color(0xff10b981),
+                      ),
+                    ],
+                  ),
+                if (rental == null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'Menunggu penyewaan dimulai...',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    Container(
-                        width: 1, height: 40, color: const Color(0xfff3f4f6)),
-                    _ModernStatColumn(
-                      icon: Icons.route_outlined,
-                      label: 'Jarak',
-                      value:
-                          '${(rental.totalDistanceKilometers).toStringAsFixed(2)} km',
-                      iconColor: const Color(0xff10b981),
-                    ),
-                    Container(
-                        width: 1, height: 40, color: const Color(0xfff3f4f6)),
-                    _ModernStatColumn(
-                      icon: Icons.attach_money,
-                      label: 'Estimasi Biaya',
-                      value: _formatRupiah(rental.totalCost),
-                      iconColor: const Color(0xff10b981),
-                    ),
-                  ],
-                ),
+                  ),
               ],
             ),
           ),
@@ -1271,178 +1229,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                   Icons.tune_rounded,
                   color: Color(0xFF0F766E),
                 ),
->>>>>>> 85841e002c40e0ba54cda30f0445745c278a5aaf
               ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _StatusBanner(
-                    streaming: _streaming,
-                    mode: _locationMode,
-                    sending: _sending,
-                    serverMessage: _lastServerMsg,
-                    lastGpsReadAt: _lastGpsReadAt,
-                    lastSentAt: _lastSentAt,
-                  ),
-                  if (rental != null && _isIdleAlertStatus(rental.status)) ...[
-                    const SizedBox(height: 8),
-                    _IdleAlertBanner(rental: rental),
-                  ],
-                  if (_checkingLocationAccess || !_locationAccessGranted) ...[
-                    const SizedBox(height: 8),
-                    _LocationAccessBanner(
-                      checking: _checkingLocationAccess,
-                      status: _locationAccessStatus,
-                      message: _locationAccessMessage,
-                      onRequestPermission: () => _ensureLocationReady(
-                        requestIfDenied: true,
-                      ),
-                      onOpenSettings: _openLocationSettings,
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _LegendDot(color: Color(0xFF38BDF8)),
-                      SizedBox(width: 5),
-                      Text(
-                        'Titik Awal',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
-                      ),
-                      SizedBox(width: 24),
-                      _LegendDot(color: Color(0xFF22C55E)),
-                      SizedBox(width: 5),
-                      Text(
-                        'Titik Terbaru',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            ],
           ),
-        ),
-        Positioned(
-          bottom: 24,
-          left: 16,
-          right: 16,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
-                  child: Row(
-                    children: [
-                      _MetricItemLarge(
-                        label: 'SPEED',
-                        value: displaySpeed.toStringAsFixed(1),
-                        unit: 'km/h',
-                        icon: Icons.speed_rounded,
-                        color: const Color(0xFF2F9E38),
-                      ),
-                      Container(width: 1, height: 30, color: const Color(0xFFF2F4F7)),
-                      _MetricItemLarge(
-                        label: 'JARAK',
-                        value: (rental?.totalDistanceKilometers ?? 0).toStringAsFixed(2),
-                        unit: 'km',
-                        icon: Icons.route_rounded,
-                        color: const Color(0xFF38BDF8),
-                      ),
-                      Container(width: 1, height: 30, color: const Color(0xFFF2F4F7)),
-                      _MetricItemLarge(
-                        label: 'BIAYA',
-                        value: _formatRupiah(rental?.totalCost ?? 0).replaceAll('Rp', ''),
-                        unit: 'Rp',
-                        icon: Icons.payments_rounded,
-                        color: const Color(0xFFF59E0B),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Divider(height: 1, color: Color(0xFFF2F4F7)),
-                InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DeviceDetailsScreen(
-                          api: widget.api,
-                          bike: bike,
-                          rental: rental,
-                          displaySpeed: displaySpeed,
-                          batteryPercent: _batteryPercent,
-                          networkType: _networkType,
-                          pointsSent: _pointsSent,
-                          lastSentAt: _lastSentAt,
-                          locationMode: _locationMode,
-                          streaming: _streaming,
-                          now: _now,
-                          locationAccessGranted: _locationAccessGranted,
-                          locationAccessStatus: _locationAccessStatus,
-                          lastGpsReadAt: _lastGpsReadAt,
-                          accuracyMeters: _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
-                        ),
-                      ),
-                    );
-                  },
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE8F5E9),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.electric_bike_rounded, color: Color(0xFF2F9E38), size: 20),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Detail Perangkat & Rental',
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF101828)),
-                              ),
-                              Text(
-                                '${bike.code} • Baterai $_batteryPercent%',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF667085), fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -1765,7 +1556,7 @@ class _IdleAlertBanner extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.75),
+              color: Colors.white.withValues(alpha: .75),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -1875,87 +1666,6 @@ class _ModernStatColumn extends StatelessWidget {
   }
 }
 
-class _DeviceAndRentalSummary extends StatelessWidget {
-  const _DeviceAndRentalSummary({
-    required this.bike,
-    required this.rental,
-    required this.batteryPercent,
-    required this.networkType,
-    required this.pointsSent,
-    required this.lastSentAt,
-    required this.locationMode,
-    required this.streaming,
-    required this.now,
-  });
-
-  final Bike bike;
-  final ActiveBikeRental? rental;
-  final int batteryPercent;
-  final String networkType;
-  final int pointsSent;
-  final DateTime? lastSentAt;
-  final String locationMode;
-  final bool streaming;
-  final DateTime now;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Panel(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.pedal_bike_rounded,
-                  size: 18, color: Color(0xFF0F766E)),
-              const SizedBox(width: 8),
-              Text(
-                '${bike.code} - ${bike.name}',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF101828),
-                    fontSize: 13),
-              ),
-              const Spacer(),
-              if (rental != null)
-                _Badge(label: _rentalStatusLabel(rental!.status)),
-            ],
-          ),
-          const Divider(height: 16),
-          _MetricGridCompact(
-            children: [
-              _MetricItemLarge(
-                  label: 'Baterai',
-                  value: '$batteryPercent',
-                  unit: '%',
-                  icon: Icons.battery_std,
-                  color: const Color(0xFF667085)),
-              _MetricItemLarge(
-                  label: 'Jaringan',
-                  value: networkType,
-                  unit: '',
-                  icon: Icons.network_check,
-                  color: const Color(0xFF667085)),
-              _MetricItemLarge(
-                  label: 'Titik',
-                  value: '$pointsSent',
-                  unit: '',
-                  icon: Icons.upload,
-                  color: const Color(0xFF667085)),
-              _MetricItemLarge(
-                  label: 'Mode',
-                  value: locationMode,
-                  unit: '',
-                  icon: Icons.explore_outlined,
-                  color: const Color(0xFF667085)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _MetricGridCompact extends StatelessWidget {
   const _MetricGridCompact({required this.children});
   final List<Widget> children;
@@ -2016,7 +1726,7 @@ class _MetricItemLarge extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF101828).withOpacity(0.5),
+                      color: const Color(0xFF101828).withValues(alpha: 0.5),
                     ),
                   ),
                 TextSpan(
@@ -2037,39 +1747,6 @@ class _MetricItemLarge extends StatelessWidget {
                     ),
                   ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapLegendChip extends StatelessWidget {
-  const _MapLegendChip({required this.color, required this.label});
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withOpacity(0.8),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _LegendDot(color: color),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -2356,8 +2033,6 @@ class _MapTypeToggle extends StatelessWidget {
     );
   }
 }
-  }
-}
 
 class _MapChip extends StatelessWidget {
   const _MapChip({
@@ -2565,4 +2240,41 @@ String _formatDuration(DateTime? startedAt, DateTime now) {
   final minutes = (diff.inMinutes % 60).toString().padLeft(2, '0');
   final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
   return '$hours:$minutes:$seconds';
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF3),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFABEFC6)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF027A48),
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+String _rentalStatusLabel(String status) {
+  return switch (status) {
+    'active' => 'Aktif',
+    'idle_warning' => 'Peringatan Diam',
+    'idle_billing' => 'Biaya Diam',
+    'completed' => 'Selesai',
+    'cancelled' => 'Dibatalkan',
+    _ => status,
+  };
 }
