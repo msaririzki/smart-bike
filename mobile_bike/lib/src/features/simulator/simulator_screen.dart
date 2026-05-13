@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlong;
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../models/bike.dart';
 import '../../models/device_rental_summary.dart';
@@ -39,6 +40,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   static const double _minRouteDistanceMeters = 10;
   static const double _maxDynamicMovementThresholdMeters = 35;
   static const double _minReliableSpeedKmh = 2;
+  static const Duration _gpsWarmupDuration = Duration(seconds: 6);
+  static const int _gpsWarmupMinSamples = 3;
+  static const double _speedRiseLimitKmhPerSecond = 5;
+  static const double _speedFallLimitKmhPerSecond = 8;
   static const Duration _stationaryServerPingInterval = Duration(seconds: 15);
   static const int _maxRoutePoints = 120;
 
@@ -72,7 +77,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   int? _activeRentalId;
   String _lastServerMsg = 'Belum ada pengiriman';
   String _simulationProgress = '';
-  int _currentInterval = 5;
+  int _currentInterval = GpsService.trackingInterval.inSeconds;
   SimulationMode _currentMode = SimulationMode.loop;
   String _locationMode = 'Belum aktif';
   bool _checkingLocationAccess = true;
@@ -84,14 +89,24 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
   final List<_RoutePoint> _routePoints = [];
   _RoutePoint? _lastAcceptedGpsPoint;
+  _PendingLocationUpdate? _pendingLocationUpdate;
   DateTime? _lastStationarySentAt;
+  DateTime? _lastServerRecordedAt;
+  DateTime? _gpsWarmupStartedAt;
+  DateTime? _lastSpeedSampleAt;
+  int _gpsWarmupSampleCount = 0;
+  bool _gpsWarmupComplete = false;
+  double _smoothedSpeedKmh = 0;
   _BikeMapType _mapType = _BikeMapType.standard;
 
   bool get _hasActiveRental => _summary?.rental != null;
+  bool get _isGpsWarmupActive =>
+      _hasActiveRental && !_gpsWarmupComplete && _gpsWarmupStartedAt != null;
 
   @override
   void initState() {
     super.initState();
+    unawaited(WakelockPlus.enable());
     _loadBike();
     _loadRentalSummary();
     _ensureLocationReady(requestIfDenied: true, showMessage: false);
@@ -111,6 +126,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   @override
   void dispose() {
     _stopStream();
+    unawaited(WakelockPlus.disable());
     _networkSub?.cancel();
     _batteryTimer?.cancel();
     _summaryTimer?.cancel();
@@ -138,10 +154,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         _summary = summary;
         _bike = summary.bike ?? _bike;
         final nextRentalId = summary.rental?.id;
-        if (_activeRentalId != null && nextRentalId != _activeRentalId) {
-          _routePoints.clear();
-          _lastAcceptedGpsPoint = null;
-          _lastStationarySentAt = null;
+        if (nextRentalId != _activeRentalId) {
+          _resetRealtimeTrackingState();
         }
         _activeRentalId = nextRentalId;
       });
@@ -337,13 +351,13 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   void _startRealGpsRefresh() {
     _realGpsRefreshTimer?.cancel();
     _realGpsRefreshTimer = Timer.periodic(
-      Duration(seconds: _currentInterval),
+      GpsService.trackingInterval,
       (_) => _refreshRealGpsPosition(),
     );
   }
 
   Future<void> _refreshRealGpsPosition() async {
-    if (!_streaming || _isSimulating || _sending) return;
+    if (!_streaming || _isSimulating) return;
 
     final currentPosition = await _gps.getCurrentPosition();
     if (!mounted || currentPosition == null) return;
@@ -352,7 +366,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   void _handleRealGpsPosition(Position pos) {
-    final sampledAt = pos.timestamp.toLocal();
+    final sampledAt = _effectiveGpsSampleTime(pos);
+    final rentalActive = _hasActiveRental;
 
     setState(() {
       _accuracyMeters = pos.accuracy;
@@ -369,15 +384,25 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return;
     }
 
-    if (!_hasActiveRental) {
+    if (!rentalActive) {
+      _resetSpeedSmoothing();
       setState(() => _speedKmh = 0);
       _sendLocation(pos, speedKmh: 0);
       return;
     }
 
+    _startGpsWarmupIfNeeded(sampledAt);
+    _gpsWarmupSampleCount++;
+
     final previous = _lastAcceptedGpsPoint;
     if (previous == null) {
-      _acceptRealGpsPoint(pos, speedKmh: 0, message: 'Baseline GPS disimpan.');
+      _acceptRealGpsPoint(
+        pos,
+        sampledAt: sampledAt,
+        speedKmh: 0,
+        serverSpeedKmh: 0,
+        message: 'Mengunci GPS awal.',
+      );
       return;
     }
 
@@ -391,10 +416,32 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         Duration.millisecondsPerSecond;
     final impliedSpeedKmh = seconds <= 0 ? 0.0 : (distance / seconds) * 3.6;
     final movementThreshold = _movementThresholdMeters(pos, previous);
+    final targetSpeedKmh = _targetDisplaySpeedKmh(pos, impliedSpeedKmh);
+    final clearMovement = distance >= movementThreshold &&
+        impliedSpeedKmh >= _minReliableSpeedKmh &&
+        impliedSpeedKmh <= _maxAcceptedJumpSpeedKmh;
+    final warmupReady = _updateGpsWarmupState(sampledAt, clearMovement);
+    final displaySpeedKmh =
+        warmupReady ? _smoothDisplaySpeed(targetSpeedKmh, sampledAt) : 0.0;
+
+    setState(() => _speedKmh = displaySpeedKmh);
+
+    if (!warmupReady) {
+      setState(() {
+        _lastServerMsg =
+            'Mengunci GPS awal (${_gpsWarmupSampleCount.clamp(1, _gpsWarmupMinSamples)}/$_gpsWarmupMinSamples)';
+      });
+      if (distance < movementThreshold) {
+        _sendStationaryPingIfDue(previous, pos);
+      }
+      return;
+    }
 
     if (distance < movementThreshold) {
       setState(() {
-        _speedKmh = 0;
+        if (displaySpeedKmh < _minReliableSpeedKmh) {
+          _speedKmh = 0;
+        }
         _lastServerMsg =
             'GPS stabil: perpindahan ${distance.toStringAsFixed(1)} m dianggap diam';
       });
@@ -411,10 +458,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return;
     }
 
-    final speedKmh = _displaySpeedKmh(pos, impliedSpeedKmh);
     _acceptRealGpsPoint(
       pos,
-      speedKmh: speedKmh,
+      sampledAt: sampledAt,
+      speedKmh: displaySpeedKmh,
+      serverSpeedKmh: targetSpeedKmh,
       message: 'GPS valid, pergerakan ${distance.toStringAsFixed(1)} m.',
     );
   }
@@ -436,6 +484,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _positionSub = null;
     _realGpsRefreshTimer?.cancel();
     _realGpsRefreshTimer = null;
+    _pendingLocationUpdate = null;
   }
 
   void _startHeartbeat() {
@@ -575,16 +624,116 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _sendLocation(pos);
   }
 
-  double _displaySpeedKmh(Position pos, double impliedSpeedKmh) {
+  double _targetDisplaySpeedKmh(Position pos, double impliedSpeedKmh) {
     final gpsSpeedKmh =
         pos.speed.isFinite && pos.speed > 0 ? pos.speed * 3.6 : 0.0;
+    final gpsReliable = gpsSpeedKmh >= _minReliableSpeedKmh &&
+        gpsSpeedKmh <= _maxAcceptedJumpSpeedKmh;
+    final impliedReliable = impliedSpeedKmh >= _minReliableSpeedKmh &&
+        impliedSpeedKmh <= _maxAcceptedJumpSpeedKmh;
 
-    if (gpsSpeedKmh >= _minReliableSpeedKmh &&
-        gpsSpeedKmh <= _maxAcceptedJumpSpeedKmh) {
+    if (gpsReliable && impliedReliable) {
+      final delta = (gpsSpeedKmh - impliedSpeedKmh).abs();
+      if (delta <= 10) {
+        return (gpsSpeedKmh * .65) + (impliedSpeedKmh * .35);
+      }
       return gpsSpeedKmh;
     }
 
-    return impliedSpeedKmh >= _minReliableSpeedKmh ? impliedSpeedKmh : 0;
+    if (gpsReliable) return gpsSpeedKmh;
+    if (impliedReliable) return impliedSpeedKmh;
+    return 0;
+  }
+
+  double _smoothDisplaySpeed(double targetSpeedKmh, DateTime sampledAt) {
+    final target = targetSpeedKmh < _minReliableSpeedKmh ? 0.0 : targetSpeedKmh;
+    final previous = _smoothedSpeedKmh;
+    final lastSampleAt = _lastSpeedSampleAt;
+    final seconds = lastSampleAt == null
+        ? GpsService.trackingInterval.inMilliseconds /
+            Duration.millisecondsPerSecond
+        : math.max(
+            sampledAt.difference(lastSampleAt).inMilliseconds /
+                Duration.millisecondsPerSecond,
+            .2,
+          );
+    final alpha = target >= previous ? .55 : .72;
+    final blended = previous + ((target - previous) * alpha);
+    final maxDelta = (target >= previous
+            ? _speedRiseLimitKmhPerSecond
+            : _speedFallLimitKmhPerSecond) *
+        seconds;
+    final limited = previous + (blended - previous).clamp(-maxDelta, maxDelta);
+    final next = limited < .8 ? 0.0 : limited;
+
+    _smoothedSpeedKmh = next;
+    _lastSpeedSampleAt = sampledAt;
+
+    return next;
+  }
+
+  void _startGpsWarmupIfNeeded(DateTime sampledAt) {
+    _gpsWarmupStartedAt ??= sampledAt;
+  }
+
+  bool _updateGpsWarmupState(DateTime sampledAt, bool clearMovement) {
+    if (_gpsWarmupComplete) return true;
+
+    if (clearMovement && _gpsWarmupSampleCount >= 2) {
+      _gpsWarmupComplete = true;
+      return true;
+    }
+
+    final startedAt = _gpsWarmupStartedAt ?? sampledAt;
+    final enoughSamples = _gpsWarmupSampleCount >= _gpsWarmupMinSamples;
+    final enoughTime = sampledAt.difference(startedAt) >= _gpsWarmupDuration;
+
+    if (enoughSamples && enoughTime) {
+      _gpsWarmupComplete = true;
+      return true;
+    }
+
+    return false;
+  }
+
+  void _resetSpeedSmoothing() {
+    _smoothedSpeedKmh = 0;
+    _lastSpeedSampleAt = null;
+  }
+
+  void _resetRealtimeTrackingState() {
+    _routePoints.clear();
+    _lastAcceptedGpsPoint = null;
+    _pendingLocationUpdate = null;
+    _lastStationarySentAt = null;
+    _lastServerRecordedAt = null;
+    _gpsWarmupStartedAt = null;
+    _gpsWarmupSampleCount = 0;
+    _gpsWarmupComplete = false;
+    _resetSpeedSmoothing();
+    _speedKmh = 0;
+  }
+
+  DateTime _effectiveGpsSampleTime(Position pos) {
+    final now = DateTime.now();
+    final gpsTime = pos.timestamp.toLocal();
+    final tooOld = now.difference(gpsTime).abs() > const Duration(seconds: 10);
+
+    if (tooOld || gpsTime.isAfter(now.add(const Duration(seconds: 2)))) {
+      return now;
+    }
+
+    return gpsTime;
+  }
+
+  DateTime _nextServerRecordedAt(DateTime candidate) {
+    final last = _lastServerRecordedAt;
+    if (last != null && !candidate.isAfter(last)) {
+      candidate = last.add(const Duration(milliseconds: 1));
+    }
+
+    _lastServerRecordedAt = candidate;
+    return candidate;
   }
 
   double _movementThresholdMeters(Position pos, _RoutePoint previous) {
@@ -599,7 +748,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _acceptRealGpsPoint(
     Position pos, {
+    required DateTime sampledAt,
     required double speedKmh,
+    required double serverSpeedKmh,
     required String message,
   }) {
     final point = _RoutePoint(
@@ -607,7 +758,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       longitude: pos.longitude,
       accuracyMeters: pos.accuracy,
       source: 'Real GPS',
-      recordedAt: pos.timestamp.toLocal(),
+      recordedAt: sampledAt,
     );
 
     _lastAcceptedGpsPoint = point;
@@ -624,7 +775,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       );
     });
 
-    _sendLocation(pos, speedKmh: speedKmh);
+    _sendLocation(pos, speedKmh: serverSpeedKmh);
   }
 
   void _sendStationaryPingIfDue(_RoutePoint stablePoint, Position sample) {
@@ -657,8 +808,24 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     );
   }
 
-  Future<void> _sendLocation(Position pos, {double? speedKmh}) async {
-    if (_sending) return;
+  Future<void> _sendLocation(
+    Position pos, {
+    double? speedKmh,
+    DateTime? recordedAt,
+  }) async {
+    final effectiveRecordedAt = _nextServerRecordedAt(
+      recordedAt ?? _effectiveGpsSampleTime(pos),
+    );
+
+    if (_sending) {
+      _pendingLocationUpdate = _PendingLocationUpdate(
+        position: pos,
+        speedKmh: speedKmh,
+        recordedAt: effectiveRecordedAt,
+      );
+      return;
+    }
+
     setState(() => _sending = true);
     try {
       final res = await widget.api.sendLocationUpdate(
@@ -667,7 +834,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         speedKmh: speedKmh ?? (pos.speed * 3.6),
         accuracyMeters: pos.accuracy,
         networkType: _networkType,
-        recordedAt: pos.timestamp.toLocal(),
+        recordedAt: effectiveRecordedAt,
       );
       if (mounted) {
         setState(() {
@@ -680,6 +847,17 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       if (mounted) setState(() => _lastServerMsg = 'Error: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
+      final pending = _pendingLocationUpdate;
+      if (pending != null && mounted) {
+        _pendingLocationUpdate = null;
+        unawaited(
+          _sendLocation(
+            pending.position,
+            speedKmh: pending.speedKmh,
+            recordedAt: pending.recordedAt,
+          ),
+        );
+      }
     }
   }
 
@@ -908,22 +1086,39 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 borderRadius: BorderRadius.circular(32),
                 border: Border.all(color: const Color(0xFF334155)),
               ),
-              child: Row(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(
-                    (_speedKmh ?? rental.currentSpeedKmh ?? 0.0)
-                        .toStringAsFixed(1),
-                    style: const TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        (_speedKmh ?? rental.currentSpeedKmh ?? 0.0)
+                            .toStringAsFixed(1),
+                        style: const TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('km/h',
+                          style: TextStyle(
+                              fontSize: 18, color: Color(0xFF9CA3AF))),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  const Text('km/h',
-                      style: TextStyle(fontSize: 18, color: Color(0xFF9CA3AF))),
+                  if (_isGpsWarmupActive) ...[
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Mengunci GPS',
+                      style: TextStyle(
+                        color: Color(0xFFE2E8F0),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1641,6 +1836,18 @@ class _RoutePoint {
   final double longitude;
   final double accuracyMeters;
   final String source;
+  final DateTime recordedAt;
+}
+
+class _PendingLocationUpdate {
+  const _PendingLocationUpdate({
+    required this.position,
+    required this.recordedAt,
+    this.speedKmh,
+  });
+
+  final Position position;
+  final double? speedKmh;
   final DateTime recordedAt;
 }
 
