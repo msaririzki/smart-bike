@@ -17,6 +17,7 @@
         header .header-left { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
         nav { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
         .nav-item { display: flex; align-items: center; gap: 8px; color: #ccfbf1; padding: 8px 12px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px; transition: all 0.2s ease; cursor: pointer; }
+        button.nav-item { background: transparent; border: none; font-family: inherit; width: 100%; text-align: left; }
         .nav-item:hover, .nav-item.active { background: #115e59; color: white; box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); }
         .nav-dropdown { position: relative; }
         .dropdown-menu { display: none; position: absolute; top: 100%; right: 0; background: white; min-width: 220px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding: 8px; z-index: 50; flex-direction: column; gap: 4px; margin-top: 8px; }
@@ -65,7 +66,7 @@
 
             .nav-dropdown:hover .dropdown-menu { display: none; }
             .dropdown-menu { position: static; box-shadow: none; background: transparent; padding: 0 0 0 16px; margin-top: 4px; display: none; border-left: 2px solid #e2e8f0; margin-left: 16px; border-radius: 0; }
-            .dropdown-menu.open { display: flex; }
+            .dropdown-menu.open { display: flex !important; }
             .dropdown-menu a { color: #475569; padding: 10px 12px; }
             .dropdown-menu a:hover, .dropdown-menu a.active { background: rgba(15,118,110,0.08); color: #0f766e; }
 
@@ -191,7 +192,16 @@
         }
         .muted { color: #667085; }
         .error { color: #b42318; }
-        .success { color: #027a48; }
+        /* Custom Pagination Styles */
+        .pagination { display: flex; padding-left: 0; list-style: none; justify-content: center; margin-top: 1.5rem; margin-bottom: 0; gap: 0.25rem; }
+        .page-link { position: relative; display: flex; align-items: center; justify-content: center; padding: 0.5rem 0.75rem; min-width: 36px; height: 36px; color: #0f766e; text-decoration: none; background-color: #fff; border: 1px solid #e2e8f0; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; transition: all 0.2s; }
+        .page-link:hover { z-index: 2; color: #0f172a; background-color: #f8fafc; border-color: #cbd5e1; }
+        .page-item.active .page-link { z-index: 3; color: #fff; background-color: #0f766e; border-color: #0f766e; }
+        .page-item.disabled .page-link { color: #94a3b8; pointer-events: none; background-color: #f8fafc; border-color: #e2e8f0; }
+        .page-link svg { width: 1.25rem; height: 1.25rem; }
+        .d-flex.justify-content-between.flex-fill { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 1rem; margin-top: 1.5rem; }
+        .d-none.flex-sm-fill.d-sm-flex.align-items-sm-center.justify-content-sm-between { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        p.small.text-muted { margin: 0; font-size: 0.875rem; color: #64748b; }
     </style>
 </head>
 <body>
@@ -236,7 +246,7 @@
                 $isAnalyticActive = request()->routeIs('admin.reports.*') || request()->routeIs('admin.alerts.*');
             @endphp
             <div class="nav-dropdown">
-                <button class="nav-item {{ $isAnalyticActive ? 'active' : '' }}" id="analytic-btn" style="background:transparent; border:none; width:100%; text-align:left;">
+                <button class="nav-item {{ $isAnalyticActive ? 'active' : '' }}" id="analytic-btn">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Analitik
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto;"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </button>
@@ -255,7 +265,7 @@
                 $isManagementActive = request()->routeIs('admin.bikes.*') || request()->routeIs('admin.users.*') || request()->routeIs('admin.settings.*');
             @endphp
             <div class="nav-dropdown">
-                <button class="nav-item {{ $isManagementActive ? 'active' : '' }}" id="management-btn" style="background:transparent; border:none; width:100%; text-align:left;">
+                <button class="nav-item {{ $isManagementActive ? 'active' : '' }}" id="management-btn">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Manajemen
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto;"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </button>
