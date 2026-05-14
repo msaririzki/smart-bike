@@ -159,10 +159,10 @@ class _HomeScreenState extends State<HomeScreen> {
             api: widget.api,
             onOpenScanner: _openQrScanner,
           ),
-          const _ComingSoonPage(
-            icon: Icons.map_outlined,
-            title: 'Peta sepeda',
-            message: 'Tampilan peta akan aktif bersama fitur scan to rent.',
+          MapTestScreen(
+            api: widget.api,
+            showScaffold: false,
+            bottomPadding: 92,
           ),
           const _ComingSoonPage(
             icon: Icons.qr_code_scanner_rounded,
@@ -182,9 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _selectedIndex,
         onTap: (index) {
           if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => MapTestScreen(api: widget.api)),
-            );
+            setState(() => _selectedIndex = index);
           } else if (index == 2) {
             _openQrScanner();
           } else {
@@ -328,7 +326,9 @@ class _DashboardPageState extends State<_DashboardPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryLight),
+      );
     }
 
     return RefreshIndicator(
