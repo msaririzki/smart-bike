@@ -58,13 +58,13 @@ class RentalController extends Controller
 
     public function show(Request $request, Rental $rental): JsonResponse
     {
-        if ($rental->user_id !== $request->user()->id) {
-            abort(403);
-        }
+        abort_unless((int) $rental->user_id === (int) $request->user()->id, 404);
 
         return response()->json([
-            'data' => $rental->load(['bike', 'locationPoints' => function($query) {
-                $query->orderBy('recorded_at', 'asc');
+            'data' => $rental->load(['bike', 'locationPoints' => function ($query): void {
+                $query
+                    ->where('is_valid_movement', true)
+                    ->orderBy('recorded_at', 'asc');
             }]),
         ]);
     }
@@ -85,9 +85,7 @@ class RentalController extends Controller
 
     public function destroy(Request $request, Rental $rental): JsonResponse
     {
-        if ($rental->user_id !== $request->user()->id) {
-            abort(403, 'Anda tidak berhak menghapus riwayat ini.');
-        }
+        abort_unless((int) $rental->user_id === (int) $request->user()->id, 404);
 
         if (in_array($rental->status, [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING])) {
             abort(400, 'Rental aktif tidak dapat dihapus.');

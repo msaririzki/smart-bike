@@ -27,9 +27,9 @@ class Rental {
 
   double get totalDistanceKilometers => totalDistanceMeters / 1000;
 
-  double? get latitude => bike?.latitude ?? latestLocationPoint?.latitude;
+  double? get latitude => latestLocationPoint?.latitude ?? bike?.latitude;
 
-  double? get longitude => bike?.longitude ?? latestLocationPoint?.longitude;
+  double? get longitude => latestLocationPoint?.longitude ?? bike?.longitude;
 
   DateTime? get lastLocationUpdateAt => latestLocationPoint?.recordedAt;
 
@@ -40,9 +40,7 @@ class Rental {
   factory Rental.fromJson(Map<String, dynamic> json) {
     final latestPoint = json['latest_location_point'];
     final parsedLatestPoint = latestPoint is Map
-        ? RentalLocationPoint.fromJson(
-            Map<String, dynamic>.from(latestPoint),
-          )
+        ? RentalLocationPoint.fromJson(Map<String, dynamic>.from(latestPoint))
         : null;
 
     return Rental(

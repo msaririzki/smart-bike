@@ -20,6 +20,9 @@ class LocationAccessResult {
 }
 
 class GpsService {
+  static const trackingInterval = Duration(seconds: 2);
+  static const trackingDistanceFilterMeters = 1;
+
   /// Pastikan GPS aktif dan izin lokasi foreground sudah diberikan.
   Future<LocationAccessResult> ensureLocationAccess({
     bool requestIfDenied = true,
@@ -53,23 +56,30 @@ class GpsService {
       final access = await ensureLocationAccess(requestIfDenied: false);
       if (!access.granted) return null;
 
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-        ),
-      );
+      final settings = defaultTargetPlatform == TargetPlatform.android
+          ? AndroidSettings(
+              accuracy: LocationAccuracy.bestForNavigation,
+              intervalDuration: trackingInterval,
+              timeLimit: const Duration(seconds: 10),
+            )
+          : const LocationSettings(
+              accuracy: LocationAccuracy.bestForNavigation,
+              timeLimit: Duration(seconds: 10),
+            );
+
+      return await Geolocator.getCurrentPosition(locationSettings: settings);
     } catch (_) {
       return null;
     }
   }
 
-  /// Stream posisi real-time saat perangkat bergerak minimal 1 meter.
+  /// Stream posisi real-time untuk dashboard sepeda.
   Stream<Position> positionStream() {
     final locationSettings = defaultTargetPlatform == TargetPlatform.android
         ? AndroidSettings(
             accuracy: LocationAccuracy.bestForNavigation,
-            distanceFilter: 1,
-            intervalDuration: const Duration(seconds: 5),
+            distanceFilter: trackingDistanceFilterMeters,
+            intervalDuration: trackingInterval,
             foregroundNotificationConfig: const ForegroundNotificationConfig(
               notificationTitle: 'Smart Bike sedang mengirim lokasi',
               notificationText:
@@ -82,7 +92,7 @@ class GpsService {
           )
         : const LocationSettings(
             accuracy: LocationAccuracy.bestForNavigation,
-            distanceFilter: 1,
+            distanceFilter: trackingDistanceFilterMeters,
           );
 
     return Geolocator.getPositionStream(

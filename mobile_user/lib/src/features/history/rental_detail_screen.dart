@@ -5,10 +5,15 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import '../../models/rental_history.dart';
 import '../../services/api_client.dart';
+import '../../theme/app_colors.dart';
 import '../rental/map_widget.dart';
 
 class RentalDetailScreen extends StatefulWidget {
-  const RentalDetailScreen({required this.history, required this.api, super.key});
+  const RentalDetailScreen({
+    required this.history,
+    required this.api,
+    super.key,
+  });
 
   final RentalHistory history;
   final ApiClient api;
@@ -20,6 +25,7 @@ class RentalDetailScreen extends StatefulWidget {
 class _RentalDetailScreenState extends State<RentalDetailScreen> {
   late RentalHistory _currentHistory;
   bool _isLoading = true;
+  String? _detailError;
 
   @override
   void initState() {
@@ -35,11 +41,15 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
         setState(() {
           _currentHistory = RentalHistory.fromJson(data);
           _isLoading = false;
+          _detailError = null;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _detailError = 'Detail lengkap perjalanan belum bisa dimuat.';
+        });
       }
     }
   }
@@ -56,10 +66,10 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
     final timeFormat = DateFormat('HH:mm');
 
     return Scaffold(
-      backgroundColor: const Color(0xfff7fbf8),
+      backgroundColor: const Color.fromARGB(255, 253, 255, 254),
       appBar: AppBar(
         title: const Text('Detail Perjalanan'),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color.fromARGB(255, 253, 255, 254),
         foregroundColor: const Color(0xff073f3a),
         elevation: 0,
         actions: [
@@ -70,25 +80,40 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _BikeHeader(history: history, dateFormat: dateFormat),
-            const SizedBox(height: 24),
-            _RentalRouteMap(history: history),
-            const SizedBox(height: 24),
-            _RideMetricsGrid(history: history),
-            const SizedBox(height: 24),
-            _TripTimeline(history: history, timeFormat: timeFormat),
-            const SizedBox(height: 24),
-            _BillingDetailCard(history: history, currency: currency),
-            const SizedBox(height: 24),
-            _GreenImpactCard(history: history),
-            const SizedBox(height: 32),
-          ],
-        ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_detailError != null) ...[
+                  _InlineErrorBanner(message: _detailError!),
+                  const SizedBox(height: 16),
+                ],
+                _BikeHeader(history: history, dateFormat: dateFormat),
+                const SizedBox(height: 24),
+                _RentalRouteMap(history: history),
+                const SizedBox(height: 24),
+                _RideMetricsGrid(history: history),
+                const SizedBox(height: 24),
+                _TripTimeline(history: history, timeFormat: timeFormat),
+                const SizedBox(height: 24),
+                _BillingDetailCard(history: history, currency: currency),
+                const SizedBox(height: 24),
+                _GreenImpactCard(history: history),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+          if (_isLoading)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+        ],
       ),
     );
   }
@@ -99,6 +124,45 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _ShareSheet(history: _currentHistory),
+    );
+  }
+}
+
+class _InlineErrorBanner extends StatelessWidget {
+  const _InlineErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xfffff7ed),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xffffedd5)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            color: Color(0xffc2410c),
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Color(0xff9a3412),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -120,17 +184,28 @@ class _RentalRouteMap extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xfff1f5f3),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xffe3ebe7), style: BorderStyle.none),
+          border: Border.all(
+            color: const Color(0xffe3ebe7),
+            style: BorderStyle.none,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.map_outlined, color: const Color(0xff23866f).withValues(alpha: 0.3), size: 48),
+            Icon(
+              Icons.map_outlined,
+              color: const Color(0xff23866f).withValues(alpha: 0.3),
+              size: 48,
+            ),
             const SizedBox(height: 12),
             Text(
               'Peta rute tidak tersedia\n(Total jarak: ${history.totalDistanceKilometers.toStringAsFixed(1)} km)',
               textAlign: TextAlign.center,
-              style: TextStyle(color: const Color(0xff23866f).withValues(alpha: 0.5), fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                color: const Color(0xff23866f).withValues(alpha: 0.5),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -175,7 +250,11 @@ class _BikeHeader extends StatelessWidget {
             color: const Color(0xffe8f7f2),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Icon(Icons.pedal_bike, color: Color(0xff23866f), size: 32),
+          child: const Icon(
+            Icons.pedal_bike,
+            color: Color(0xff23866f),
+            size: 32,
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -184,11 +263,18 @@ class _BikeHeader extends StatelessWidget {
             children: [
               Text(
                 history.bike?.code ?? 'SMART BIKE',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xff073f3a)),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xff073f3a),
+                ),
               ),
               Text(
                 dateFormat.format(history.startedAt),
-                style: const TextStyle(color: Color(0xff8a9590), fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  color: Color(0xff8a9590),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -294,18 +380,30 @@ class _MetricItem extends StatelessWidget {
                 children: [
                   Text(
                     value,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xff073f3a)),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xff073f3a),
+                    ),
                   ),
                   const SizedBox(width: 2),
                   Text(
                     unit,
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xff8a9590)),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff8a9590),
+                    ),
                   ),
                 ],
               ),
               Text(
                 label,
-                style: const TextStyle(fontSize: 11, color: Color(0xff8a9590), fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xff8a9590),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -334,7 +432,11 @@ class _TripTimeline extends StatelessWidget {
         children: [
           const Text(
             'Timeline Perjalanan',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xff073f3a)),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xff073f3a),
+            ),
           ),
           const SizedBox(height: 20),
           _TimelineRow(
@@ -349,7 +451,9 @@ class _TripTimeline extends StatelessWidget {
             color: const Color(0xffe3ebe7),
           ),
           _TimelineRow(
-            time: history.endedAt != null ? timeFormat.format(history.endedAt!) : '-',
+            time: history.endedAt != null
+                ? timeFormat.format(history.endedAt!)
+                : '-',
             label: 'Selesai Berkendara',
             isStart: false,
           ),
@@ -360,7 +464,11 @@ class _TripTimeline extends StatelessWidget {
 }
 
 class _TimelineRow extends StatelessWidget {
-  const _TimelineRow({required this.time, required this.label, required this.isStart});
+  const _TimelineRow({
+    required this.time,
+    required this.label,
+    required this.isStart,
+  });
   final String time;
   final String label;
   final bool isStart;
@@ -373,10 +481,14 @@ class _TimelineRow extends StatelessWidget {
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: isStart ? const Color(0xff269276).withValues(alpha: 0.1) : const Color(0xfff1f5f9),
+            color: isStart
+                ? AppColors.primaryLight.withValues(alpha: 0.1)
+                : const Color(0xfff1f5f9),
             shape: BoxShape.circle,
             border: Border.all(
-              color: isStart ? const Color(0xff269276) : const Color(0xffcbd5e1),
+              color: isStart
+                  ? AppColors.primaryLight
+                  : const Color(0xffcbd5e1),
               width: 2,
             ),
           ),
@@ -385,7 +497,9 @@ class _TimelineRow extends StatelessWidget {
               width: 8,
               height: 8,
               decoration: BoxDecoration(
-                color: isStart ? const Color(0xff269276) : const Color(0xffcbd5e1),
+                color: isStart
+                    ? AppColors.primaryLight
+                    : const Color(0xffcbd5e1),
                 shape: BoxShape.circle,
               ),
             ),
@@ -397,7 +511,11 @@ class _TimelineRow extends StatelessWidget {
           children: [
             Text(
               time,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xff073f3a)),
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                color: Color(0xff073f3a),
+              ),
             ),
             Text(
               label,
@@ -430,23 +548,41 @@ class _BillingDetailCard extends StatelessWidget {
         children: [
           const Text(
             'Rincian Biaya',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xff073f3a)),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xff073f3a),
+            ),
           ),
           const Divider(height: 32),
-          _InfoRow(label: 'Biaya Jarak', value: currency.format(history.distanceCost)),
+          _InfoRow(
+            label: 'Biaya Jarak',
+            value: currency.format(history.distanceCost),
+          ),
           const SizedBox(height: 12),
-          _InfoRow(label: 'Biaya Idle', value: currency.format(history.idleCost)),
+          _InfoRow(
+            label: 'Biaya Idle',
+            value: currency.format(history.idleCost),
+          ),
           const Divider(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 'Total Biaya',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xff073f3a)),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xff073f3a),
+                ),
               ),
               Text(
                 currency.format(history.totalCost),
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xff269276)),
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primaryLight,
+                ),
               ),
             ],
           ),
@@ -488,13 +624,22 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCompleted = status == 'completed';
-    final color = isCompleted ? const Color(0xff23866f) : const Color(0xffd14148);
-    final bgColor = isCompleted ? const Color(0xffe8f7f2) : const Color(0xffffecef);
+    final color = isCompleted
+        ? const Color(0xff23866f)
+        : const Color(0xffd14148);
+    final bgColor = isCompleted
+        ? const Color(0xffe8f7f2)
+        : const Color(0xffffecef);
 
     return GestureDetector(
-      onTap: status.toLowerCase() == 'active' || status.toLowerCase() == 'idle_warning' || status.toLowerCase() == 'idle_billing' ? () {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      } : null,
+      onTap:
+          status.toLowerCase() == 'active' ||
+              status.toLowerCase() == 'idle_warning' ||
+              status.toLowerCase() == 'idle_billing'
+          ? () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
@@ -522,7 +667,7 @@ class _GreenImpactCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final co2Gram = history.totalDistanceKilometers * 120;
-    final co2Text = co2Gram >= 1000 
+    final co2Text = co2Gram >= 1000
         ? '${(co2Gram / 1000).toStringAsFixed(1)} kg'
         : '${co2Gram.toStringAsFixed(0)} g';
 
@@ -577,7 +722,9 @@ class _ShareSheet extends StatelessWidget {
     final dateFormat = DateFormat('EEEE, d MMM yyyy', 'id_ID');
 
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -587,11 +734,28 @@ class _ShareSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const SizedBox(height: 24),
-            const Text('Highlight Perjalanan', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xff073f3a))),
+            const Text(
+              'Highlight Perjalanan',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: Color(0xff073f3a),
+              ),
+            ),
             const SizedBox(height: 8),
-            const Text('Desain premium siap dibagikan!', style: TextStyle(color: Color(0xff8a9590))),
+            const Text(
+              'Desain premium siap dibagikan!',
+              style: TextStyle(color: Color(0xff8a9590)),
+            ),
             const SizedBox(height: 32),
             // THE CARD (Vertical Poster Style)
             Container(
@@ -615,26 +779,18 @@ class _ShareSheet extends StatelessWidget {
                       height: 180,
                       width: double.infinity,
                       decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xff064e3b), Color(0xff065f46), Color(0xff047857)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: AppColors.primaryLight,
                       ),
                     ),
                     // DECORATION: Abstract Waves
                     Positioned.fill(
-                      child: CustomPaint(
-                        painter: _MeshWavePainter(),
-                      ),
+                      child: CustomPaint(painter: _MeshWavePainter()),
                     ),
                     // DECORATION: Dot Pattern
                     Positioned.fill(
                       child: Opacity(
                         opacity: 0.05,
-                        child: CustomPaint(
-                          painter: _DotPatternPainter(),
-                        ),
+                        child: CustomPaint(painter: _DotPatternPainter()),
                       ),
                     ),
                     // DECORATION: Large Bike Icon
@@ -643,7 +799,11 @@ class _ShareSheet extends StatelessWidget {
                       right: -40,
                       child: Opacity(
                         opacity: 0.08,
-                        child: Icon(Icons.pedal_bike, size: 220, color: Colors.white),
+                        child: Icon(
+                          Icons.pedal_bike,
+                          size: 220,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     // CONTENT
@@ -661,34 +821,72 @@ class _ShareSheet extends StatelessWidget {
                                   children: [
                                     Text(
                                       'SMART BIKE',
-                                      style: TextStyle(color: Color(0xff4ade80), letterSpacing: 2, fontSize: 8, fontWeight: FontWeight.w900),
+                                      style: TextStyle(
+                                        color: Color(0xff4ade80),
+                                        letterSpacing: 2,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
                                     Text(
                                       'HIGHLIGHT',
-                                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
                                   ],
                                 ),
-                                const Icon(Icons.eco_rounded, color: Color(0xff4ade80), size: 24),
+                                const Icon(
+                                  Icons.eco_rounded,
+                                  color: Color(0xff4ade80),
+                                  size: 24,
+                                ),
                               ],
                             ),
                             const Spacer(),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _CompactStat(label: 'JARAK', value: history.totalDistanceKilometers.toStringAsFixed(1), unit: 'km'),
-                                _CompactStat(label: 'DURASI', value: history.durationMinutes.toString(), unit: 'min'),
-                                _CompactStat(label: 'KALORI', value: history.caloriesBurned.toStringAsFixed(0), unit: 'kkal'),
+                                _CompactStat(
+                                  label: 'JARAK',
+                                  value: history.totalDistanceKilometers
+                                      .toStringAsFixed(1),
+                                  unit: 'km',
+                                ),
+                                _CompactStat(
+                                  label: 'DURASI',
+                                  value: history.durationMinutes.toString(),
+                                  unit: 'min',
+                                ),
+                                _CompactStat(
+                                  label: 'KALORI',
+                                  value: history.caloriesBurned.toStringAsFixed(
+                                    0,
+                                  ),
+                                  unit: 'kkal',
+                                ),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
                                       dateFormat.format(history.startedAt),
-                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 8, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     Text(
                                       history.bike?.code ?? 'UNIT-01',
-                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -702,13 +900,14 @@ class _ShareSheet extends StatelessWidget {
                 ),
               ),
             ),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                final summary = '''
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  final summary =
+                      '''
 🚲 *Ringkasan Smart Bike* 🚲
 
 Sepeda: ${history.bike?.code ?? 'N/A'}
@@ -719,57 +918,63 @@ Total Biaya: Rp${NumberFormat('#,###', 'id_ID').format(history.totalCost)}
 
 #SmartBike #EcoFriendly #Cycling
 ''';
-                Clipboard.setData(ClipboardData(text: summary));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ringkasan perjalanan disalin ke clipboard!'),
-                    backgroundColor: Color(0xff269276),
+                  Clipboard.setData(ClipboardData(text: summary));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Ringkasan perjalanan disalin ke clipboard!',
+                      ),
+                      backgroundColor: Color(0xff269276),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy_rounded, color: Colors.white),
+                label: const Text(
+                  'Salin Ringkasan',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
-                );
-              },
-              icon: const Icon(Icons.copy_rounded, color: Colors.white),
-              label: const Text(
-                'Salin Ringkasan',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
                 ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xff269276),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Tutup',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xff64748b),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xff269276),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
                 ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Tutup',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xff64748b),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-     ),
     );
   }
 }
 
 class _CompactStat extends StatelessWidget {
-  const _CompactStat({required this.label, required this.value, required this.unit});
+  const _CompactStat({
+    required this.label,
+    required this.value,
+    required this.unit,
+  });
   final String label, value, unit;
 
   @override
@@ -781,12 +986,33 @@ class _CompactStat extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             const SizedBox(width: 2),
-            Text(unit, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 8)),
+            Text(
+              unit,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 8,
+              ),
+            ),
           ],
         ),
-        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 7, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.4),
+            fontSize: 7,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+        ),
       ],
     );
   }
@@ -804,22 +1030,29 @@ class _MeshWavePainter extends CustomPainter {
     for (int i = 0; i < 5; i++) {
       path.moveTo(0, size.height * (0.2 + i * 0.15));
       path.quadraticBezierTo(
-        size.width * 0.5, 
-        size.height * (0.1 + i * 0.15), 
-        size.width, 
-        size.height * (0.3 + i * 0.15)
+        size.width * 0.5,
+        size.height * (0.1 + i * 0.15),
+        size.width,
+        size.height * (0.3 + i * 0.15),
       );
     }
     canvas.drawPath(path, paint);
-    
+
     // Abstract circles
-    canvas.drawCircle(Offset(size.width * 0.8, size.height * 0.2), 100, paint..style = PaintingStyle.fill..color = Colors.white.withValues(alpha: 0.02));
+    canvas.drawCircle(
+      Offset(size.width * 0.8, size.height * 0.2),
+      100,
+      paint
+        ..style = PaintingStyle.fill
+        ..color = Colors.white.withValues(alpha: 0.02),
+    );
     canvas.drawCircle(Offset(size.width * 0.2, size.height * 0.8), 150, paint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
 class _DotPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

@@ -12,7 +12,10 @@ use Illuminate\Validation\ValidationException;
 
 class BikeQrRentalService
 {
-    public function __construct(private readonly RentalService $rentals) {}
+    public function __construct(
+        private readonly RentalService $rentals,
+        private readonly BikeStatusService $bikeStatus,
+    ) {}
 
     /**
      * Generate a new QR rental token for a device's assigned bike.
@@ -29,12 +32,6 @@ class BikeQrRentalService
             ]);
         }
 
-        if ($bike->status !== 'available') {
-            throw ValidationException::withMessages([
-                'bike' => 'Sepeda tidak tersedia untuk disewa (status: ' . $bike->status . ').',
-            ]);
-        }
-
         // Check if bike has an active rental
         $hasActiveRental = Rental::query()
             ->where('bike_id', $bike->id)
@@ -44,6 +41,21 @@ class BikeQrRentalService
         if ($hasActiveRental) {
             throw ValidationException::withMessages([
                 'bike' => 'Sepeda sedang disewa, tidak bisa membuat QR.',
+            ]);
+        }
+
+        if ($bike->status === 'offline') {
+            $bike->update([
+                'status' => $this->bikeStatus->onlineOperationalStatus($bike),
+                'is_online' => true,
+                'last_seen_at' => now(),
+            ]);
+            $bike->refresh();
+        }
+
+        if ($bike->status !== 'available') {
+            throw ValidationException::withMessages([
+                'bike' => 'Sepeda tidak tersedia untuk disewa (status: ' . $bike->status . ').',
             ]);
         }
 

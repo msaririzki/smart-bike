@@ -95,8 +95,9 @@ class ApiClient {
   Future<List<RentalLocationPoint>> rentalLocationPoints(int rentalId) async {
     final json = await _get('/rentals/$rentalId/location-points');
     return (json['data'] as List<dynamic>)
-        .map((item) =>
-            RentalLocationPoint.fromJson(item as Map<String, dynamic>))
+        .map(
+          (item) => RentalLocationPoint.fromJson(item as Map<String, dynamic>),
+        )
         .toList();
   }
 

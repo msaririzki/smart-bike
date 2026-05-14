@@ -81,14 +81,12 @@ class RentalService
         }
 
         $rental->update([
-            'status' => Rental::STATUS_IDLE_BILLING,
-            'idle_started_at' => now(),
-            'last_idle_billing_at' => now(),
+            'idle_warning_at' => now(),
         ]);
 
         $rental->idleEvents()->create([
-            'event_type' => 'continue',
-            'description' => 'User memilih lanjut sewa saat idle warning.',
+            'event_type' => 'warning_acknowledged',
+            'description' => 'User memilih lanjut sewa saat idle warning. Grace period idle diulang.',
             'event_at' => now(),
         ]);
 

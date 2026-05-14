@@ -54,7 +54,7 @@ class AdminPagesTest extends TestCase
 
         $this->get('/admin')->assertOk()->assertSee('Sepeda Tersedia');
         $this->get('/admin/dashboard/map-data')->assertOk()->assertJsonPath('data.0.code', 'BIKE-ADMIN-1');
-        $this->get('/admin/rentals?status=running')->assertOk()->assertSee('Rental Aktif');
+        $this->get('/admin/rentals?status=running')->assertOk()->assertSee('rental berjalan');
         $this->get("/admin/rentals/{$rental->id}/route-map-data")->assertOk()->assertJsonPath('data.0.latitude', -8.583000);
         $this->get('/admin/users')->assertOk()->assertSee('Manajemen Pengguna');
         $this->get("/admin/users/{$user->id}")->assertOk()->assertSee('Histori Rental Pengguna');
@@ -84,6 +84,64 @@ class AdminPagesTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'role' => 'admin',
+        ]);
+    }
+
+    public function test_admin_can_create_bike_with_device_login_account(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin',
+            'email' => 'admin@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
+
+        $response = $this->actingAs($admin)->post('/admin/bikes', [
+            'code' => 'BIKE-FAST-1',
+            'name' => 'Sepeda Cepat 1',
+            'status' => 'available',
+            'current_latitude' => -8.583,
+            'current_longitude' => 116.116,
+            'battery_percent' => 100,
+            'create_device_account' => '1',
+            'device_email' => 'device-fast-1@example.test',
+            'device_password' => 'password123',
+        ]);
+
+        $response
+            ->assertRedirect('/admin/bikes')
+            ->assertSessionHas('device_credentials.email', 'device-fast-1@example.test')
+            ->assertSessionHas('device_credentials.password', 'password123');
+
+        $device = User::query()->where('email', 'device-fast-1@example.test')->firstOrFail();
+
+        $this->assertSame('device', $device->role);
+        $this->assertDatabaseHas('bikes', [
+            'code' => 'BIKE-FAST-1',
+            'assigned_device_user_id' => $device->id,
+        ]);
+    }
+
+    public function test_new_bike_uses_ubg_defaults_when_location_and_battery_are_empty(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin',
+            'email' => 'admin@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
+
+        $this->actingAs($admin)->post('/admin/bikes', [
+            'code' => 'BIKE-UBG-1',
+            'name' => 'Sepeda UBG Default',
+            'status' => 'available',
+        ])->assertRedirect('/admin/bikes');
+
+        $this->assertDatabaseHas('bikes', [
+            'code' => 'BIKE-UBG-1',
+            'current_latitude' => -8.583000,
+            'current_longitude' => 116.116000,
+            'battery_percent' => 100,
         ]);
     }
 }

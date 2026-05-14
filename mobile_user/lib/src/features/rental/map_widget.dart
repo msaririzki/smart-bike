@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../models/bike.dart';
+
 enum MapType {
   standard('Standar'),
   satellite('Satelit'),
@@ -48,6 +50,8 @@ class MapWidget extends StatefulWidget {
     this.onSpotTap,
     this.bikeLabel,
     this.lastUpdateTime,
+    this.mapBikes = const [],
+    this.onMapBikeTap,
   });
 
   final double latitude;
@@ -77,6 +81,12 @@ class MapWidget extends StatefulWidget {
 
   /// Timestamp of the last GPS update from the bike device.
   final DateTime? lastUpdateTime;
+
+  /// Available bikes to show as markers on the map.
+  final List<Bike> mapBikes;
+
+  /// Callback when a bike marker is tapped.
+  final void Function(Bike bike)? onMapBikeTap;
 
   @override
   State<MapWidget> createState() => _MapWidgetState();
@@ -130,9 +140,12 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     );
     _bounceAnimation = TweenSequence<double>([
       TweenSequenceItem(
-          tween: Tween(begin: -30.0, end: 0.0)
-              .chain(CurveTween(curve: Curves.bounceOut)),
-          weight: 70),
+        tween: Tween(
+          begin: -30.0,
+          end: 0.0,
+        ).chain(CurveTween(curve: Curves.bounceOut)),
+        weight: 70,
+      ),
       TweenSequenceItem(tween: Tween(begin: 0.0, end: -4.0), weight: 15),
       TweenSequenceItem(tween: Tween(begin: -4.0, end: 0.0), weight: 15),
     ]).animate(_bounceController!);
@@ -154,8 +167,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
     _userPulseAnimation = Tween<double>(begin: 0.3, end: 0.08).animate(
-      CurvedAnimation(
-          parent: _userPulseController!, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _userPulseController!, curve: Curves.easeInOut),
     );
   }
 
@@ -178,8 +190,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 2000),
     );
     _routeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _routeAnimController!, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _routeAnimController!, curve: Curves.easeInOut),
     );
     _routeAnimController!.forward();
   }
@@ -220,8 +231,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     super.didUpdateWidget(old);
 
     // Smooth bike position transition
-    if (old.latitude != widget.latitude ||
-        old.longitude != widget.longitude) {
+    if (old.latitude != widget.latitude || old.longitude != widget.longitude) {
       final oldPos = LatLng(old.latitude, old.longitude);
       final newPos = LatLng(widget.latitude, widget.longitude);
       final dist = calculateDistance(oldPos, newPos);
@@ -345,6 +355,11 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     if (widget.userLatitude != null && widget.userLongitude != null) {
       points.add(LatLng(widget.userLatitude!, widget.userLongitude!));
     }
+    for (final bike in widget.mapBikes) {
+      if (bike.latitude != null && bike.longitude != null) {
+        points.add(LatLng(bike.latitude!, bike.longitude!));
+      }
+    }
     if (points.length < 2) return;
 
     final bounds = LatLngBounds.fromPoints(points);
@@ -360,10 +375,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
   Widget _buildMap(LatLng bikePos) {
     return FlutterMap(
       mapController: _mapController,
-      options: MapOptions(
-        initialCenter: bikePos,
-        initialZoom: 16,
-      ),
+      options: MapOptions(initialCenter: bikePos, initialZoom: 16),
       children: [
         _buildTileLayer(),
         if (widget.mapType == MapType.hybrid) _buildHybridLabelLayer(),
@@ -383,6 +395,8 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
           _buildUserMarker(),
         // Bike marker: only show when backend has real GPS data
         if (widget.bikeLabel != null) _buildBikeMarker(bikePos),
+        // Map bikes markers
+        if (widget.mapBikes.isNotEmpty) _buildMapBikeMarkers(),
       ],
     );
   }
@@ -456,8 +470,9 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       animation: _routeAnimation!,
       builder: (context, _) {
         final totalPoints = _animatedRoutePoints.length;
-        final visibleCount =
-            (_routeAnimation!.value * totalPoints).round().clamp(2, totalPoints);
+        final visibleCount = (_routeAnimation!.value * totalPoints)
+            .round()
+            .clamp(2, totalPoints);
         final visiblePoints = _animatedRoutePoints.sublist(0, visibleCount);
 
         return PolylineLayer(
@@ -466,8 +481,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
               points: visiblePoints,
               color: const Color(0xff3b82f6),
               strokeWidth: 5,
-              borderColor:
-                  const Color(0xff1d4ed8).withValues(alpha: 0.4),
+              borderColor: const Color(0xff1d4ed8).withValues(alpha: 0.4),
               borderStrokeWidth: 2,
             ),
           ],
@@ -482,12 +496,16 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       polylines: [
         Polyline(
           points: widget.routePoints,
-          color: widget.routeColor ??
+          color:
+              widget.routeColor ??
               (isSatellite ? const Color(0xff38bdf8) : const Color(0xff0d9488)),
           strokeWidth: 4,
-          borderColor: (widget.routeColor ??
-                  (isSatellite ? const Color(0xff0284c7) : const Color(0xff0f766e)))
-              .withValues(alpha: 0.3),
+          borderColor:
+              (widget.routeColor ??
+                      (isSatellite
+                          ? const Color(0xff0284c7)
+                          : const Color(0xff0f766e)))
+                  .withValues(alpha: 0.3),
           borderStrokeWidth: 2,
         ),
       ],
@@ -519,11 +537,13 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
-                child:
-                    const Icon(Icons.store, color: Colors.white, size: 16),
+                child: const Icon(Icons.store, color: Colors.white, size: 16),
               ),
-              const Icon(Icons.arrow_drop_down,
-                  color: Color(0xffef4444), size: 16),
+              const Icon(
+                Icons.arrow_drop_down,
+                color: Color(0xffef4444),
+                size: 16,
+              ),
             ],
           ),
         ),
@@ -542,8 +562,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              border:
-                  Border.all(color: const Color(0xff0f766e), width: 3),
+              border: Border.all(color: const Color(0xff0f766e), width: 3),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x33000000),
@@ -553,8 +572,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
               ],
             ),
             child: const Center(
-              child:
-                  Icon(Icons.flag, color: Color(0xff0f766e), size: 14),
+              child: Icon(Icons.flag, color: Color(0xff0f766e), size: 14),
             ),
           ),
         ),
@@ -622,8 +640,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     decoration: BoxDecoration(
                       color: const Color(0xff8b5cf6),
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: Colors.white, width: 2.5),
+                      border: Border.all(color: Colors.white, width: 2.5),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x44000000),
@@ -632,8 +649,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                         ),
                       ],
                     ),
-                    child:
-                        Icon(spot.icon, color: Colors.white, size: 18),
+                    child: Icon(spot.icon, color: Colors.white, size: 18),
                   ),
                   const Icon(
                     Icons.arrow_drop_down,
@@ -666,18 +682,12 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
 
   /// User's own location: blue pulsing dot
   Widget _buildUserMarker() {
-    final userPos =
-        LatLng(widget.userLatitude!, widget.userLongitude!);
+    final userPos = LatLng(widget.userLatitude!, widget.userLongitude!);
 
     if (_userPulseAnimation == null) {
       return MarkerLayer(
         markers: [
-          Marker(
-            point: userPos,
-            width: 24,
-            height: 24,
-            child: _buildUserDot(),
-          ),
+          Marker(point: userPos, width: 24, height: 24, child: _buildUserDot()),
         ],
       );
     }
@@ -699,9 +709,9 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xff3b82f6).withValues(
-                        alpha: _userPulseAnimation!.value,
-                      ),
+                      color: const Color(
+                        0xff3b82f6,
+                      ).withValues(alpha: _userPulseAnimation!.value),
                     ),
                   ),
                   _buildUserDot(),
@@ -782,6 +792,98 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
           ),
         ),
       ],
+    );
+  }
+
+  /// Markers for map bikes: colored based on status, tappable
+  MarkerLayer _buildMapBikeMarkers() {
+    final bikes = widget.mapBikes
+        .where((bike) => bike.latitude != null && bike.longitude != null)
+        .toList();
+
+    return MarkerLayer(
+      markers: bikes.map((bike) {
+        final pos = LatLng(bike.latitude!, bike.longitude!);
+        
+        // Determine color based on status
+        Color mainColor;
+        Color textColor;
+        Color bgColor = Colors.white;
+        
+        if (!bike.isOnline) {
+          mainColor = const Color(0xff9ca3af); // Grey for Offline
+          textColor = const Color(0xff4b5563);
+        } else if (bike.isAvailable) {
+          mainColor = const Color(0xff10b981); // Green for Available
+          textColor = const Color(0xff065f46);
+        } else {
+          mainColor = const Color(0xff3b82f6); // Blue for In Use
+          textColor = const Color(0xff1d4ed8);
+        }
+
+        return Marker(
+          point: pos,
+          width: 80,
+          height: 52,
+          child: GestureDetector(
+            onTap: () => widget.onMapBikeTap?.call(bike),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    bike.code,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: mainColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2.5),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x44000000),
+                        blurRadius: 5,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.pedal_bike,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

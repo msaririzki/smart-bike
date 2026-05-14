@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_user/src/theme/app_colors.dart';
 
 enum RentalStatus { active, idleWarning, idleBilling, other }
 
@@ -58,10 +59,7 @@ class _StatusBadgeState extends State<StatusBadge>
           duration: const Duration(milliseconds: 1200),
         );
         _pulseAnimation = Tween<double>(begin: 1.0, end: 0.4).animate(
-          CurvedAnimation(
-            parent: _pulseController!,
-            curve: Curves.easeInOut,
-          ),
+          CurvedAnimation(parent: _pulseController!, curve: Curves.easeInOut),
         );
         _pulseController!.repeat(reverse: true);
       }
@@ -85,33 +83,33 @@ class _StatusBadgeState extends State<StatusBadge>
 
     final (label, gradient, textColor, icon, glowColor) = switch (parsed) {
       RentalStatus.active => (
-          'AKTIF',
-          const [Color(0xff059669), Color(0xff10b981)],
-          Colors.white,
-          Icons.play_circle_outline,
-          const Color(0xff059669),
-        ),
+        'AKTIF',
+        const [Color(0xff059669), AppColors.primaryLight],
+        Colors.white,
+        Icons.play_circle_outline,
+        const Color(0xff059669),
+      ),
       RentalStatus.idleWarning => (
-          'IDLE WARNING',
-          const [Color(0xfff59e0b), Color(0xfffbbf24)],
-          Colors.white,
-          Icons.warning_amber_rounded,
-          const Color(0xfff59e0b),
-        ),
+        'IDLE WARNING',
+        const [Color(0xfff59e0b), Color(0xfffbbf24)],
+        Colors.white,
+        Icons.warning_amber_rounded,
+        const Color(0xfff59e0b),
+      ),
       RentalStatus.idleBilling => (
-          'IDLE BILLING',
-          const [Color(0xffef4444), Color(0xfff87171)],
-          Colors.white,
-          Icons.attach_money,
-          const Color(0xffef4444),
-        ),
+        'IDLE BILLING',
+        const [Color(0xffef4444), Color(0xfff87171)],
+        Colors.white,
+        Icons.attach_money,
+        const Color(0xffef4444),
+      ),
       RentalStatus.other => (
-          widget.status.toUpperCase(),
-          const [Color(0xff6b7280), Color(0xff9ca3af)],
-          Colors.white,
-          Icons.info_outline,
-          const Color(0xff6b7280),
-        ),
+        widget.status.toUpperCase(),
+        const [Color(0xff6b7280), Color(0xff9ca3af)],
+        Colors.white,
+        Icons.info_outline,
+        const Color(0xff6b7280),
+      ),
     };
 
     final badge = Container(
@@ -152,10 +150,7 @@ class _StatusBadgeState extends State<StatusBadge>
 
     // Pulse animation untuk idle_warning dan idle_billing
     if (_pulseAnimation != null) {
-      return FadeTransition(
-        opacity: _pulseAnimation!,
-        child: badge,
-      );
+      return FadeTransition(opacity: _pulseAnimation!, child: badge);
     }
 
     return badge;

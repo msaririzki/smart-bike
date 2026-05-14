@@ -1,4 +1,5 @@
 import 'bike.dart';
+import 'rental_location_point.dart';
 
 class RentalHistory {
   const RentalHistory({
@@ -71,28 +72,11 @@ class RentalHistory {
       locationPoints: json['location_points'] == null
           ? const []
           : (json['location_points'] as List)
-              .map((e) => RentalLocationPoint.fromJson(e as Map<String, dynamic>))
-              .toList(),
-    );
-  }
-}
-
-class RentalLocationPoint {
-  const RentalLocationPoint({
-    required this.latitude,
-    required this.longitude,
-    required this.recordedAt,
-  });
-
-  final double latitude;
-  final double longitude;
-  final DateTime recordedAt;
-
-  factory RentalLocationPoint.fromJson(Map<String, dynamic> json) {
-    return RentalLocationPoint(
-      latitude: _toDouble(json['latitude']) ?? 0.0,
-      longitude: _toDouble(json['longitude']) ?? 0.0,
-      recordedAt: _toDateTime(json['recorded_at']) ?? DateTime.now(),
+                .map(
+                  (e) =>
+                      RentalLocationPoint.fromJson(e as Map<String, dynamic>),
+                )
+                .toList(),
     );
   }
 }

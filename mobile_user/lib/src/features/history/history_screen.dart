@@ -2,18 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/rental_history.dart';
 import '../../services/api_client.dart';
+import '../../theme/app_colors.dart';
 import 'rental_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({required this.api, super.key});
+  const HistoryScreen({
+    required this.api,
+    this.showScaffold = true,
+    this.bottomPadding = 0,
+    super.key,
+  });
 
   final ApiClient api;
+  final bool showScaffold;
+  final double bottomPadding;
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  State<HistoryScreen> createState() => HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class HistoryScreenState extends State<HistoryScreen> {
   List<RentalHistory>? _history;
   bool _isLoading = true;
   String? _error;
@@ -35,7 +43,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadHistory();
+    loadHistory();
     _scrollController.addListener(_onScroll);
   }
 
@@ -47,14 +55,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       if (_hasMore && !_isLoadMoreLoading && !_isLoading) {
         _loadMore();
       }
     }
   }
 
-  Future<void> _loadHistory() async {
+  Future<void> loadHistory() async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -65,7 +74,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final data = await widget.api.rentalHistory(page: 1);
       final rawList = data['data'] as List<dynamic>;
-      final history = rawList.map((item) => RentalHistory.fromJson(item as Map<String, dynamic>)).toList();
+      final history = rawList
+          .map((item) => RentalHistory.fromJson(item as Map<String, dynamic>))
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -102,7 +113,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final nextPage = _currentPage + 1;
       final data = await widget.api.rentalHistory(page: nextPage);
       final rawList = data['data'] as List<dynamic>;
-      final nextHistory = rawList.map((item) => RentalHistory.fromJson(item as Map<String, dynamic>)).toList();
+      final nextHistory = rawList
+          .map((item) => RentalHistory.fromJson(item as Map<String, dynamic>))
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -129,25 +142,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     try {
       await widget.api.deleteRental(item.id);
-      if (mounted) {
-        _showSuccessNotification('Riwayat ${item.bike?.code ?? ""} berhasil dihapus');
-      }
+      if (!mounted) return;
+      _showSuccessNotification(
+        'Riwayat ${item.bike?.code ?? ""} berhasil dihapus',
+      );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _history = originalList;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menghapus: $e'), backgroundColor: Colors.red),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menghapus: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   Future<void> _deleteSelected() async {
     if (_selectedIds.isEmpty) return;
 
-    final toDelete = _history!.where((e) => _selectedIds.contains(e.id)).toList();
+    final toDelete = _history!
+        .where((e) => _selectedIds.contains(e.id))
+        .toList();
     final originalList = List<RentalHistory>.from(_history ?? []);
 
     setState(() {
@@ -157,22 +175,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
 
     try {
-      _showSuccessNotification('Sedang menghapus ${toDelete.length} riwayat...');
+      _showSuccessNotification(
+        'Sedang menghapus ${toDelete.length} riwayat...',
+      );
+      var failedCount = 0;
       for (var item in toDelete) {
         try {
           await widget.api.deleteRental(item.id);
-        } catch (_) {}
+        } catch (_) {
+          failedCount++;
+        }
       }
-      _showSuccessNotification('Berhasil menghapus ${toDelete.length} riwayat');
-    } catch (e) {
+
+      if (!mounted) return;
+      if (failedCount == 0) {
+        _showSuccessNotification(
+          'Berhasil menghapus ${toDelete.length} riwayat',
+        );
+        return;
+      }
+
       setState(() {
         _history = originalList;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menghapus: $e'), backgroundColor: Colors.red),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$failedCount riwayat gagal dihapus. Data dikembalikan.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _history = originalList;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menghapus: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -205,12 +249,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
-        backgroundColor: const Color(0xff269276),
+        backgroundColor: AppColors.primaryLight,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -221,52 +269,65 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final body = Padding(
+      padding: EdgeInsets.only(bottom: widget.bottomPadding),
+      child: _buildBody(context),
+    );
+
+    if (!widget.showScaffold) {
+      return ColoredBox(
+        color: const Color.fromARGB(255, 253, 255, 254),
+        child: body,
+      );
+    }
+
     return Scaffold(
-      backgroundColor: const Color(0xfff7fbf8),
+      backgroundColor: const Color.fromARGB(255, 253, 255, 254),
       appBar: AppBar(
         title: const Text(
           'Riwayat Sewa',
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color.fromARGB(255, 253, 255, 254),
         foregroundColor: const Color(0xff073f3a),
         elevation: 0,
         actions: [
           IconButton(
-            onPressed: _isLoading ? null : _loadHistory,
+            onPressed: _isLoading ? null : loadHistory,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
-      body: _isLoading
-          ? const _ShimmerLoadingView()
-          : _error != null
-              ? RefreshIndicator(
-                  onRefresh: _loadHistory,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: SizedBox(
-                      height: MediaQuery.of(context).size.height - 100,
-                      child: _ErrorView(message: _error!, onRetry: _loadHistory),
-                    ),
-                  ),
-                )
-              : _history == null || _history!.isEmpty
-                  ? RefreshIndicator(
-                      onRefresh: _loadHistory,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-                          const _EmptyView(),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadHistory,
-                      child: _buildFilteredList(),
-                    ),
+      body: body,
     );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    return _isLoading
+        ? const _ShimmerLoadingView()
+        : _error != null
+        ? RefreshIndicator(
+            onRefresh: loadHistory,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height - 100,
+                child: _ErrorView(message: _error!, onRetry: loadHistory),
+              ),
+            ),
+          )
+        : _history == null || _history!.isEmpty
+        ? RefreshIndicator(
+            onRefresh: loadHistory,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                const _EmptyView(),
+              ],
+            ),
+          )
+        : RefreshIndicator(onRefresh: loadHistory, child: _buildFilteredList());
   }
 
   List<RentalHistory> get _filteredHistory {
@@ -292,7 +353,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           final weekAgo = now.subtract(const Duration(days: 7));
           if (item.startedAt.isBefore(weekAgo)) return false;
         } else if (_periodFilter == 'ThisMonth') {
-          if (item.startedAt.month != now.month || item.startedAt.year != now.year) {
+          if (item.startedAt.month != now.month ||
+              item.startedAt.year != now.year) {
             return false;
           }
         }
@@ -307,7 +369,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         list.sort((a, b) => a.startedAt.compareTo(b.startedAt));
         break;
       case 'distance':
-        list.sort((a, b) => b.totalDistanceKilometers.compareTo(a.totalDistanceKilometers));
+        list.sort(
+          (a, b) =>
+              b.totalDistanceKilometers.compareTo(a.totalDistanceKilometers),
+        );
         break;
       case 'cost':
         list.sort((a, b) => b.totalCost.compareTo(a.totalCost));
@@ -334,7 +399,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
           _buildFilterBar(),
           const SizedBox(height: 60),
           const _EmptyView(message: 'Tidak ada data yang cocok dengan filter.'),
-          const SizedBox(height: 100), // Extra space to prevent any layout issues
+          const SizedBox(
+            height: 100,
+          ), // Extra space to prevent any layout issues
         ],
       );
     }
@@ -342,7 +409,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return ListView.separated(
       controller: _scrollController,
       padding: const EdgeInsets.all(20),
-      itemCount: filteredHistory.length + 3, // Summary + Filters + Items + Loading Indicator
+      itemCount:
+          filteredHistory.length +
+          3, // Summary + Filters + Items + Loading Indicator
       separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -354,11 +423,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
         if (index == filteredHistory.length + 2) {
           return _hasMore
-            ? const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              )
-            : const SizedBox(height: 40);
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : const SizedBox(height: 40);
         }
 
         final itemIndex = index - 2;
@@ -373,7 +444,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
               color: const Color(0xffef4444),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 28),
+            child: const Icon(
+              Icons.delete_outline_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
           ),
           onDismissed: (direction) => _deleteHistory(item),
           confirmDismiss: (direction) async {
@@ -381,15 +456,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
               context: context,
               builder: (context) => AlertDialog(
                 title: const Text('Hapus Riwayat?'),
-                content: const Text('Data ini akan dihapus permanen dari riwayat kamu.'),
+                content: const Text(
+                  'Data ini akan dihapus permanen dari riwayat kamu.',
+                ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Batal', style: TextStyle(color: Color(0xff64748b))),
+                    child: const Text(
+                      'Batal',
+                      style: TextStyle(color: Color(0xff64748b)),
+                    ),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Hapus', style: TextStyle(color: Color(0xffef4444), fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Hapus',
+                      style: TextStyle(
+                        color: Color(0xffef4444),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -405,12 +491,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 _toggleSelection(item.id);
               } else {
                 final st = item.status.toLowerCase();
-                if (st == 'active' || st == 'idle_warning' || st == 'idle_billing') {
+                if (st == 'active' ||
+                    st == 'idle_warning' ||
+                    st == 'idle_billing') {
                   Navigator.popUntil(context, (route) => route.isFirst);
                 } else {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => RentalDetailScreen(history: item, api: widget.api)),
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          RentalDetailScreen(history: item, api: widget.api),
+                    ),
                   );
                 }
               }
@@ -428,7 +519,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       children: [
         const Text(
           'Status',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xff64748b)),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Color(0xff64748b),
+          ),
         ),
         const SizedBox(height: 8),
         SingleChildScrollView(
@@ -460,8 +555,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              _isSelectionMode ? '${_selectedIds.length} Terpilih' : 'Periode & Pencarian',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xff64748b)),
+              _isSelectionMode
+                  ? '${_selectedIds.length} Terpilih'
+                  : 'Periode & Pencarian',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Color(0xff64748b),
+              ),
             ),
             Row(
               children: [
@@ -474,7 +575,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ? Icons.check_box_rounded
                           : Icons.check_box_outline_blank_rounded,
                       size: 20,
-                      color: const Color(0xff269276)
+                      color: AppColors.primaryLight,
                     ),
                     onPressed: () => _selectAll(filteredHistory),
                   ),
@@ -483,7 +584,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded, size: 18, color: const Color(0xff64748b)),
+                  icon: Icon(
+                    _isSearching ? Icons.close_rounded : Icons.search_rounded,
+                    size: 18,
+                    color: const Color(0xff64748b),
+                  ),
                   onPressed: () => setState(() {
                     _isSearching = !_isSearching;
                     if (!_isSearching) {
@@ -499,7 +604,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   icon: Icon(
                     Icons.delete_outline_rounded,
                     size: 18,
-                    color: _isSelectionMode ? const Color(0xffef4444) : const Color(0xff94a3b8)
+                    color: _isSelectionMode
+                        ? const Color(0xffef4444)
+                        : const Color(0xff94a3b8),
                   ),
                   onPressed: () {
                     if (!_isSelectionMode) {
@@ -512,18 +619,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       context: context,
                       builder: (context) => AlertDialog(
                         title: const Text('Hapus Riwayat?'),
-                        content: Text('Apakah kamu yakin ingin menghapus ${_selectedIds.length} riwayat yang dipilih?'),
+                        content: Text(
+                          'Apakah kamu yakin ingin menghapus ${_selectedIds.length} riwayat yang dipilih?',
+                        ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('Batal', style: TextStyle(color: Color(0xff64748b))),
+                            child: const Text(
+                              'Batal',
+                              style: TextStyle(color: Color(0xff64748b)),
+                            ),
                           ),
                           TextButton(
                             onPressed: () {
                               Navigator.pop(context);
                               _deleteSelected();
                             },
-                            child: const Text('Hapus', style: TextStyle(color: Color(0xffef4444), fontWeight: FontWeight.bold)),
+                            child: const Text(
+                              'Hapus',
+                              style: TextStyle(
+                                color: Color(0xffef4444),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -542,8 +660,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
             onChanged: (value) => setState(() => _searchQuery = value),
             decoration: InputDecoration(
               hintText: 'Cari kode sepeda...',
-              hintStyle: const TextStyle(color: Color(0xff94a3b8), fontSize: 13),
-              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xff94a3b8)),
+              hintStyle: const TextStyle(
+                color: Color(0xff94a3b8),
+                fontSize: 13,
+              ),
+              prefixIcon: const Icon(
+                Icons.search_rounded,
+                size: 18,
+                color: Color(0xff94a3b8),
+              ),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.close_rounded, size: 16),
@@ -556,7 +681,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               filled: true,
               fillColor: const Color(0xfff8fafc),
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: Color(0xffe2e8f0)),
@@ -567,7 +695,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xff269276), width: 1.5),
+                borderSide: const BorderSide(
+                  color: AppColors.primaryLight,
+                  width: 1.5,
+                ),
               ),
             ),
           ),
@@ -598,22 +729,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        if (_statusFilter != 'All' || _periodFilter != 'All' || _searchQuery.isNotEmpty)
-        const SizedBox(height: 16),
+        if (_statusFilter != 'All' ||
+            _periodFilter != 'All' ||
+            _searchQuery.isNotEmpty)
+          const SizedBox(height: 16),
         Row(
           children: [
             const Icon(Icons.sort_rounded, size: 14, color: Color(0xff64748b)),
             const SizedBox(width: 6),
             const Text(
               'Urutkan',
-              style: TextStyle(color: Color(0xff64748b), fontSize: 11, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Color(0xff64748b),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(width: 8),
             PopupMenuButton<String>(
               initialValue: _sortBy,
               onSelected: (value) => setState(() => _sortBy = value),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
@@ -623,12 +763,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      _sortBy == 'latest' ? 'Terbaru' :
-                      _sortBy == 'oldest' ? 'Terlama' :
-                      _sortBy == 'distance' ? 'Terjauh' : 'Termahal',
-                      style: const TextStyle(color: Color(0xff073f3a), fontSize: 11, fontWeight: FontWeight.bold),
+                      _sortBy == 'latest'
+                          ? 'Terbaru'
+                          : _sortBy == 'oldest'
+                          ? 'Terlama'
+                          : _sortBy == 'distance'
+                          ? 'Terjauh'
+                          : 'Termahal',
+                      style: const TextStyle(
+                        color: Color(0xff073f3a),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    const Icon(Icons.arrow_drop_down, size: 16, color: Color(0xff073f3a)),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      size: 16,
+                      color: Color(0xff073f3a),
+                    ),
                   ],
                 ),
               ),
@@ -640,7 +792,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ],
             ),
             const Spacer(),
-            if (_statusFilter != 'All' || _periodFilter != 'All' || _sortBy != 'latest' || _searchQuery.isNotEmpty)
+            if (_statusFilter != 'All' ||
+                _periodFilter != 'All' ||
+                _sortBy != 'latest' ||
+                _searchQuery.isNotEmpty)
               GestureDetector(
                 onTap: () {
                   _searchController.clear();
@@ -654,7 +809,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 },
                 child: const Text(
                   'Reset Semua',
-                  style: TextStyle(color: Color(0xff269276), fontSize: 11, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Color(0xff269276),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
           ],
@@ -673,20 +832,21 @@ class _HistorySummaryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalKm = history.fold(0.0, (sum, e) => sum + e.totalDistanceKilometers);
+    final totalKm = history.fold(
+      0.0,
+      (sum, e) => sum + e.totalDistanceKilometers,
+    );
     final totalRentals = history.length;
     final totalCo2Gram = totalKm * 120;
-    final co2Text = totalCo2Gram >= 1000 ? '${(totalCo2Gram / 1000).toStringAsFixed(1)} kg' : '${totalCo2Gram.toStringAsFixed(0)} g';
+    final co2Text = totalCo2Gram >= 1000
+        ? '${(totalCo2Gram / 1000).toStringAsFixed(1)} kg'
+        : '${totalCo2Gram.toStringAsFixed(0)} g';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xff269276), Color(0xff18846e)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -703,7 +863,11 @@ class _HistorySummaryHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _StatItem(label: 'Jarak', value: totalKm.toStringAsFixed(1), unit: 'km'),
+              _StatItem(
+                label: 'Jarak',
+                value: totalKm.toStringAsFixed(1),
+                unit: 'km',
+              ),
               _StatDivider(),
               _StatItem(label: 'Sewa', value: '$totalRentals', unit: 'kali'),
               _StatDivider(),
@@ -718,31 +882,19 @@ class _HistorySummaryHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                flex: 3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'Aktivitas 7 Hari',
-                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _WeeklyBarChart(history: history),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      'Badges',
-                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    _AchievementBadgesCompact(history: history),
                   ],
                 ),
               ),
@@ -769,7 +921,9 @@ class _GoalTracker extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final monthlyKm = history
-        .where((e) => e.startedAt.month == now.month && e.startedAt.year == now.year)
+        .where(
+          (e) => e.startedAt.month == now.month && e.startedAt.year == now.year,
+        )
         .fold(0.0, (sum, e) => sum + e.totalDistanceKilometers);
 
     const goalKm = 50.0;
@@ -784,7 +938,11 @@ class _GoalTracker extends StatelessWidget {
           children: [
             const Text(
               'Target Bulan Ini',
-              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -805,7 +963,11 @@ class _GoalTracker extends StatelessWidget {
                   ),
                   if (progress >= 1.0) ...[
                     const SizedBox(width: 4),
-                    const Icon(Icons.check_circle, color: Color(0xff00ff87), size: 16),
+                    const Icon(
+                      Icons.check_circle,
+                      color: Color(0xff00ff87),
+                      size: 16,
+                    ),
                   ],
                 ],
               ),
@@ -829,18 +991,8 @@ class _GoalTracker extends StatelessWidget {
                 height: 14,
                 width: constraints.maxWidth * progress,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xff00ff87), Color(0xff60efff)], // Electric Green to Cyan
-                  ),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(7),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xff00ff87).withValues(alpha: 0.5),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 0),
-                    ),
-                  ],
                 ),
               ),
             ),
@@ -849,7 +1001,11 @@ class _GoalTracker extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           '${monthlyKm.toStringAsFixed(1)} km dari target $goalKm km',
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     );
@@ -857,7 +1013,11 @@ class _GoalTracker extends StatelessWidget {
 }
 
 class _StatItem extends StatelessWidget {
-  const _StatItem({required this.label, required this.value, required this.unit});
+  const _StatItem({
+    required this.label,
+    required this.value,
+    required this.unit,
+  });
   final String label, value, unit;
 
   @override
@@ -866,58 +1026,30 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+          ),
         ),
         Text(
           unit,
-          style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9, letterSpacing: 0.5),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.4),
+            fontSize: 9,
+            letterSpacing: 0.5,
+          ),
         ),
       ],
-    );
-  }
-}
-
-class _AchievementBadgesCompact extends StatelessWidget {
-  const _AchievementBadgesCompact({required this.history});
-  final List<RentalHistory> history;
-
-  @override
-  Widget build(BuildContext context) {
-    final totalKm = history.fold(0.0, (sum, e) => sum + e.totalDistanceKilometers);
-    final totalRentals = history.length;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        if (totalKm > 10) _CompactBadge(icon: Icons.terrain_rounded, color: Colors.amber),
-        if (totalRentals > 5) _CompactBadge(icon: Icons.stars_rounded, color: Colors.orange),
-        if (totalKm > 0) _CompactBadge(icon: Icons.directions_bike_rounded, color: Colors.blue),
-      ],
-    );
-  }
-}
-
-class _CompactBadge extends StatelessWidget {
-  const _CompactBadge({required this.icon, required this.color});
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(left: 6),
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.2),
-      ),
-      child: Icon(icon, color: Colors.white, size: 14),
     );
   }
 }
@@ -971,7 +1103,9 @@ class _HistoryCard extends StatelessWidget {
                     child: Checkbox(
                       value: isSelected,
                       onChanged: (v) => onTap(),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                       activeColor: const Color(0xff269276),
                     ),
                   ),
@@ -1001,7 +1135,7 @@ class _HistoryCard extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xff073f3a),
+                              color: Colors.black87,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -1028,13 +1162,17 @@ class _HistoryCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xff269276),
+                        color: AppColors.primaryLight,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(Icons.timer_outlined, size: 12, color: Color(0xff94a3b8)),
+                        const Icon(
+                          Icons.timer_outlined,
+                          size: 12,
+                          color: Color(0xff94a3b8),
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           history.durationString,
@@ -1115,26 +1253,32 @@ class _ShimmerLoadingView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Row(
-            children: List.generate(3, (index) => Container(
-              margin: const EdgeInsets.only(right: 8),
-              width: 80,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+            children: List.generate(
+              3,
+              (index) => Container(
+                margin: const EdgeInsets.only(right: 8),
+                width: 80,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-            )),
+            ),
           ),
           const SizedBox(height: 24),
-          ...List.generate(5, (index) => Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            height: 100,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+          ...List.generate(
+            5,
+            (index) => Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              height: 100,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -1155,7 +1299,11 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 48, color: Colors.red),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: Colors.red,
+            ),
             const SizedBox(height: 16),
             Text(
               message,
@@ -1163,10 +1311,7 @@ class _ErrorView extends StatelessWidget {
               style: const TextStyle(color: Color(0xff475569)),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: onRetry,
-              child: const Text('Coba Lagi'),
-            ),
+            ElevatedButton(onPressed: onRetry, child: const Text('Coba Lagi')),
           ],
         ),
       ),
@@ -1232,6 +1377,7 @@ class _FilterChip extends StatelessWidget {
     );
   }
 }
+
 class _WeeklyBarChart extends StatelessWidget {
   const _WeeklyBarChart({required this.history});
 
@@ -1243,17 +1389,21 @@ class _WeeklyBarChart extends StatelessWidget {
     final now = DateTime.now();
     final dayData = List.generate(7, (index) {
       final date = now.subtract(Duration(days: 6 - index));
-      final dayRentals = history.where((e) =>
-        e.startedAt.year == date.year &&
-        e.startedAt.month == date.month &&
-        e.startedAt.day == date.day
+      final dayRentals = history.where(
+        (e) =>
+            e.startedAt.year == date.year &&
+            e.startedAt.month == date.month &&
+            e.startedAt.day == date.day,
       );
 
       // Calculate total duration in minutes for that day
       double totalMinutes = 0;
       for (var r in dayRentals) {
         if (r.endedAt != null) {
-          totalMinutes += r.endedAt!.difference(r.startedAt).inMinutes.toDouble();
+          totalMinutes += r.endedAt!
+              .difference(r.startedAt)
+              .inMinutes
+              .toDouble();
         }
       }
       return totalMinutes;
@@ -1286,15 +1436,28 @@ class _WeeklyBarChart extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: index == 6
-                          ? [const Color(0xff4ade80), Colors.white]
-                          : [Colors.white.withValues(alpha: 0.4), Colors.white.withValues(alpha: 0.1)],
+                            ? [const Color(0xff4ade80), Colors.white]
+                            : [
+                                Colors.white.withValues(alpha: 0.4),
+                                Colors.white.withValues(alpha: 0.1),
+                              ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-                      boxShadow: index == 6 ? [
-                        BoxShadow(color: const Color(0xff4ade80).withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 2))
-                      ] : null,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(4),
+                      ),
+                      boxShadow: index == 6
+                          ? [
+                              BoxShadow(
+                                color: const Color(
+                                  0xff4ade80,
+                                ).withValues(alpha: 0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
                     ),
                   ),
                 ),
@@ -1304,7 +1467,9 @@ class _WeeklyBarChart extends StatelessWidget {
                   style: TextStyle(
                     color: index == 6 ? Colors.white : Colors.white60,
                     fontSize: 10,
-                    fontWeight: index == 6 ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: index == 6
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
               ],
@@ -1315,4 +1480,3 @@ class _WeeklyBarChart extends StatelessWidget {
     );
   }
 }
-

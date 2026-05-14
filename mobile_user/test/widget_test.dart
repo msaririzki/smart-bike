@@ -9,11 +9,10 @@ void main() {
     await tester.pumpWidget(const SmartBikeUserApp());
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Smart Bike Rental'), findsOneWidget);
-
     await tester.pump(const Duration(milliseconds: 2100));
     await tester.pump();
 
+    expect(find.text('Ride Smooth. Track Smart.'), findsOneWidget);
     expect(find.text('Login'), findsOneWidget);
   });
 }
