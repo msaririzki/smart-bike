@@ -18,11 +18,14 @@ class MapTestScreen extends StatefulWidget {
     required this.api,
     this.showScaffold = true,
     this.bottomPadding = 0,
+    this.focusBike,
   });
-
   final ApiClient api;
   final bool showScaffold;
   final double bottomPadding;
+
+  /// Optional bike to focus on when the map opens (from "Lacak" button).
+  final Bike? focusBike;
 
   @override
   State<MapTestScreen> createState() => MapTestScreenState();
@@ -87,8 +90,8 @@ class MapTestScreenState extends State<MapTestScreen> {
   String _bikeName = '';
   bool _hasBikeCoords = false;
 
-  // Available bikes for map markers
-  List<Bike> _availableBikes = [];
+  // Map bikes (all bikes with coordinates)
+  List<Bike> _mapBikes = [];
 
   // User's own location (blue dot)
   LatLng? _userPosition;
@@ -107,6 +110,14 @@ class MapTestScreenState extends State<MapTestScreen> {
   @override
   void initState() {
     super.initState();
+    // If a specific bike was passed (from "Lacak" button), focus on it
+    final fb = widget.focusBike;
+    if (fb != null && fb.latitude != null && fb.longitude != null) {
+      _bikePosition = LatLng(fb.latitude!, fb.longitude!);
+      _hasBikeCoords = true;
+      _bikeName = '${fb.code} - ${fb.name}';
+      _locationName = 'Lokasi ${fb.code}';
+    }
     _initUserLocation();
     _startPolling();
   }
@@ -177,7 +188,7 @@ class MapTestScreenState extends State<MapTestScreen> {
 
     try {
       final rental = await widget.api.activeRental();
-      final available = await _fetchAvailableBikes(
+      final mapBikes = await _fetchMapBikes(
         excludeBikeId: rental?.bike?.id,
       );
       if (!mounted) return;
@@ -193,7 +204,7 @@ class MapTestScreenState extends State<MapTestScreen> {
           _totalDistance = rental.totalDistanceMeters;
           _bikeName = bike != null ? '${bike.code} - ${bike.name}' : '';
           _hasBikeCoords = hasCoords;
-          _availableBikes = available;
+          _mapBikes = mapBikes;
           if (hasCoords) {
             _bikePosition = LatLng(bike!.latitude!, bike.longitude!);
           }
@@ -218,19 +229,30 @@ class MapTestScreenState extends State<MapTestScreen> {
         }
       } else {
         if (mounted) {
+          // Preserve focusBike data when there's no active rental
+          final fb = widget.focusBike;
+          final hasFocus = fb != null && fb.latitude != null && fb.longitude != null;
           setState(() {
             _rentalId = null;
             _rentalStatus = '';
-            _bikeName = '';
             _bikeSpeed = 0;
             _totalDistance = 0;
             _pathHistory = [];
-            _bikePosition = null;
-            _hasBikeCoords = false;
             _rentalStartedAt = null;
             _elapsed = Duration.zero;
-            _locationName = 'Menunggu data sepeda...';
-            _availableBikes = available;
+            _mapBikes = mapBikes;
+            if (hasFocus) {
+              // Keep showing the focused bike's location
+              _bikePosition = LatLng(fb.latitude!, fb.longitude!);
+              _hasBikeCoords = true;
+              _bikeName = '${fb.code} - ${fb.name}';
+              _locationName = 'Lokasi ${fb.code}';
+            } else {
+              _bikeName = '';
+              _bikePosition = null;
+              _hasBikeCoords = false;
+              _locationName = 'Menunggu data sepeda...';
+            }
           });
           _clockTimer?.cancel();
         }
@@ -241,21 +263,19 @@ class MapTestScreenState extends State<MapTestScreen> {
     }
   }
 
-  Future<List<Bike>> _fetchAvailableBikes({int? excludeBikeId}) async {
+  Future<List<Bike>> _fetchMapBikes({int? excludeBikeId}) async {
     try {
       final allBikes = await widget.api.bikes();
       return allBikes
           .where(
             (bike) =>
-                bike.isAvailable &&
-                bike.isOnline &&
                 bike.latitude != null &&
                 bike.longitude != null &&
                 bike.id != excludeBikeId,
           )
           .toList();
     } catch (_) {
-      return _availableBikes;
+      return _mapBikes;
     }
   }
 
@@ -284,13 +304,13 @@ class MapTestScreenState extends State<MapTestScreen> {
     );
   }
 
-  void _onAvailableBikeTap(Bike bike) {
+  void _onMapBikeTap(Bike bike) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => _AvailableBikeSheet(
+      builder: (_) => _BikeInfoSheet(
         bike: bike,
         userPosition: _userPosition,
         onScanQr: () {
@@ -324,8 +344,8 @@ class MapTestScreenState extends State<MapTestScreen> {
             userLongitude: _userPosition?.longitude,
             onSpotTap: _onSpotTap,
             bikeLabel: _hasBikeCoords ? _bikeName : null,
-            availableBikes: _availableBikes,
-            onAvailableBikeTap: _onAvailableBikeTap,
+            mapBikes: _mapBikes,
+            onMapBikeTap: _onMapBikeTap,
           ),
         ),
         if (hasRental && !_hasBikeCoords)
@@ -831,9 +851,9 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-/// Bottom sheet showing available bike info when tapped on map.
-class _AvailableBikeSheet extends StatelessWidget {
-  const _AvailableBikeSheet({
+/// Bottom sheet showing bike info when tapped on map.
+class _BikeInfoSheet extends StatelessWidget {
+  const _BikeInfoSheet({
     required this.bike,
     this.userPosition,
     this.onScanQr,
@@ -848,6 +868,29 @@ class _AvailableBikeSheet extends StatelessWidget {
     final dist = userPosition != null
         ? calculateDistance(userPosition!, bikePos)
         : null;
+
+    // Determine status styling
+    String statusText;
+    Color statusBgColor;
+    Color statusTextColor;
+    Color mainColor;
+
+    if (!bike.isOnline) {
+      statusText = 'Offline';
+      statusBgColor = const Color(0xfff3f4f6);
+      statusTextColor = const Color(0xff4b5563);
+      mainColor = const Color(0xff9ca3af);
+    } else if (bike.isAvailable) {
+      statusText = 'Tersedia';
+      statusBgColor = const Color(0xffd1fae5);
+      statusTextColor = const Color(0xff065f46);
+      mainColor = const Color(0xff10b981);
+    } else {
+      statusText = 'Sedang Dipakai';
+      statusBgColor = const Color(0xffdbeafe);
+      statusTextColor = const Color(0xff1d4ed8);
+      mainColor = const Color(0xff3b82f6);
+    }
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -871,8 +914,8 @@ class _AvailableBikeSheet extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: const BoxDecoration(
-                  color: Color(0xff10b981),
+                decoration: BoxDecoration(
+                  color: mainColor,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -901,15 +944,15 @@ class _AvailableBikeSheet extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xffd1fae5),
+                            color: statusBgColor,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
-                            'Tersedia',
+                          child: Text(
+                            statusText,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xff065f46),
+                              color: statusTextColor,
                             ),
                           ),
                         ),
@@ -917,9 +960,7 @@ class _AvailableBikeSheet extends StatelessWidget {
                         Icon(
                           Icons.circle,
                           size: 8,
-                          color: bike.isOnline
-                              ? const Color(0xff10b981)
-                              : const Color(0xff9ca3af),
+                          color: mainColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -927,9 +968,7 @@ class _AvailableBikeSheet extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: bike.isOnline
-                                ? const Color(0xff065f46)
-                                : const Color(0xff6b7280),
+                            color: mainColor,
                           ),
                         ),
                       ],
@@ -971,23 +1010,25 @@ class _AvailableBikeSheet extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onScanQr,
-              icon: const Icon(Icons.qr_code_scanner, size: 18),
-              label: const Text('Scan QR untuk Sewa'),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xff0f766e),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          if (bike.isAvailable && bike.isOnline) ...[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onScanQr,
+                icon: const Icon(Icons.qr_code_scanner, size: 18),
+                label: const Text('Scan QR untuk Sewa'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xff0f766e),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
+          ],
         ],
       ),
     );

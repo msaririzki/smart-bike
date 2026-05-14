@@ -24,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  Bike? _focusBike;
   final _dashboardKey = GlobalKey<_DashboardPageState>();
   final _historyKey = GlobalKey<HistoryScreenState>();
 
@@ -160,9 +161,11 @@ class _HomeScreenState extends State<HomeScreen> {
             onOpenScanner: _openQrScanner,
           ),
           MapTestScreen(
+            key: ValueKey(_focusBike?.id ?? 'map'),
             api: widget.api,
             showScaffold: false,
             bottomPadding: 92,
+            focusBike: _focusBike,
           ),
           const _ComingSoonPage(
             icon: Icons.qr_code_scanner_rounded,
@@ -182,7 +185,10 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _selectedIndex,
         onTap: (index) {
           if (index == 1) {
-            setState(() => _selectedIndex = index);
+            setState(() {
+              _focusBike = null;
+              _selectedIndex = index;
+            });
           } else if (index == 2) {
             _openQrScanner();
           } else {
@@ -366,7 +372,7 @@ class _DashboardPageState extends State<_DashboardPage> {
           const SizedBox(height: 28),
           const _SectionHeader(
             title: 'Sepeda tersedia',
-            subtitle: 'Untuk mulai sewa, scan QR pada perangkat sepeda.',
+            subtitle: 'Ketuk Lacak untuk melihat lokasi sepeda di peta.',
           ),
           const SizedBox(height: 12),
           if (_bikes.isEmpty)
@@ -376,7 +382,14 @@ class _DashboardPageState extends State<_DashboardPage> {
               _BikeListTile(
                 bike: bike,
                 isBusy: _isBusy || _activeRental != null,
-                onScan: widget.onOpenScanner,
+                onTrack: (selectedBike) {
+                  final homeState = context
+                      .findAncestorStateOfType<_HomeScreenState>();
+                  homeState?.setState(() {
+                    homeState._focusBike = selectedBike;
+                    homeState._selectedIndex = 1;
+                  });
+                },
               ),
             ],
         ],
@@ -802,16 +815,17 @@ class _BikeListTile extends StatelessWidget {
   const _BikeListTile({
     required this.bike,
     required this.isBusy,
-    required this.onScan,
+    required this.onTrack,
   });
 
   final Bike bike;
   final bool isBusy;
-  final VoidCallback onScan;
+  final void Function(Bike bike) onTrack;
 
   @override
   Widget build(BuildContext context) {
     final available = bike.isAvailable;
+    final hasCoords = bike.latitude != null && bike.longitude != null;
     final statusColor = available
         ? AppColors.primaryLight
         : const Color(0xffdc2626);
@@ -859,9 +873,12 @@ class _BikeListTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          FilledButton(
-            onPressed: available && !isBusy ? onScan : null,
-            child: const Text('Scan QR'),
+          FilledButton.icon(
+            onPressed: available && hasCoords && !isBusy
+                ? () => onTrack(bike)
+                : null,
+            icon: const Icon(Icons.location_on_outlined, size: 18),
+            label: const Text('Lacak'),
           ),
         ],
       ),
