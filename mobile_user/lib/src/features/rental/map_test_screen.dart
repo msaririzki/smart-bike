@@ -4,14 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../models/bike.dart';
 import '../../services/api_client.dart';
 import 'map_widget.dart';
 import 'rolling_number.dart';
 import 'routing_service.dart';
 
 class MapTestScreen extends StatefulWidget {
-  const MapTestScreen({super.key, required this.api});
+  const MapTestScreen({super.key, required this.api, this.focusBike});
   final ApiClient api;
+
+  /// Optional bike to focus on when the map opens (from "Lacak" button).
+  final Bike? focusBike;
 
   @override
   State<MapTestScreen> createState() => _MapTestScreenState();
@@ -59,6 +63,14 @@ class _MapTestScreenState extends State<MapTestScreen> {
   @override
   void initState() {
     super.initState();
+    // If a specific bike was passed (from "Lacak" button), focus on it
+    final fb = widget.focusBike;
+    if (fb != null && fb.latitude != null && fb.longitude != null) {
+      _bikePosition = LatLng(fb.latitude!, fb.longitude!);
+      _hasBikeCoords = true;
+      _bikeName = '${fb.code} - ${fb.name}';
+      _locationName = 'Lokasi ${fb.code}';
+    }
     _initUserLocation();
     _startPolling();
   }
@@ -145,18 +157,29 @@ class _MapTestScreenState extends State<MapTestScreen> {
         }
       } else {
         if (mounted) {
+          // Preserve focusBike data when there's no active rental
+          final fb = widget.focusBike;
+          final hasFocus = fb != null && fb.latitude != null && fb.longitude != null;
           setState(() {
             _rentalId = null;
             _rentalStatus = '';
-            _bikeName = '';
             _bikeSpeed = 0;
             _totalDistance = 0;
             _pathHistory = [];
-            _bikePosition = null;
-            _hasBikeCoords = false;
             _rentalStartedAt = null;
             _elapsed = Duration.zero;
-            _locationName = 'Menunggu data sepeda...';
+            if (hasFocus) {
+              // Keep showing the focused bike's location
+              _bikePosition = LatLng(fb.latitude!, fb.longitude!);
+              _hasBikeCoords = true;
+              _bikeName = '${fb.code} - ${fb.name}';
+              _locationName = 'Lokasi ${fb.code}';
+            } else {
+              _bikeName = '';
+              _bikePosition = null;
+              _hasBikeCoords = false;
+              _locationName = 'Menunggu data sepeda...';
+            }
           });
           _clockTimer?.cancel();
         }

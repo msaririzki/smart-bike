@@ -366,7 +366,7 @@ class _DashboardPageState extends State<_DashboardPage> {
           const SizedBox(height: 28),
           const _SectionHeader(
             title: 'Sepeda tersedia',
-            subtitle: 'Untuk mulai sewa, scan QR pada perangkat sepeda.',
+            subtitle: 'Ketuk Lacak untuk melihat lokasi sepeda di peta.',
           ),
           const SizedBox(height: 12),
           if (_bikes.isEmpty)
@@ -376,7 +376,16 @@ class _DashboardPageState extends State<_DashboardPage> {
               _BikeListTile(
                 bike: bike,
                 isBusy: _isBusy || _activeRental != null,
-                onScan: widget.onOpenScanner,
+                onTrack: (selectedBike) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MapTestScreen(
+                        api: widget.api,
+                        focusBike: selectedBike,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
         ],
@@ -802,16 +811,17 @@ class _BikeListTile extends StatelessWidget {
   const _BikeListTile({
     required this.bike,
     required this.isBusy,
-    required this.onScan,
+    required this.onTrack,
   });
 
   final Bike bike;
   final bool isBusy;
-  final VoidCallback onScan;
+  final void Function(Bike bike) onTrack;
 
   @override
   Widget build(BuildContext context) {
     final available = bike.isAvailable;
+    final hasCoords = bike.latitude != null && bike.longitude != null;
     final statusColor = available
         ? AppColors.primaryLight
         : const Color(0xffdc2626);
@@ -859,9 +869,12 @@ class _BikeListTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          FilledButton(
-            onPressed: available && !isBusy ? onScan : null,
-            child: const Text('Scan QR'),
+          FilledButton.icon(
+            onPressed: available && hasCoords && !isBusy
+                ? () => onTrack(bike)
+                : null,
+            icon: const Icon(Icons.location_on_outlined, size: 18),
+            label: const Text('Lacak'),
           ),
         ],
       ),
