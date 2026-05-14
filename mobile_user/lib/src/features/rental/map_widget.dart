@@ -50,8 +50,8 @@ class MapWidget extends StatefulWidget {
     this.onSpotTap,
     this.bikeLabel,
     this.lastUpdateTime,
-    this.availableBikes = const [],
-    this.onAvailableBikeTap,
+    this.mapBikes = const [],
+    this.onMapBikeTap,
   });
 
   final double latitude;
@@ -83,10 +83,10 @@ class MapWidget extends StatefulWidget {
   final DateTime? lastUpdateTime;
 
   /// Available bikes to show as markers on the map.
-  final List<Bike> availableBikes;
+  final List<Bike> mapBikes;
 
-  /// Callback when an available bike marker is tapped.
-  final void Function(Bike bike)? onAvailableBikeTap;
+  /// Callback when a bike marker is tapped.
+  final void Function(Bike bike)? onMapBikeTap;
 
   @override
   State<MapWidget> createState() => _MapWidgetState();
@@ -355,7 +355,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     if (widget.userLatitude != null && widget.userLongitude != null) {
       points.add(LatLng(widget.userLatitude!, widget.userLongitude!));
     }
-    for (final bike in widget.availableBikes) {
+    for (final bike in widget.mapBikes) {
       if (bike.latitude != null && bike.longitude != null) {
         points.add(LatLng(bike.latitude!, bike.longitude!));
       }
@@ -395,8 +395,8 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
           _buildUserMarker(),
         // Bike marker: only show when backend has real GPS data
         if (widget.bikeLabel != null) _buildBikeMarker(bikePos),
-        // Available bikes markers
-        if (widget.availableBikes.isNotEmpty) _buildAvailableBikeMarkers(),
+        // Map bikes markers
+        if (widget.mapBikes.isNotEmpty) _buildMapBikeMarkers(),
       ],
     );
   }
@@ -795,21 +795,38 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     );
   }
 
-  /// Markers for available bikes: smaller green markers, tappable
-  MarkerLayer _buildAvailableBikeMarkers() {
-    final bikes = widget.availableBikes
+  /// Markers for map bikes: colored based on status, tappable
+  MarkerLayer _buildMapBikeMarkers() {
+    final bikes = widget.mapBikes
         .where((bike) => bike.latitude != null && bike.longitude != null)
         .toList();
 
     return MarkerLayer(
       markers: bikes.map((bike) {
         final pos = LatLng(bike.latitude!, bike.longitude!);
+        
+        // Determine color based on status
+        Color mainColor;
+        Color textColor;
+        Color bgColor = Colors.white;
+        
+        if (!bike.isOnline) {
+          mainColor = const Color(0xff9ca3af); // Grey for Offline
+          textColor = const Color(0xff4b5563);
+        } else if (bike.isAvailable) {
+          mainColor = const Color(0xff10b981); // Green for Available
+          textColor = const Color(0xff065f46);
+        } else {
+          mainColor = const Color(0xff3b82f6); // Blue for In Use
+          textColor = const Color(0xff1d4ed8);
+        }
+
         return Marker(
           point: pos,
           width: 80,
           height: 52,
           child: GestureDetector(
-            onTap: () => widget.onAvailableBikeTap?.call(bike),
+            onTap: () => widget.onMapBikeTap?.call(bike),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -819,7 +836,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: bgColor,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: const [
                       BoxShadow(
@@ -833,10 +850,10 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                     bike.code,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xff065f46),
+                      color: textColor,
                     ),
                   ),
                 ),
@@ -845,7 +862,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: const Color(0xff10b981),
+                    color: mainColor,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2.5),
                     boxShadow: const [
