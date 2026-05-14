@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../models/bike.dart';
+import '../../models/rental.dart';
 import '../../services/api_client.dart';
+import '../rental/qr_scan_screen.dart';
 import 'map_widget.dart';
 import 'rolling_number.dart';
 import 'routing_service.dart';
@@ -40,6 +43,9 @@ class _MapTestScreenState extends State<MapTestScreen> {
   int? _rentalId;
   String _bikeName = '';
   bool _hasBikeCoords = false;
+
+  // Available bikes for map markers
+  List<Bike> _availableBikes = [];
 
   // User's own location (blue dot)
   LatLng? _userPosition;
@@ -109,8 +115,25 @@ class _MapTestScreenState extends State<MapTestScreen> {
     _isPolling = true;
 
     try {
-      final rental = await widget.api.activeRental();
+      // Fetch rental + available bikes in parallel
+      final results = await Future.wait([
+        widget.api.activeRental(),
+        widget.api.bikes(),
+      ]);
       if (!mounted) return;
+
+      final rental = results[0] as Rental?;
+      final allBikes = results[1] as List<Bike>;
+
+      // Filter: only available bikes with GPS coordinates
+      // Exclude the bike being rented by this user (if any)
+      final rentedBikeId = rental?.bike?.id;
+      final available = allBikes.where((b) =>
+        b.isAvailable &&
+        b.latitude != null &&
+        b.longitude != null &&
+        b.id != rentedBikeId
+      ).toList();
 
       if (rental != null) {
         final bike = rental.bike;
@@ -123,6 +146,7 @@ class _MapTestScreenState extends State<MapTestScreen> {
           _totalDistance = rental.totalDistanceMeters;
           _bikeName = bike != null ? '${bike.code} - ${bike.name}' : '';
           _hasBikeCoords = hasCoords;
+          _availableBikes = available;
           if (hasCoords) {
             _bikePosition = LatLng(bike!.latitude!, bike.longitude!);
           }
@@ -157,6 +181,7 @@ class _MapTestScreenState extends State<MapTestScreen> {
             _rentalStartedAt = null;
             _elapsed = Duration.zero;
             _locationName = 'Menunggu data sepeda...';
+            _availableBikes = available;
           });
           _clockTimer?.cancel();
         }
@@ -187,6 +212,23 @@ class _MapTestScreenState extends State<MapTestScreen> {
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => _SpotInfoSheet(spot: spot, bikePosition: _bikePosition),
+    );
+  }
+
+  void _onAvailableBikeTap(Bike bike) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => _AvailableBikeSheet(
+        bike: bike,
+        userPosition: _userPosition,
+        onScanQr: () {
+          Navigator.of(context).pop(); // close bottom sheet
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => QrScanScreen(api: widget.api)),
+          );
+        },
+      ),
     );
   }
 
@@ -234,6 +276,9 @@ class _MapTestScreenState extends State<MapTestScreen> {
                 onSpotTap: _onSpotTap,
                 // Only show bike marker when we have real GPS data from backend
                 bikeLabel: _hasBikeCoords ? _bikeName : null,
+                // Available bikes markers
+                availableBikes: _availableBikes,
+                onAvailableBikeTap: _onAvailableBikeTap,
               ),
             ),
           ),
@@ -496,5 +541,86 @@ class _DetailRow extends StatelessWidget {
       Text('$label: ', style: const TextStyle(color: Color(0xff667085), fontWeight: FontWeight.w500)),
       Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
     ]);
+  }
+}
+
+/// Bottom sheet showing available bike info when tapped on map.
+class _AvailableBikeSheet extends StatelessWidget {
+  const _AvailableBikeSheet({required this.bike, this.userPosition, this.onScanQr});
+  final Bike bike;
+  final LatLng? userPosition;
+  final VoidCallback? onScanQr;
+
+  @override
+  Widget build(BuildContext context) {
+    final bikePos = LatLng(bike.latitude!, bike.longitude!);
+    final dist = userPosition != null ? calculateDistance(userPosition!, bikePos) : null;
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffd0d5dd), borderRadius: BorderRadius.circular(2)))),
+        const SizedBox(height: 16),
+        Row(children: [
+          Container(
+            width: 48, height: 48,
+            decoration: const BoxDecoration(color: Color(0xff10b981), shape: BoxShape.circle),
+            child: const Icon(Icons.pedal_bike, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(bike.code, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: const Color(0xffd1fae5), borderRadius: BorderRadius.circular(6)),
+                child: const Text('Tersedia', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xff065f46))),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.circle, size: 8, color: bike.isOnline ? const Color(0xff10b981) : const Color(0xff9ca3af)),
+              const SizedBox(width: 4),
+              Text(bike.isOnline ? 'Online' : 'Offline', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: bike.isOnline ? const Color(0xff065f46) : const Color(0xff6b7280))),
+            ]),
+          ])),
+        ]),
+        const SizedBox(height: 16), const Divider(), const SizedBox(height: 12),
+        _DetailRow(icon: Icons.pedal_bike, label: 'Nama', value: bike.name),
+        const SizedBox(height: 10),
+        _DetailRow(icon: Icons.location_on, label: 'Koordinat', value: '${bike.latitude!.toStringAsFixed(4)}, ${bike.longitude!.toStringAsFixed(4)}'),
+        if (dist != null) ...[
+          const SizedBox(height: 10),
+          _DetailRow(
+            icon: Icons.straighten,
+            label: 'Jarak dari Anda',
+            value: dist >= 1000 ? '${(dist / 1000).toStringAsFixed(2)} km' : '${dist.toStringAsFixed(0)} m',
+          ),
+        ],
+        if (bike.batteryPercent != null) ...[
+          const SizedBox(height: 10),
+          _DetailRow(
+            icon: bike.batteryPercent! > 20 ? Icons.battery_std : Icons.battery_alert,
+            label: 'Baterai',
+            value: '${bike.batteryPercent}%',
+          ),
+        ],
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: onScanQr,
+            icon: const Icon(Icons.qr_code_scanner, size: 18),
+            label: const Text('Scan QR untuk Sewa'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xff0f766e),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ]),
+    );
   }
 }
