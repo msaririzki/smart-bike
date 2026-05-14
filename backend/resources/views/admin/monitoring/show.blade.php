@@ -199,6 +199,7 @@
                         <th style="padding: 1rem 1.5rem; font-size: 0.875rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Rental</th>
                         <th style="padding: 1rem 1.5rem; font-size: 0.875rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Pengguna</th>
                         <th style="padding: 1rem 1.5rem; font-size: 0.875rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Lokasi</th>
+                        <th style="padding: 1rem 1.5rem; font-size: 0.875rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Tipe Jaringan</th>
                         <th style="padding: 1rem 1.5rem; font-size: 0.875rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Waktu Diterima</th>
                     </tr>
                 </thead>
@@ -214,10 +215,15 @@
                             </td>
                             <td style="padding: 1rem 1.5rem; color: #0f172a;">{{ $point->rental?->user?->name ?? '-' }}</td>
                             <td style="padding: 1rem 1.5rem; color: #64748b; font-family: monospace;">{{ $point->latitude }}, {{ $point->longitude }}</td>
+                            <td style="padding: 1rem 1.5rem;">
+                                <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">
+                                    {{ $point->network_type ?? '-' }}
+                                </span>
+                            </td>
                             <td style="padding: 1rem 1.5rem; color: #64748b;">{{ $point->recorded_at }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" style="padding: 2rem; text-align: center; color: #94a3b8;">Belum ada lokasi rental.</td></tr>
+                        <tr><td colspan="5" style="padding: 2rem; text-align: center; color: #94a3b8;">Belum ada lokasi rental.</td></tr>
                     @endforelse
                 </tbody>
             </table>
