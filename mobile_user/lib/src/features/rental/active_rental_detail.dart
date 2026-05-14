@@ -136,10 +136,18 @@ class ActiveRentalDetail extends StatelessWidget {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
               : const Icon(Icons.stop_circle_outlined),
           label: Text(isFinishing ? 'Menyelesaikan...' : 'Selesaikan Sewa'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primaryLight,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
         ),
       ],
     );

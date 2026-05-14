@@ -328,7 +328,7 @@ class _DashboardPageState extends State<_DashboardPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
     }
 
     return RefreshIndicator(
@@ -650,7 +650,7 @@ class _ActiveRentalSummary extends StatelessWidget {
                 icon: const Icon(Icons.stop_circle_outlined, size: 18),
                 label: const Text('Akhiri'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primaryLight,
+                  backgroundColor: Colors.white,
                   foregroundColor: AppColors.primaryDark,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),

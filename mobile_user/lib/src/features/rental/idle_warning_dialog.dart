@@ -284,46 +284,24 @@ class IdleWarningDialog extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     height: 50,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            AppColors.primaryDark,
-                            AppColors.primaryDark,
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryDark.withValues(
-                              alpha: 0.35,
-                            ),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                    child: FilledButton.icon(
+                      onPressed: onContinue,
+                      icon: const Icon(
+                        Icons.play_arrow_rounded,
+                        size: 22,
                       ),
-                      child: ElevatedButton.icon(
-                        onPressed: onContinue,
-                        icon: const Icon(
-                          Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 22,
+                      label: const Text(
+                        'Saya Lanjutkan',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
                         ),
-                        label: const Text(
-                          'Saya Lanjutkan',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primaryLight,
+                        foregroundColor: AppColors.primaryDark,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                     ),

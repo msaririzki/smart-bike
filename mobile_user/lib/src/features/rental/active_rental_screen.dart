@@ -417,8 +417,12 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
     final rental = _rental;
 
     return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 253, 255, 254),
       appBar: AppBar(
-        title: const Text('Rental Aktif'),
+        title: const Text('Rental Aktif', style: TextStyle(fontWeight: FontWeight.w900)),
+        backgroundColor: const Color.fromARGB(255, 253, 255, 254),
+        foregroundColor: const Color(0xff073f3a),
+        elevation: 0,
         actions: [
           IconButton(
             tooltip: 'Refresh',
