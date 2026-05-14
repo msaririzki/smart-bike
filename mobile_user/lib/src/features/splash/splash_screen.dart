@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../theme/app_colors.dart';
+
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
@@ -69,7 +71,7 @@ class SplashScreen extends StatelessWidget {
               height: 40,
               child: CircularProgressIndicator(
                 strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF349665)),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryLight),
               ),
             ).animate().fade(delay: 1000.ms, duration: 500.ms),
           ],

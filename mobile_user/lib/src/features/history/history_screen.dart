@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/rental_history.dart';
 import '../../services/api_client.dart';
+import '../../theme/app_colors.dart';
 import 'rental_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -257,7 +258,7 @@ class HistoryScreenState extends State<HistoryScreen> {
             Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
-        backgroundColor: const Color(0xff269276),
+        backgroundColor: AppColors.primaryLight,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -274,17 +275,17 @@ class HistoryScreenState extends State<HistoryScreen> {
     );
 
     if (!widget.showScaffold) {
-      return ColoredBox(color: const Color(0xfff7fbf8), child: body);
+      return ColoredBox(color: const Color.fromARGB(255, 253, 255, 254), child: body);
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xfff7fbf8),
+      backgroundColor: const Color.fromARGB(255, 253, 255, 254),
       appBar: AppBar(
         title: const Text(
           'Riwayat Sewa',
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color.fromARGB(255, 253, 255, 254),
         foregroundColor: const Color(0xff073f3a),
         elevation: 0,
         actions: [
@@ -571,7 +572,7 @@ class HistoryScreenState extends State<HistoryScreen> {
                           ? Icons.check_box_rounded
                           : Icons.check_box_outline_blank_rounded,
                       size: 20,
-                      color: const Color(0xff269276),
+                      color: AppColors.primaryLight,
                     ),
                     onPressed: () => _selectAll(filteredHistory),
                   ),
@@ -692,7 +693,7 @@ class HistoryScreenState extends State<HistoryScreen> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(
-                  color: Color(0xff269276),
+                  color: AppColors.primaryLight,
                   width: 1.5,
                 ),
               ),
@@ -842,11 +843,7 @@ class _HistorySummaryHeader extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xff269276), Color(0xff18846e)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -882,7 +879,6 @@ class _HistorySummaryHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                flex: 3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -896,25 +892,6 @@ class _HistorySummaryHeader extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     _WeeklyBarChart(history: history),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      'Badges',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _AchievementBadgesCompact(history: history),
                   ],
                 ),
               ),
@@ -1011,21 +988,8 @@ class _GoalTracker extends StatelessWidget {
                 height: 14,
                 width: constraints.maxWidth * progress,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xff00ff87),
-                      Color(0xff60efff),
-                    ], // Electric Green to Cyan
-                  ),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(7),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xff00ff87).withValues(alpha: 0.5),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 0),
-                    ),
-                  ],
                 ),
               ),
             ),
@@ -1217,7 +1181,7 @@ class _HistoryCard extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xff073f3a),
+                              color: Colors.black87,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -1244,7 +1208,7 @@ class _HistoryCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xff269276),
+                        color: AppColors.primaryLight,
                       ),
                     ),
                     const SizedBox(height: 2),
