@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../models/bike.dart';
 import '../../services/api_client.dart';
 import 'map_widget.dart';
+import 'qr_scan_screen.dart';
 import 'rolling_number.dart';
 import 'routing_service.dart';
 
@@ -22,13 +24,48 @@ class _MapTestScreenState extends State<MapTestScreen> {
   static const _defaultCenter = LatLng(-8.5830, 116.1163);
 
   static final _popularSpots = [
-    const PopularSpot(name: 'Taman Kota Mataram', position: LatLng(-8.5810, 116.1150), icon: Icons.park, category: 'Taman'),
-    const PopularSpot(name: 'Pantai Loang Baloq', position: LatLng(-8.5780, 116.0980), icon: Icons.beach_access, category: 'Pantai'),
-    const PopularSpot(name: 'Mall Epicentrum', position: LatLng(-8.5890, 116.1230), icon: Icons.shopping_bag, category: 'Mall'),
-    const PopularSpot(name: 'Masjid Islamic Center', position: LatLng(-8.5760, 116.1120), icon: Icons.mosque, category: 'Tempat Ibadah'),
-    const PopularSpot(name: 'Universitas Bumigora', position: LatLng(-8.5776, 116.1264), icon: Icons.school, category: 'Kampus'),
-    const PopularSpot(name: 'Taman Mayura', position: LatLng(-8.5868, 116.1331), icon: Icons.temple_hindu, category: 'Taman'),
-    const PopularSpot(name: 'Taman Sangkareang', position: LatLng(-8.5830, 116.1118), icon: Icons.nature_people, category: 'Taman'),
+    const PopularSpot(
+      name: 'Taman Kota Mataram',
+      position: LatLng(-8.5810, 116.1150),
+      icon: Icons.park,
+      category: 'Taman',
+    ),
+    const PopularSpot(
+      name: 'Pantai Loang Baloq',
+      position: LatLng(-8.5780, 116.0980),
+      icon: Icons.beach_access,
+      category: 'Pantai',
+    ),
+    const PopularSpot(
+      name: 'Mall Epicentrum',
+      position: LatLng(-8.5890, 116.1230),
+      icon: Icons.shopping_bag,
+      category: 'Mall',
+    ),
+    const PopularSpot(
+      name: 'Masjid Islamic Center',
+      position: LatLng(-8.5760, 116.1120),
+      icon: Icons.mosque,
+      category: 'Tempat Ibadah',
+    ),
+    const PopularSpot(
+      name: 'Universitas Bumigora',
+      position: LatLng(-8.5776, 116.1264),
+      icon: Icons.school,
+      category: 'Kampus',
+    ),
+    const PopularSpot(
+      name: 'Taman Mayura',
+      position: LatLng(-8.5868, 116.1331),
+      icon: Icons.temple_hindu,
+      category: 'Taman',
+    ),
+    const PopularSpot(
+      name: 'Taman Sangkareang',
+      position: LatLng(-8.5830, 116.1118),
+      icon: Icons.nature_people,
+      category: 'Taman',
+    ),
   ];
 
   // Bike position from backend: null when no GPS data yet.
@@ -40,6 +77,9 @@ class _MapTestScreenState extends State<MapTestScreen> {
   int? _rentalId;
   String _bikeName = '';
   bool _hasBikeCoords = false;
+
+  // Available bikes for map markers
+  List<Bike> _availableBikes = [];
 
   // User's own location (blue dot)
   LatLng? _userPosition;
@@ -81,19 +121,35 @@ class _MapTestScreenState extends State<MapTestScreen> {
       LocationPermission perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
-        if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return;
+        if (perm == LocationPermission.denied ||
+            perm == LocationPermission.deniedForever) {
+          return;
+        }
       }
 
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 10)),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
       );
-      if (mounted) setState(() => _userPosition = LatLng(pos.latitude, pos.longitude));
+      if (mounted) {
+        setState(() => _userPosition = LatLng(pos.latitude, pos.longitude));
+      }
 
-      _userPosStream = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 10),
-      ).listen((pos) {
-        if (mounted) setState(() => _userPosition = LatLng(pos.latitude, pos.longitude));
-      });
+      _userPosStream =
+          Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 10,
+            ),
+          ).listen((pos) {
+            if (mounted) {
+              setState(
+                () => _userPosition = LatLng(pos.latitude, pos.longitude),
+              );
+            }
+          });
     } catch (_) {}
   }
 
@@ -101,7 +157,10 @@ class _MapTestScreenState extends State<MapTestScreen> {
 
   void _startPolling() {
     _fetchRentalData();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchRentalData());
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _fetchRentalData(),
+    );
   }
 
   Future<void> _fetchRentalData() async {
@@ -110,6 +169,9 @@ class _MapTestScreenState extends State<MapTestScreen> {
 
     try {
       final rental = await widget.api.activeRental();
+      final available = await _fetchAvailableBikes(
+        excludeBikeId: rental?.bike?.id,
+      );
       if (!mounted) return;
 
       if (rental != null) {
@@ -123,6 +185,7 @@ class _MapTestScreenState extends State<MapTestScreen> {
           _totalDistance = rental.totalDistanceMeters;
           _bikeName = bike != null ? '${bike.code} - ${bike.name}' : '';
           _hasBikeCoords = hasCoords;
+          _availableBikes = available;
           if (hasCoords) {
             _bikePosition = LatLng(bike!.latitude!, bike.longitude!);
           }
@@ -139,7 +202,9 @@ class _MapTestScreenState extends State<MapTestScreen> {
           try {
             final points = await widget.api.rentalLocationPoints(_rentalId!);
             if (mounted) {
-              setState(() => _pathHistory = points.map((p) => p.latLng).toList());
+              setState(
+                () => _pathHistory = points.map((p) => p.latLng).toList(),
+              );
             }
           } catch (_) {}
         }
@@ -157,6 +222,7 @@ class _MapTestScreenState extends State<MapTestScreen> {
             _rentalStartedAt = null;
             _elapsed = Duration.zero;
             _locationName = 'Menunggu data sepeda...';
+            _availableBikes = available;
           });
           _clockTimer?.cancel();
         }
@@ -164,6 +230,24 @@ class _MapTestScreenState extends State<MapTestScreen> {
     } catch (_) {
     } finally {
       _isPolling = false;
+    }
+  }
+
+  Future<List<Bike>> _fetchAvailableBikes({int? excludeBikeId}) async {
+    try {
+      final allBikes = await widget.api.bikes();
+      return allBikes
+          .where(
+            (bike) =>
+                bike.isAvailable &&
+                bike.isOnline &&
+                bike.latitude != null &&
+                bike.longitude != null &&
+                bike.id != excludeBikeId,
+          )
+          .toList();
+    } catch (_) {
+      return _availableBikes;
     }
   }
 
@@ -185,8 +269,29 @@ class _MapTestScreenState extends State<MapTestScreen> {
   void _onSpotTap(PopularSpot spot) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => _SpotInfoSheet(spot: spot, bikePosition: _bikePosition),
+    );
+  }
+
+  void _onAvailableBikeTap(Bike bike) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _AvailableBikeSheet(
+        bike: bike,
+        userPosition: _userPosition,
+        onScanQr: () {
+          Navigator.of(context).pop(); // close bottom sheet
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => QrScanScreen(api: widget.api)),
+          );
+        },
+      ),
     );
   }
 
@@ -216,7 +321,10 @@ class _MapTestScreenState extends State<MapTestScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: _MapTypeDropdown(value: _mapType, onChanged: (t) => setState(() => _mapType = t)),
+            child: _MapTypeDropdown(
+              value: _mapType,
+              onChanged: (t) => setState(() => _mapType = t),
+            ),
           ),
           Expanded(
             child: Padding(
@@ -234,6 +342,9 @@ class _MapTestScreenState extends State<MapTestScreen> {
                 onSpotTap: _onSpotTap,
                 // Only show bike marker when we have real GPS data from backend
                 bikeLabel: _hasBikeCoords ? _bikeName : null,
+                // Available bikes markers
+                availableBikes: _availableBikes,
+                onAvailableBikeTap: _onAvailableBikeTap,
               ),
             ),
           ),
@@ -269,17 +380,32 @@ class _MapTestScreenState extends State<MapTestScreen> {
             padding: const EdgeInsets.all(16),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(color: const Color(0xfff0fdfa), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xff99f6e4))),
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Icon(Icons.info_outline, size: 14, color: Color(0xff0f766e)),
-                const SizedBox(width: 8),
-                Text(
-                  hasRental
-                      ? 'Data lokasi dikirim oleh perangkat sepeda (mobile_bike)'
-                      : 'Ketuk tempat populer di peta untuk info jarak',
-                  style: const TextStyle(fontSize: 11, color: Color(0xff0f766e), fontWeight: FontWeight.w500),
-                ),
-              ]),
+              decoration: BoxDecoration(
+                color: const Color(0xfff0fdfa),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xff99f6e4)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: Color(0xff0f766e),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    hasRental
+                        ? 'Data lokasi dikirim oleh perangkat sepeda (mobile_bike)'
+                        : 'Ketuk tempat populer di peta untuk info jarak',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xff0f766e),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -296,15 +422,30 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color bg; Color fg;
+    Color bg;
+    Color fg;
     switch (status) {
-      case 'active': bg = const Color(0xffd1fae5); fg = const Color(0xff065f46); break;
-      case 'idle_warning': bg = const Color(0xfffef3c7); fg = const Color(0xff92400e); break;
-      case 'idle_billing': bg = const Color(0xfffee2e2); fg = const Color(0xff991b1b); break;
-      default: bg = const Color(0xfff3f4f6); fg = const Color(0xff374151);
+      case 'active':
+        bg = const Color(0xffd1fae5);
+        fg = const Color(0xff065f46);
+        break;
+      case 'idle_warning':
+        bg = const Color(0xfffef3c7);
+        fg = const Color(0xff92400e);
+        break;
+      case 'idle_billing':
+        bg = const Color(0xfffee2e2);
+        fg = const Color(0xff991b1b);
+        break;
+      default:
+        bg = const Color(0xfff3f4f6);
+        fg = const Color(0xff374151);
     }
     return Chip(
-      label: Text(status.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
+      label: Text(
+        status.replaceAll('_', ' ').toUpperCase(),
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg),
+      ),
       backgroundColor: bg,
       padding: EdgeInsets.zero,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -322,23 +463,59 @@ class _MapTypeDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xffd0d5dd)), borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xffd0d5dd)),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: DropdownButton<MapType>(
-        value: value, isExpanded: true, underline: const SizedBox.shrink(),
-        icon: const Icon(Icons.layers, color: Color(0xff0f766e)), borderRadius: BorderRadius.circular(10),
-        items: MapType.values.map((type) => DropdownMenuItem(value: type, child: Row(children: [
-          Icon(_iconFor(type), size: 18, color: const Color(0xff0f766e)), const SizedBox(width: 10), Text(type.label),
-        ]))).toList(),
-        onChanged: (t) { if (t != null) onChanged(t); },
+        value: value,
+        isExpanded: true,
+        underline: const SizedBox.shrink(),
+        icon: const Icon(Icons.layers, color: Color(0xff0f766e)),
+        borderRadius: BorderRadius.circular(10),
+        items: MapType.values
+            .map(
+              (type) => DropdownMenuItem(
+                value: type,
+                child: Row(
+                  children: [
+                    Icon(
+                      _iconFor(type),
+                      size: 18,
+                      color: const Color(0xff0f766e),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(type.label),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+        onChanged: (t) {
+          if (t != null) onChanged(t);
+        },
       ),
     );
   }
 
-  IconData _iconFor(MapType t) => switch (t) { MapType.standard => Icons.map_outlined, MapType.satellite => Icons.satellite_alt, MapType.hybrid => Icons.layers };
+  IconData _iconFor(MapType t) => switch (t) {
+    MapType.standard => Icons.map_outlined,
+    MapType.satellite => Icons.satellite_alt,
+    MapType.hybrid => Icons.layers,
+  };
 }
 
 class _InfoPanel extends StatelessWidget {
-  const _InfoPanel({required this.locationName, required this.distance, required this.speed, required this.elapsed, this.bikeName = '', this.hasRental = false, this.hasBikeCoords = false});
+  const _InfoPanel({
+    required this.locationName,
+    required this.distance,
+    required this.speed,
+    required this.elapsed,
+    this.bikeName = '',
+    this.hasRental = false,
+    this.hasBikeCoords = false,
+  });
   final String locationName;
   final double distance;
   final double speed;
@@ -352,35 +529,104 @@ class _InfoPanel extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: const Color(0xfff0fdfa), border: Border.all(color: const Color(0xff99f6e4)), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: const Color(0xfff0fdfa),
+        border: Border.all(color: const Color(0xff99f6e4)),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         children: [
-          Row(children: [
-            Icon(hasBikeCoords ? Icons.location_on : Icons.location_off, size: 16, color: Color(hasBikeCoords ? 0xff0f766e : 0xff9ca3af)),
-            const SizedBox(width: 6),
-            Expanded(child: Text(locationName.isEmpty ? 'Memuat lokasi...' : locationName, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-          ]),
+          Row(
+            children: [
+              Icon(
+                hasBikeCoords ? Icons.location_on : Icons.location_off,
+                size: 16,
+                color: Color(hasBikeCoords ? 0xff0f766e : 0xff9ca3af),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  locationName.isEmpty ? 'Memuat lokasi...' : locationName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
           if (bikeName.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Row(children: [
-              const Icon(Icons.pedal_bike, size: 14, color: Color(0xff0f766e)),
-              const SizedBox(width: 6),
-              Flexible(child: Text(bikeName, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: const Color(0xff0f766e), fontWeight: FontWeight.w600))),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(color: const Color(0xffd1fae5), borderRadius: BorderRadius.circular(4)),
-                child: const Text('Perangkat sepeda', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xff065f46))),
-              ),
-            ]),
+            Row(
+              children: [
+                const Icon(
+                  Icons.pedal_bike,
+                  size: 14,
+                  color: Color(0xff0f766e),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    bikeName,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: const Color(0xff0f766e),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffd1fae5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Perangkat sepeda',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xff065f46),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
           if (hasRental) ...[
             const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: _InfoItem(icon: Icons.straighten, label: 'Jarak', value: distance >= 1000 ? '${(distance / 1000).toStringAsFixed(2)} km' : '${distance.toStringAsFixed(0)} m')),
-              Expanded(child: _InfoItemRolling(icon: Icons.speed, label: 'Kecepatan', value: speed.toStringAsFixed(1), suffix: 'km/h')),
-              Expanded(child: _InfoItem(icon: Icons.timer_outlined, label: 'Durasi', value: _fmt(elapsed))),
-            ]),
+            Row(
+              children: [
+                Expanded(
+                  child: _InfoItem(
+                    icon: Icons.straighten,
+                    label: 'Jarak',
+                    value: distance >= 1000
+                        ? '${(distance / 1000).toStringAsFixed(2)} km'
+                        : '${distance.toStringAsFixed(0)} m',
+                  ),
+                ),
+                Expanded(
+                  child: _InfoItemRolling(
+                    icon: Icons.speed,
+                    label: 'Kecepatan',
+                    value: speed.toStringAsFixed(1),
+                    suffix: 'km/h',
+                  ),
+                ),
+                Expanded(
+                  child: _InfoItem(
+                    icon: Icons.timer_outlined,
+                    label: 'Durasi',
+                    value: _fmt(elapsed),
+                  ),
+                ),
+              ],
+            ),
           ],
         ],
       ),
@@ -388,58 +634,121 @@ class _InfoPanel extends StatelessWidget {
   }
 
   String _fmt(Duration d) {
-    final h = d.inHours; final m = d.inMinutes.remainder(60).toString().padLeft(2, '0'); final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 }
 
 class _InfoItem extends StatelessWidget {
-  const _InfoItem({required this.icon, required this.label, required this.value});
-  final IconData icon; final String label; final String value;
+  const _InfoItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
-      Icon(icon, size: 18, color: const Color(0xff0f766e)),
-      const SizedBox(height: 4),
-      Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: const Color(0xff667085))),
-      const SizedBox(height: 2),
-      Text(value, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-    ]);
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xff0f766e)),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: const Color(0xff667085)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          textAlign: TextAlign.center,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
   }
 }
 
 class _InfoItemRolling extends StatelessWidget {
-  const _InfoItemRolling({required this.icon, required this.label, required this.value, this.suffix = ''});
-  final IconData icon; final String label; final String value; final String suffix;
+  const _InfoItemRolling({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.suffix = '',
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+  final String suffix;
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
-      Icon(icon, size: 18, color: const Color(0xff0f766e)),
-      const SizedBox(height: 4),
-      Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: const Color(0xff667085))),
-      const SizedBox(height: 2),
-      RollingNumber(value: value, suffix: suffix, textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()])),
-    ]);
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xff0f766e)),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: const Color(0xff667085)),
+        ),
+        const SizedBox(height: 2),
+        RollingNumber(
+          value: value,
+          suffix: suffix,
+          textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
   }
 }
 
 class _StatusBanner extends StatelessWidget {
-  const _StatusBanner({required this.icon, required this.text, required this.bgColor, required this.borderColor, required this.iconColor, required this.textColor});
-  final IconData icon; final String text; final Color bgColor; final Color borderColor; final Color iconColor; final Color textColor;
+  const _StatusBanner({
+    required this.icon,
+    required this.text,
+    required this.bgColor,
+    required this.borderColor,
+    required this.iconColor,
+    required this.textColor,
+  });
+  final IconData icon;
+  final String text;
+  final Color bgColor;
+  final Color borderColor;
+  final Color iconColor;
+  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: bgColor, border: Border.all(color: borderColor), borderRadius: BorderRadius.circular(8)),
-      child: Row(children: [
-        Icon(icon, size: 16, color: iconColor),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text, style: TextStyle(fontSize: 12, color: textColor))),
-      ]),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: iconColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: TextStyle(fontSize: 12, color: textColor)),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -452,49 +761,299 @@ class _SpotInfoSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dist = bikePosition != null ? calculateDistance(bikePosition!, spot.position) : null;
+    final dist = bikePosition != null
+        ? calculateDistance(bikePosition!, spot.position)
+        : null;
 
     return Padding(
       padding: const EdgeInsets.all(20),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffd0d5dd), borderRadius: BorderRadius.circular(2)))),
-        const SizedBox(height: 16),
-        Row(children: [
-          Container(width: 44, height: 44, decoration: const BoxDecoration(color: Color(0xff8b5cf6), shape: BoxShape.circle), child: Icon(spot.icon, color: Colors.white, size: 22)),
-          const SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(spot.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: const Color(0xffede9fe), borderRadius: BorderRadius.circular(6)),
-              child: Text(spot.category, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xff7c3aed)))),
-          ])),
-        ]),
-        const SizedBox(height: 16), const Divider(), const SizedBox(height: 12),
-        _DetailRow(icon: Icons.location_on, label: 'Koordinat', value: '${spot.position.latitude.toStringAsFixed(4)}, ${spot.position.longitude.toStringAsFixed(4)}'),
-        if (dist != null) ...[
-          const SizedBox(height: 10),
-          _DetailRow(icon: Icons.straighten, label: 'Jarak dari sepeda', value: dist >= 1000 ? '${(dist / 1000).toStringAsFixed(2)} km' : '${dist.toStringAsFixed(0)} m'),
-        ] else ...[
-          const SizedBox(height: 10),
-          const _DetailRow(icon: Icons.info_outline, label: 'Info', value: 'Belum ada data lokasi sepeda'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xffd0d5dd),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: Color(0xff8b5cf6),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(spot.icon, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      spot.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xffede9fe),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        spot.category,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xff7c3aed),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 12),
+          _DetailRow(
+            icon: Icons.location_on,
+            label: 'Koordinat',
+            value:
+                '${spot.position.latitude.toStringAsFixed(4)}, ${spot.position.longitude.toStringAsFixed(4)}',
+          ),
+          if (dist != null) ...[
+            const SizedBox(height: 10),
+            _DetailRow(
+              icon: Icons.straighten,
+              label: 'Jarak dari sepeda',
+              value: dist >= 1000
+                  ? '${(dist / 1000).toStringAsFixed(2)} km'
+                  : '${dist.toStringAsFixed(0)} m',
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            const _DetailRow(
+              icon: Icons.info_outline,
+              label: 'Info',
+              value: 'Belum ada data lokasi sepeda',
+            ),
+          ],
+          const SizedBox(height: 16),
         ],
-        const SizedBox(height: 16),
-      ]),
+      ),
     );
   }
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.icon, required this.label, required this.value});
-  final IconData icon; final String label; final String value;
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      Icon(icon, size: 18, color: const Color(0xff667085)),
-      const SizedBox(width: 10),
-      Text('$label: ', style: const TextStyle(color: Color(0xff667085), fontWeight: FontWeight.w500)),
-      Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
-    ]);
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xff667085)),
+        const SizedBox(width: 10),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            color: Color(0xff667085),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bottom sheet showing available bike info when tapped on map.
+class _AvailableBikeSheet extends StatelessWidget {
+  const _AvailableBikeSheet({
+    required this.bike,
+    this.userPosition,
+    this.onScanQr,
+  });
+  final Bike bike;
+  final LatLng? userPosition;
+  final VoidCallback? onScanQr;
+
+  @override
+  Widget build(BuildContext context) {
+    final bikePos = LatLng(bike.latitude!, bike.longitude!);
+    final dist = userPosition != null
+        ? calculateDistance(userPosition!, bikePos)
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xffd0d5dd),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: Color(0xff10b981),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.pedal_bike,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      bike.code,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xffd1fae5),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Tersedia',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xff065f46),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.circle,
+                          size: 8,
+                          color: bike.isOnline
+                              ? const Color(0xff10b981)
+                              : const Color(0xff9ca3af),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          bike.isOnline ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: bike.isOnline
+                                ? const Color(0xff065f46)
+                                : const Color(0xff6b7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 12),
+          _DetailRow(icon: Icons.pedal_bike, label: 'Nama', value: bike.name),
+          const SizedBox(height: 10),
+          _DetailRow(
+            icon: Icons.location_on,
+            label: 'Koordinat',
+            value:
+                '${bike.latitude!.toStringAsFixed(4)}, ${bike.longitude!.toStringAsFixed(4)}',
+          ),
+          if (dist != null) ...[
+            const SizedBox(height: 10),
+            _DetailRow(
+              icon: Icons.straighten,
+              label: 'Jarak dari Anda',
+              value: dist >= 1000
+                  ? '${(dist / 1000).toStringAsFixed(2)} km'
+                  : '${dist.toStringAsFixed(0)} m',
+            ),
+          ],
+          if (bike.batteryPercent != null) ...[
+            const SizedBox(height: 10),
+            _DetailRow(
+              icon: bike.batteryPercent! > 20
+                  ? Icons.battery_std
+                  : Icons.battery_alert,
+              label: 'Baterai',
+              value: '${bike.batteryPercent}%',
+            ),
+          ],
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onScanQr,
+              icon: const Icon(Icons.qr_code_scanner, size: 18),
+              label: const Text('Scan QR untuk Sewa'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xff0f766e),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
   }
 }
