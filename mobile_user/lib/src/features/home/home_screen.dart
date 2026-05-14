@@ -178,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
             showScaffold: false,
             bottomPadding: 92,
           ),
-          _ProfilePage(onLogout: widget.onLogout),
+          _ProfilePage(api: widget.api, onLogout: widget.onLogout),
         ],
       ),
       bottomNavigationBar: _CustomBottomNavBar(
@@ -887,11 +887,17 @@ class _BikeListTile extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.subtitle, this.onTap});
+  const _SectionHeader({
+    required this.title,
+    this.subtitle,
+    this.onTap,
+    this.actionLabel = 'Lihat semua',
+  });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onTap;
+  final String actionLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -919,7 +925,7 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         if (onTap != null)
-          TextButton(onPressed: onTap, child: const Text('Lihat semua')),
+          TextButton(onPressed: onTap, child: Text(actionLabel)),
       ],
     );
   }
@@ -1024,34 +1030,987 @@ class _ComingSoonPage extends StatelessWidget {
   }
 }
 
-class _ProfilePage extends StatelessWidget {
-  const _ProfilePage({required this.onLogout});
+class _ProfilePage extends StatefulWidget {
+  const _ProfilePage({required this.api, required this.onLogout});
 
+  final ApiClient api;
   final VoidCallback onLogout;
 
   @override
+  State<_ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<_ProfilePage> {
+  Map<String, dynamic>? _user;
+  int _totalTrips = 0;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        widget.api.currentUser(),
+        widget.api.rentalHistory(page: 1),
+      ]);
+      final history = results[1];
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _user = results[0];
+        _totalTrips = (history['total'] as num?)?.toInt() ?? 0;
+      });
+    } on ApiException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Gagal memuat data profil.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  String get _name => _user?['name']?.toString() ?? 'Pengguna FlowBike';
+
+  String get _email => _user?['email']?.toString() ?? '-';
+
+  String get _phone {
+    final phone = _user?['phone']?.toString();
+    if (phone == null || phone.isEmpty) {
+      return 'Belum diisi';
+    }
+
+    return phone;
+  }
+
+  String get _memberSince {
+    final value = _user?['created_at']?.toString();
+    if (value == null || value.isEmpty) {
+      return 'Baru bergabung';
+    }
+
+    final date = DateTime.tryParse(value);
+    if (date == null) {
+      return 'Baru bergabung';
+    }
+
+    return 'Sejak ${DateFormat('d MMM yyyy', 'id_ID').format(date)}';
+  }
+
+  String get _initials {
+    final parts = _name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .toList();
+    if (parts.isEmpty) {
+      return 'FB';
+    }
+
+    return parts.map((part) => part[0].toUpperCase()).join();
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _showEditProfileSheet() async {
+    final nameController = TextEditingController(text: _name);
+    final emailController = TextEditingController(
+      text: _email == '-' ? '' : _email,
+    );
+    final phoneController = TextEditingController(
+      text: _phone == 'Belum diisi' ? '' : _phone,
+    );
+    final formKey = GlobalKey<FormState>();
+
+    var isBusy = false;
+    String? sheetError;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final navigator = Navigator.of(sheetContext);
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> saveProfile() async {
+              if (!formKey.currentState!.validate()) {
+                return;
+              }
+
+              setSheetState(() {
+                isBusy = true;
+                sheetError = null;
+              });
+
+              try {
+                final updatedUser = await widget.api.updateProfile(
+                  name: nameController.text.trim(),
+                  email: emailController.text.trim(),
+                  phone: phoneController.text.trim().isEmpty
+                      ? null
+                      : phoneController.text.trim(),
+                );
+
+                if (!mounted) {
+                  return;
+                }
+
+                setState(() => _user = updatedUser);
+                navigator.pop();
+                _showMessage('Profil berhasil diperbarui.');
+              } on ApiException catch (error) {
+                setSheetState(() {
+                  sheetError = error.message;
+                  isBusy = false;
+                });
+              } catch (_) {
+                setSheetState(() {
+                  sheetError = 'Profil gagal diperbarui.';
+                  isBusy = false;
+                });
+              }
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  4,
+                  20,
+                  20 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Edit profil',
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: isBusy ? null : navigator.pop,
+                              child: const Text('Selesai'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Perbarui identitas yang dipakai untuk akun penyewa.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: const Color(0xff6b7280)),
+                        ),
+                        const SizedBox(height: 18),
+                        if (sheetError != null) ...[
+                          _SheetBanner(
+                            icon: Icons.error_outline_rounded,
+                            message: sheetError!,
+                            color: Theme.of(context).colorScheme.error,
+                            backgroundColor: const Color(0xfffff1f2),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                        TextFormField(
+                          controller: nameController,
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Nama lengkap',
+                            prefixIcon: Icon(Icons.person_outline_rounded),
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? 'Nama wajib diisi.'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: Icon(Icons.mail_outline_rounded),
+                          ),
+                          validator: (value) =>
+                              value == null || !value.contains('@')
+                              ? 'Email tidak valid.'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: phoneController,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            labelText: 'Nomor telepon',
+                            prefixIcon: Icon(Icons.phone_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        FilledButton.icon(
+                          onPressed: isBusy ? null : saveProfile,
+                          icon: isBusy
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.save_outlined),
+                          label: const Text('Simpan perubahan'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+  }
+
+  Future<void> _showPasswordResetSheet() async {
+    final codeController = TextEditingController();
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+
+    var isCodeSent = false;
+    var isBusy = false;
+    String? sheetError;
+    String? sheetMessage;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final navigator = Navigator.of(sheetContext);
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> requestCode() async {
+              setSheetState(() {
+                isBusy = true;
+                sheetError = null;
+                sheetMessage = null;
+              });
+
+              try {
+                await widget.api.requestPasswordReset(email: _email);
+                setSheetState(() {
+                  isCodeSent = true;
+                  sheetMessage = 'Kode 6 digit sudah dikirim ke $_email.';
+                });
+              } on ApiException catch (error) {
+                setSheetState(() => sheetError = error.message);
+              } catch (_) {
+                setSheetState(() => sheetError = 'Tidak bisa mengirim kode.');
+              } finally {
+                setSheetState(() => isBusy = false);
+              }
+            }
+
+            Future<void> confirmReset() async {
+              final code = codeController.text.trim();
+              final password = passwordController.text;
+              final confirmation = confirmController.text;
+
+              if (code.length != 6) {
+                setSheetState(() => sheetError = 'Kode harus 6 digit.');
+                return;
+              }
+              if (password.length < 6) {
+                setSheetState(
+                  () => sheetError = 'Password minimal 6 karakter.',
+                );
+                return;
+              }
+              if (password != confirmation) {
+                setSheetState(
+                  () => sheetError = 'Konfirmasi password berbeda.',
+                );
+                return;
+              }
+
+              setSheetState(() {
+                isBusy = true;
+                sheetError = null;
+              });
+
+              try {
+                await widget.api.confirmPasswordReset(
+                  email: _email,
+                  token: code,
+                  password: password,
+                  passwordConfirmation: confirmation,
+                );
+
+                if (!mounted) {
+                  return;
+                }
+
+                navigator.pop();
+                _showMessage('Password berhasil diubah. Silakan login ulang.');
+                widget.onLogout();
+                return;
+              } on ApiException catch (error) {
+                setSheetState(() {
+                  sheetError = error.message;
+                  isBusy = false;
+                });
+              } catch (_) {
+                setSheetState(() {
+                  sheetError = 'Password gagal diubah.';
+                  isBusy = false;
+                });
+              }
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  4,
+                  20,
+                  20 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Reset password',
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: isBusy ? null : navigator.pop,
+                            child: const Text('Selesai'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isCodeSent
+                            ? 'Masukkan kode dari email, lalu buat password baru.'
+                            : 'Kirim kode reset ke email akun yang terdaftar.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xff6b7280),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _ProfileInfoTile(
+                        icon: Icons.alternate_email_rounded,
+                        title: _email,
+                        subtitle: 'Email akun',
+                      ),
+                      const SizedBox(height: 16),
+                      if (sheetMessage != null)
+                        _SheetBanner(
+                          icon: Icons.mark_email_read_outlined,
+                          message: sheetMessage!,
+                          color: AppColors.primaryLight,
+                          backgroundColor: const Color(0xffecfdf5),
+                        ),
+                      if (sheetError != null)
+                        _SheetBanner(
+                          icon: Icons.error_outline_rounded,
+                          message: sheetError!,
+                          color: Theme.of(context).colorScheme.error,
+                          backgroundColor: const Color(0xfffff1f2),
+                        ),
+                      if (sheetMessage != null || sheetError != null)
+                        const SizedBox(height: 14),
+                      if (isCodeSent) ...[
+                        TextField(
+                          controller: codeController,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          decoration: const InputDecoration(
+                            labelText: 'Kode reset',
+                            prefixIcon: Icon(Icons.pin_outlined),
+                            counterText: '',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Password baru',
+                            prefixIcon: Icon(Icons.lock_outline_rounded),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: confirmController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Konfirmasi password',
+                            prefixIcon: Icon(Icons.verified_user_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                      ],
+                      FilledButton.icon(
+                        onPressed: isBusy
+                            ? null
+                            : isCodeSent
+                            ? confirmReset
+                            : requestCode,
+                        icon: isBusy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                isCodeSent
+                                    ? Icons.check_circle_outline_rounded
+                                    : Icons.send_outlined,
+                              ),
+                        label: Text(
+                          isCodeSent
+                              ? 'Simpan password baru'
+                              : 'Kirim kode reset',
+                        ),
+                      ),
+                      if (isCodeSent) ...[
+                        const SizedBox(height: 10),
+                        TextButton(
+                          onPressed: isBusy ? null : requestCode,
+                          child: const Text('Kirim ulang kode'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    codeController.dispose();
+    passwordController.dispose();
+    confirmController.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryLight),
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 92),
       children: [
-        Text(
-          'Akun',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
+        _ProfileHero(
+          initials: _initials,
+          name: _name,
+          email: _email,
+          memberSince: _memberSince,
+          onEdit: _showEditProfileSheet,
         ),
-        const SizedBox(height: 8),
-        const Text(
-          'Pengaturan profil akan disambungkan setelah data akun lengkap.',
-          style: TextStyle(color: Color(0xff6b7280)),
+        if (_error != null) ...[
+          const SizedBox(height: 16),
+          _ErrorBanner(message: _error!),
+        ],
+        const SizedBox(height: 18),
+        _ProfileMetricsGrid(
+          children: [
+            _ProfileMetric(
+              icon: Icons.route_rounded,
+              value: _totalTrips.toString(),
+              label: 'Trip selesai',
+            ),
+            const _ProfileMetric(
+              icon: Icons.verified_user_outlined,
+              value: 'Aktif',
+              label: 'Status akun',
+            ),
+          ],
         ),
         const SizedBox(height: 24),
-        OutlinedButton.icon(
-          onPressed: onLogout,
-          icon: const Icon(Icons.logout_rounded),
-          label: const Text('Keluar'),
+        _SectionHeader(
+          title: 'Informasi akun',
+          subtitle: 'Data utama untuk identitas penyewa.',
+          actionLabel: 'Edit',
+          onTap: _showEditProfileSheet,
+        ),
+        const SizedBox(height: 12),
+        _ProfilePanel(
+          children: [
+            _ProfileInfoTile(
+              icon: Icons.person_outline_rounded,
+              title: _name,
+              subtitle: 'Nama pengguna',
+            ),
+            _PanelDivider(),
+            _ProfileInfoTile(
+              icon: Icons.mail_outline_rounded,
+              title: _email,
+              subtitle: 'Email login',
+            ),
+            _PanelDivider(),
+            _ProfileInfoTile(
+              icon: Icons.phone_outlined,
+              title: _phone,
+              subtitle: 'Nomor telepon',
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const _SectionHeader(
+          title: 'Keamanan',
+          subtitle: 'Jaga akses akun tetap aman.',
+        ),
+        const SizedBox(height: 12),
+        _ProfilePanel(
+          children: [
+            _ProfileActionTile(
+              icon: Icons.lock_reset_rounded,
+              title: 'Reset password',
+              subtitle: 'Kirim kode ke email untuk buat password baru.',
+              onTap: _email == '-' ? null : _showPasswordResetSheet,
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _ProfilePanel(
+          children: [
+            _ProfileActionTile(
+              icon: Icons.logout_rounded,
+              title: 'Keluar',
+              subtitle: 'Akhiri sesi dari perangkat ini.',
+              iconColor: const Color(0xffdc2626),
+              onTap: widget.onLogout,
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _ProfileHero extends StatelessWidget {
+  const _ProfileHero({
+    required this.initials,
+    required this.name,
+    required this.email,
+    required this.memberSince,
+    required this.onEdit,
+  });
+
+  final String initials;
+  final String name;
+  final String email;
+  final String memberSince;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.primaryDark,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            child: Text(
+              initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFFa7c4b8)),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.calendar_month_outlined,
+                      size: 15,
+                      color: Color(0xFFbbf7d0),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        memberSince,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFbbf7d0),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          IconButton.filledTonal(
+            tooltip: 'Edit profil',
+            onPressed: onEdit,
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white.withValues(alpha: 0.14),
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.edit_outlined, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileMetricsGrid extends StatelessWidget {
+  const _ProfileMetricsGrid({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 380) {
+          return Column(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                children[index],
+                if (index != children.length - 1) const SizedBox(height: 10),
+              ],
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            for (var index = 0; index < children.length; index++) ...[
+              Expanded(child: children[index]),
+              if (index != children.length - 1) const SizedBox(width: 10),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ProfileMetric extends StatelessWidget {
+  const _ProfileMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xffe5e7eb)),
+      ),
+      child: Row(
+        children: [
+          _SoftIcon(icon: icon),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xff6b7280),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfilePanel extends StatelessWidget {
+  const _ProfilePanel({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xffe5e7eb)),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _ProfileInfoTile extends StatelessWidget {
+  const _ProfileInfoTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          _SoftIcon(icon: icon),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xff6b7280),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileActionTile extends StatelessWidget {
+  const _ProfileActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.iconColor = AppColors.primaryLight,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            _SoftIcon(
+              icon: icon,
+              color: iconColor,
+              backgroundColor: iconColor == AppColors.primaryLight
+                  ? const Color(0xffecfdf5)
+                  : const Color(0xfffff1f2),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xff6b7280),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xff94a3b8)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PanelDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 1, indent: 72, endIndent: 14);
+  }
+}
+
+class _SheetBanner extends StatelessWidget {
+  const _SheetBanner({
+    required this.icon,
+    required this.message,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  final IconData icon;
+  final String message;
+  final Color color;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message)),
+        ],
+      ),
     );
   }
 }
