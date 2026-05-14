@@ -355,6 +355,11 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     if (widget.userLatitude != null && widget.userLongitude != null) {
       points.add(LatLng(widget.userLatitude!, widget.userLongitude!));
     }
+    for (final bike in widget.availableBikes) {
+      if (bike.latitude != null && bike.longitude != null) {
+        points.add(LatLng(bike.latitude!, bike.longitude!));
+      }
+    }
     if (points.length < 2) return;
 
     final bounds = LatLngBounds.fromPoints(points);
@@ -792,8 +797,12 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
 
   /// Markers for available bikes: smaller green markers, tappable
   MarkerLayer _buildAvailableBikeMarkers() {
+    final bikes = widget.availableBikes
+        .where((bike) => bike.latitude != null && bike.longitude != null)
+        .toList();
+
     return MarkerLayer(
-      markers: widget.availableBikes.map((bike) {
+      markers: bikes.map((bike) {
         final pos = LatLng(bike.latitude!, bike.longitude!);
         return Marker(
           point: pos,
@@ -805,7 +814,10 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
