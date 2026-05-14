@@ -6,20 +6,29 @@ import 'package:latlong2/latlong.dart';
 
 import '../../models/bike.dart';
 import '../../services/api_client.dart';
+import '../../theme/app_colors.dart';
 import 'map_widget.dart';
 import 'qr_scan_screen.dart';
 import 'rolling_number.dart';
 import 'routing_service.dart';
 
 class MapTestScreen extends StatefulWidget {
-  const MapTestScreen({super.key, required this.api});
+  const MapTestScreen({
+    super.key,
+    required this.api,
+    this.showScaffold = true,
+    this.bottomPadding = 0,
+  });
+
   final ApiClient api;
+  final bool showScaffold;
+  final double bottomPadding;
 
   @override
-  State<MapTestScreen> createState() => _MapTestScreenState();
+  State<MapTestScreen> createState() => MapTestScreenState();
 }
 
-class _MapTestScreenState extends State<MapTestScreen> {
+class MapTestScreenState extends State<MapTestScreen> {
   // Default map center (Mataram): only used when no data at all.
   static const _defaultCenter = LatLng(-8.5830, 116.1163);
 
@@ -90,7 +99,6 @@ class _MapTestScreenState extends State<MapTestScreen> {
   bool _isPolling = false;
 
   // UI state
-  MapType _mapType = MapType.standard;
   String _locationName = 'Menunggu data sepeda...';
   Duration _elapsed = Duration.zero;
   Timer? _clockTimer;
@@ -156,14 +164,14 @@ class _MapTestScreenState extends State<MapTestScreen> {
   // Backend polling.
 
   void _startPolling() {
-    _fetchRentalData();
+    fetchRentalData();
     _pollTimer = Timer.periodic(
       const Duration(seconds: 5),
-      (_) => _fetchRentalData(),
+      (_) => fetchRentalData(),
     );
   }
 
-  Future<void> _fetchRentalData() async {
+  Future<void> fetchRentalData() async {
     if (_isPolling) return;
     _isPolling = true;
 
@@ -301,9 +309,69 @@ class _MapTestScreenState extends State<MapTestScreen> {
     // Map center: bike position > user position > default
     final mapCenter = _bikePosition ?? _userPosition ?? _defaultCenter;
 
+    final body = Stack(
+      children: [
+        Positioned.fill(
+          child: MapWidget(
+            latitude: mapCenter.latitude,
+            longitude: mapCenter.longitude,
+            routePoints: _pathHistory,
+            pathHistory: _pathHistory,
+            accuracyRadius: _hasBikeCoords ? 15 : 0,
+            mapType: MapType.standard,
+            popularSpots: _popularSpots,
+            userLatitude: _userPosition?.latitude,
+            userLongitude: _userPosition?.longitude,
+            onSpotTap: _onSpotTap,
+            bikeLabel: _hasBikeCoords ? _bikeName : null,
+            availableBikes: _availableBikes,
+            onAvailableBikeTap: _onAvailableBikeTap,
+          ),
+        ),
+        if (hasRental && !_hasBikeCoords)
+          Positioned(
+            top: 16,
+            left: 0,
+            right: 0,
+            child: _StatusBanner(
+              icon: Icons.gps_off,
+              text: 'Menunggu data GPS dari perangkat sepeda...',
+              bgColor: const Color(0xfff0f9ff),
+              borderColor: const Color(0xff93c5fd),
+              iconColor: const Color(0xff3b82f6),
+              textColor: const Color(0xff1e40af),
+            ),
+          ),
+        if (hasRental)
+          Positioned(
+            bottom: widget.bottomPadding + 16,
+            left: 0,
+            right: 0,
+            child: _InfoPanel(
+              locationName: _locationName,
+              distance: _totalDistance,
+              speed: _bikeSpeed,
+              elapsed: _elapsed,
+              bikeName: _bikeName,
+              hasRental: hasRental,
+              hasBikeCoords: _hasBikeCoords,
+            ),
+          ),
+      ],
+    );
+
+    if (!widget.showScaffold) return body;
+
     return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 253, 255, 254),
       appBar: AppBar(
-        title: Text(hasRental ? 'Lokasi Sepeda' : 'Live Map'),
+        title: Text(
+          hasRental ? 'Lokasi Sepeda' : 'Live Map',
+          style: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+        backgroundColor: const Color.fromARGB(255, 253, 255, 254),
+        foregroundColor: const Color(0xff073f3a),
+        elevation: 0,
         actions: [
           if (hasRental)
             Padding(
@@ -313,103 +381,11 @@ class _MapTestScreenState extends State<MapTestScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh Data',
-            onPressed: _isPolling ? null : _fetchRentalData,
+            onPressed: _isPolling ? null : fetchRentalData,
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: _MapTypeDropdown(
-              value: _mapType,
-              onChanged: (t) => setState(() => _mapType = t),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: MapWidget(
-                latitude: mapCenter.latitude,
-                longitude: mapCenter.longitude,
-                routePoints: _pathHistory,
-                pathHistory: _pathHistory,
-                accuracyRadius: _hasBikeCoords ? 15 : 0,
-                mapType: _mapType,
-                popularSpots: _popularSpots,
-                userLatitude: _userPosition?.latitude,
-                userLongitude: _userPosition?.longitude,
-                onSpotTap: _onSpotTap,
-                // Only show bike marker when we have real GPS data from backend
-                bikeLabel: _hasBikeCoords ? _bikeName : null,
-                // Available bikes markers
-                availableBikes: _availableBikes,
-                onAvailableBikeTap: _onAvailableBikeTap,
-              ),
-            ),
-          ),
-          // Status messages
-          if (!hasRental)
-            _StatusBanner(
-              icon: Icons.info_outline,
-              text: 'Belum ada rental aktif. Mulai sewa sepeda dari Home.',
-              bgColor: const Color(0xfffff7ed),
-              borderColor: const Color(0xfffbbf24),
-              iconColor: const Color(0xfff59e0b),
-              textColor: const Color(0xff92400e),
-            ),
-          if (hasRental && !_hasBikeCoords)
-            _StatusBanner(
-              icon: Icons.gps_off,
-              text: 'Menunggu data GPS dari perangkat sepeda...',
-              bgColor: const Color(0xfff0f9ff),
-              borderColor: const Color(0xff93c5fd),
-              iconColor: const Color(0xff3b82f6),
-              textColor: const Color(0xff1e40af),
-            ),
-          _InfoPanel(
-            locationName: _locationName,
-            distance: _totalDistance,
-            speed: _bikeSpeed,
-            elapsed: _elapsed,
-            bikeName: _bikeName,
-            hasRental: hasRental,
-            hasBikeCoords: _hasBikeCoords,
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xfff0fdfa),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xff99f6e4)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: Color(0xff0f766e),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    hasRental
-                        ? 'Data lokasi dikirim oleh perangkat sepeda (mobile_bike)'
-                        : 'Ketuk tempat populer di peta untuk info jarak',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xff0f766e),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+      body: body,
     );
   }
 }
@@ -422,88 +398,39 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color bg;
-    Color fg;
+    Color borderColor;
+    Color textColor;
     switch (status) {
       case 'active':
-        bg = const Color(0xffd1fae5);
-        fg = const Color(0xff065f46);
+        borderColor = AppColors.primaryLight;
+        textColor = AppColors.primaryDark;
         break;
       case 'idle_warning':
-        bg = const Color(0xfffef3c7);
-        fg = const Color(0xff92400e);
-        break;
       case 'idle_billing':
-        bg = const Color(0xfffee2e2);
-        fg = const Color(0xff991b1b);
+        borderColor = Colors.red;
+        textColor = Colors.red;
         break;
       default:
-        bg = const Color(0xfff3f4f6);
-        fg = const Color(0xff374151);
+        borderColor = Colors.grey;
+        textColor = Colors.black87;
     }
-    return Chip(
-      label: Text(
-        status.replaceAll('_', ' ').toUpperCase(),
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg),
-      ),
-      backgroundColor: bg,
-      padding: EdgeInsets.zero,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-}
-
-class _MapTypeDropdown extends StatelessWidget {
-  const _MapTypeDropdown({required this.value, required this.onChanged});
-  final MapType value;
-  final ValueChanged<MapType> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xffd0d5dd)),
-        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor, width: 1.5),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: DropdownButton<MapType>(
-        value: value,
-        isExpanded: true,
-        underline: const SizedBox.shrink(),
-        icon: const Icon(Icons.layers, color: Color(0xff0f766e)),
-        borderRadius: BorderRadius.circular(10),
-        items: MapType.values
-            .map(
-              (type) => DropdownMenuItem(
-                value: type,
-                child: Row(
-                  children: [
-                    Icon(
-                      _iconFor(type),
-                      size: 18,
-                      color: const Color(0xff0f766e),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(type.label),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
-        onChanged: (t) {
-          if (t != null) onChanged(t);
-        },
+      child: Text(
+        status.replaceAll('_', ' ').toUpperCase(),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: textColor,
+        ),
       ),
     );
   }
-
-  IconData _iconFor(MapType t) => switch (t) {
-    MapType.standard => Icons.map_outlined,
-    MapType.satellite => Icons.satellite_alt,
-    MapType.hybrid => Icons.layers,
-  };
 }
 
 class _InfoPanel extends StatelessWidget {
@@ -528,11 +455,18 @@ class _InfoPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xfff0fdfa),
-        border: Border.all(color: const Color(0xff99f6e4)),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: const Color(0xfff1f5f9)),
       ),
       child: Column(
         children: [
@@ -541,7 +475,9 @@ class _InfoPanel extends StatelessWidget {
               Icon(
                 hasBikeCoords ? Icons.location_on : Icons.location_off,
                 size: 16,
-                color: Color(hasBikeCoords ? 0xff0f766e : 0xff9ca3af),
+                color: hasBikeCoords
+                    ? AppColors.primaryDark
+                    : const Color(0xff9ca3af),
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -557,21 +493,21 @@ class _InfoPanel extends StatelessWidget {
             ],
           ),
           if (bikeName.isNotEmpty) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
               children: [
                 const Icon(
                   Icons.pedal_bike,
                   size: 14,
-                  color: Color(0xff0f766e),
+                  color: AppColors.primaryDark,
                 ),
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
                     bikeName,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: const Color(0xff0f766e),
-                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -579,18 +515,18 @@ class _InfoPanel extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
-                    vertical: 1,
+                    vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xffd1fae5),
+                    color: AppColors.primaryLight.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
                     'Perangkat sepeda',
                     style: TextStyle(
                       fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xff065f46),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryDark,
                     ),
                   ),
                 ),
@@ -598,7 +534,7 @@ class _InfoPanel extends StatelessWidget {
             ),
           ],
           if (hasRental) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -655,7 +591,7 @@ class _InfoItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, size: 18, color: const Color(0xff0f766e)),
+        Icon(icon, size: 18, color: AppColors.primaryDark),
         const SizedBox(height: 4),
         Text(
           label,
@@ -669,7 +605,7 @@ class _InfoItem extends StatelessWidget {
           textAlign: TextAlign.center,
           style: Theme.of(
             context,
-          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
         ),
       ],
     );
@@ -692,7 +628,7 @@ class _InfoItemRolling extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, size: 18, color: const Color(0xff0f766e)),
+        Icon(icon, size: 18, color: AppColors.primaryDark),
         const SizedBox(height: 4),
         Text(
           label,
@@ -705,7 +641,7 @@ class _InfoItemRolling extends StatelessWidget {
           value: value,
           suffix: suffix,
           textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),

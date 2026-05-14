@@ -12,7 +12,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 2100));
     await tester.pump();
 
-    expect(find.text('Smart Bike Rental'), findsOneWidget);
+    expect(find.text('Ride Smooth. Track Smart.'), findsOneWidget);
     expect(find.text('Login'), findsOneWidget);
   });
 }

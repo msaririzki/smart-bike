@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../services/api_client.dart';
+import '../../theme/app_colors.dart';
 import 'active_rental_screen.dart';
 
 class QrScanScreen extends StatefulWidget {
@@ -118,7 +119,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Scan QR Sepeda'),
+        title: const Text('Scan QR Sepeda', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
@@ -170,7 +171,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
             width: 260,
             height: 260,
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF22C55E), width: 3),
+              border: Border.all(color: AppColors.primaryLight, width: 3),
               borderRadius: BorderRadius.circular(20),
             ),
           ),
@@ -232,19 +233,19 @@ class _QrScanScreenState extends State<QrScanScreen> {
                 hintText: 'smartbike://rent?token=qr_xxx atau qr_xxx',
                 hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
                 filled: true,
-                fillColor: const Color(0xFF1E293B),
+                fillColor: Colors.white.withValues(alpha: 0.08),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF334155)),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF334155)),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF22C55E)),
+                  borderSide: const BorderSide(color: AppColors.primaryLight, width: 1.5),
                 ),
               ),
               onSubmitted: (_) => _submitManualToken(),
@@ -267,7 +268,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
                     : const Icon(Icons.send_rounded, size: 18),
                 label: Text(_isProcessing ? 'Memproses...' : 'Mulai Sewa'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF269276),
+                  backgroundColor: AppColors.primaryLight,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -300,7 +301,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF22C55E),
+                    color: AppColors.primaryLight,
                   ),
                 ),
                 SizedBox(width: 12),

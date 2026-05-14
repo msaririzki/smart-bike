@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import '../../models/rental_history.dart';
 import '../../services/api_client.dart';
+import '../../theme/app_colors.dart';
 import '../rental/map_widget.dart';
 
 class RentalDetailScreen extends StatefulWidget {
@@ -65,10 +66,10 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
     final timeFormat = DateFormat('HH:mm');
 
     return Scaffold(
-      backgroundColor: const Color(0xfff7fbf8),
+      backgroundColor: const Color.fromARGB(255, 253, 255, 254),
       appBar: AppBar(
         title: const Text('Detail Perjalanan'),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color.fromARGB(255, 253, 255, 254),
         foregroundColor: const Color(0xff073f3a),
         elevation: 0,
         actions: [
@@ -481,12 +482,12 @@ class _TimelineRow extends StatelessWidget {
           height: 24,
           decoration: BoxDecoration(
             color: isStart
-                ? const Color(0xff269276).withValues(alpha: 0.1)
+                ? AppColors.primaryLight.withValues(alpha: 0.1)
                 : const Color(0xfff1f5f9),
             shape: BoxShape.circle,
             border: Border.all(
               color: isStart
-                  ? const Color(0xff269276)
+                  ? AppColors.primaryLight
                   : const Color(0xffcbd5e1),
               width: 2,
             ),
@@ -497,7 +498,7 @@ class _TimelineRow extends StatelessWidget {
               height: 8,
               decoration: BoxDecoration(
                 color: isStart
-                    ? const Color(0xff269276)
+                    ? AppColors.primaryLight
                     : const Color(0xffcbd5e1),
                 shape: BoxShape.circle,
               ),
@@ -580,7 +581,7 @@ class _BillingDetailCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xff269276),
+                  color: AppColors.primaryLight,
                 ),
               ),
             ],
@@ -778,15 +779,7 @@ class _ShareSheet extends StatelessWidget {
                       height: 180,
                       width: double.infinity,
                       decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(0xff064e3b),
-                            Color(0xff065f46),
-                            Color(0xff047857),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: AppColors.primaryLight,
                       ),
                     ),
                     // DECORATION: Abstract Waves
