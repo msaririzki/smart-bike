@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../models/bike.dart';
+
 enum MapType {
   standard('Standar'),
   satellite('Satelit'),
@@ -48,6 +50,8 @@ class MapWidget extends StatefulWidget {
     this.onSpotTap,
     this.bikeLabel,
     this.lastUpdateTime,
+    this.availableBikes = const [],
+    this.onAvailableBikeTap,
   });
 
   final double latitude;
@@ -77,6 +81,12 @@ class MapWidget extends StatefulWidget {
 
   /// Timestamp of the last GPS update from the bike device.
   final DateTime? lastUpdateTime;
+
+  /// Available bikes to show as markers on the map.
+  final List<Bike> availableBikes;
+
+  /// Callback when an available bike marker is tapped.
+  final void Function(Bike bike)? onAvailableBikeTap;
 
   @override
   State<MapWidget> createState() => _MapWidgetState();
@@ -345,6 +355,11 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     if (widget.userLatitude != null && widget.userLongitude != null) {
       points.add(LatLng(widget.userLatitude!, widget.userLongitude!));
     }
+    for (final bike in widget.availableBikes) {
+      if (bike.latitude != null && bike.longitude != null) {
+        points.add(LatLng(bike.latitude!, bike.longitude!));
+      }
+    }
     if (points.length < 2) return;
 
     final bounds = LatLngBounds.fromPoints(points);
@@ -380,6 +395,8 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
           _buildUserMarker(),
         // Bike marker: only show when backend has real GPS data
         if (widget.bikeLabel != null) _buildBikeMarker(bikePos),
+        // Available bikes markers
+        if (widget.availableBikes.isNotEmpty) _buildAvailableBikeMarkers(),
       ],
     );
   }
@@ -775,6 +792,81 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
           ),
         ),
       ],
+    );
+  }
+
+  /// Markers for available bikes: smaller green markers, tappable
+  MarkerLayer _buildAvailableBikeMarkers() {
+    final bikes = widget.availableBikes
+        .where((bike) => bike.latitude != null && bike.longitude != null)
+        .toList();
+
+    return MarkerLayer(
+      markers: bikes.map((bike) {
+        final pos = LatLng(bike.latitude!, bike.longitude!);
+        return Marker(
+          point: pos,
+          width: 80,
+          height: 52,
+          child: GestureDetector(
+            onTap: () => widget.onAvailableBikeTap?.call(bike),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    bike.code,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xff065f46),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xff10b981),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2.5),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x44000000),
+                        blurRadius: 5,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.pedal_bike,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

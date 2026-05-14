@@ -275,7 +275,10 @@ class HistoryScreenState extends State<HistoryScreen> {
     );
 
     if (!widget.showScaffold) {
-      return ColoredBox(color: const Color.fromARGB(255, 253, 255, 254), child: body);
+      return ColoredBox(
+        color: const Color.fromARGB(255, 253, 255, 254),
+        child: body,
+      );
     }
 
     return Scaffold(
@@ -1047,55 +1050,6 @@ class _StatItem extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _AchievementBadgesCompact extends StatelessWidget {
-  const _AchievementBadgesCompact({required this.history});
-  final List<RentalHistory> history;
-
-  @override
-  Widget build(BuildContext context) {
-    final totalKm = history.fold(
-      0.0,
-      (sum, e) => sum + e.totalDistanceKilometers,
-    );
-    final totalRentals = history.length;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        if (totalKm > 10)
-          _CompactBadge(icon: Icons.terrain_rounded, color: Colors.amber),
-        if (totalRentals > 5)
-          _CompactBadge(icon: Icons.stars_rounded, color: Colors.orange),
-        if (totalKm > 0)
-          _CompactBadge(
-            icon: Icons.directions_bike_rounded,
-            color: Colors.blue,
-          ),
-      ],
-    );
-  }
-}
-
-class _CompactBadge extends StatelessWidget {
-  const _CompactBadge({required this.icon, required this.color});
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(left: 6),
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.2),
-      ),
-      child: Icon(icon, color: Colors.white, size: 14),
     );
   }
 }
