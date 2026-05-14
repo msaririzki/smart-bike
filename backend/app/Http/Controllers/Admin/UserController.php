@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class UserController extends Controller
@@ -18,7 +19,8 @@ class UserController extends Controller
         return view('admin.users.index', [
             'users' => User::query()
                 ->withCount('rentals')
-                ->when(in_array($role, ['user', 'admin', 'superadmin', 'device'], true), function ($query) use ($role): void {
+                ->where('role', '!=', 'device')
+                ->when(in_array($role, ['user', 'admin', 'superadmin'], true), function ($query) use ($role): void {
                     $query->where('role', $role);
                 })
                 ->when($search !== '', function ($query) use ($search): void {
@@ -34,6 +36,28 @@ class UserController extends Controller
             'role' => $role,
             'search' => $search,
         ]);
+    }
+
+    public function create(): View
+    {
+        return view('admin.users.create');
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'phone' => ['required', 'string', 'max:20', 'unique:users'],
+            'password' => ['required', 'string', 'min:8'],
+            'role' => ['required', 'in:user,admin,superadmin'],
+        ]);
+
+        $data['password'] = Hash::make($data['password']);
+
+        User::create($data);
+
+        return redirect()->route('admin.users.index')->with('status', 'User berhasil ditambahkan.');
     }
 
     public function show(User $user): View

@@ -4,9 +4,19 @@
     <style>
         body {
             background-color: #f8fafc;
-            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30,70 A15,15 0 1,0 60,70 A15,15 0 1,0 30,70 M45,70 L55,45 L70,45 M55,45 L40,45 L30,70' fill='none' stroke='%23cbd5e1' stroke-width='1.5' stroke-opacity='0.4'/%3E%3C/svg%3E");
-            background-size: 200px;
             display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0;
+            position: relative;
+        }
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url("{{ asset('images/flowbike-icon-only.png') }}");
+            background-size: 150px;
+            background-position: center;
+            opacity: 0.05;
+            z-index: 0;
+            pointer-events: none;
         }
         main { margin: 0; padding: 20px; width: 100%; display: flex; justify-content: center; align-items: center; }
         .login-card { background: white; border: none; border-radius: 1rem; padding: 2.5rem 2.5rem; width: 100%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); position: relative; z-index: 10; }

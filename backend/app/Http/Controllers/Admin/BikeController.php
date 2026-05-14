@@ -20,9 +20,24 @@ class BikeController extends Controller
     private const DEFAULT_LONGITUDE = 116.116000;
     private const DEFAULT_BATTERY_PERCENT = 100;
 
-    public function index(): View
+    public function index(Request $request): View
     {
+        $tab = $request->query('tab', 'bikes');
+
+        if ($tab === 'devices') {
+            return view('admin.bikes.index', [
+                'tab' => $tab,
+                'devices' => User::query()
+                    ->where('role', 'device')
+                    ->with('assignedBikes')
+                    ->orderBy('name')
+                    ->paginate(20)
+                    ->withQueryString(),
+            ]);
+        }
+
         return view('admin.bikes.index', [
+            'tab' => $tab,
             'bikes' => Bike::query()->with('assignedDevice')->orderBy('code')->paginate(20),
         ]);
     }
