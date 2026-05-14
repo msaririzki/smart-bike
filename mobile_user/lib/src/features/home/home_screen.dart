@@ -24,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  Bike? _focusBike;
   final _dashboardKey = GlobalKey<_DashboardPageState>();
   final _historyKey = GlobalKey<HistoryScreenState>();
 
@@ -160,9 +161,11 @@ class _HomeScreenState extends State<HomeScreen> {
             onOpenScanner: _openQrScanner,
           ),
           MapTestScreen(
+            key: ValueKey(_focusBike?.id ?? 'map'),
             api: widget.api,
             showScaffold: false,
             bottomPadding: 92,
+            focusBike: _focusBike,
           ),
           const _ComingSoonPage(
             icon: Icons.qr_code_scanner_rounded,
@@ -182,7 +185,10 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _selectedIndex,
         onTap: (index) {
           if (index == 1) {
-            setState(() => _selectedIndex = index);
+            setState(() {
+              _focusBike = null;
+              _selectedIndex = index;
+            });
           } else if (index == 2) {
             _openQrScanner();
           } else {
@@ -377,14 +383,12 @@ class _DashboardPageState extends State<_DashboardPage> {
                 bike: bike,
                 isBusy: _isBusy || _activeRental != null,
                 onTrack: (selectedBike) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => MapTestScreen(
-                        api: widget.api,
-                        focusBike: selectedBike,
-                      ),
-                    ),
-                  );
+                  final homeState = context
+                      .findAncestorStateOfType<_HomeScreenState>();
+                  homeState?.setState(() {
+                    homeState._focusBike = selectedBike;
+                    homeState._selectedIndex = 1;
+                  });
                 },
               ),
             ],
