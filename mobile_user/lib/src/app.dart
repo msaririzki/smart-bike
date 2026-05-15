@@ -29,15 +29,26 @@ class _SmartBikeUserAppState extends State<SmartBikeUserApp> {
   }
 
   Future<void> _bootstrap() async {
-    // Mengeksekusi cek token & delay 2 detik secara paralel
     final results = await Future.wait([
       _sessionStore.token,
       Future.delayed(const Duration(seconds: 2)),
     ]);
 
     final token = results[0];
+    var isLoggedIn = token != null;
+    if (isLoggedIn) {
+      try {
+        await _api.currentUser();
+      } on ApiException {
+        await _sessionStore.clear();
+        isLoggedIn = false;
+      } catch (_) {
+        isLoggedIn = false;
+      }
+    }
+
     setState(() {
-      _isLoggedIn = token != null;
+      _isLoggedIn = isLoggedIn;
       _isLoading = false;
     });
   }
