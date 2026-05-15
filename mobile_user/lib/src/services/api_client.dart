@@ -63,6 +63,56 @@ class ApiClient {
     await _post('/auth/logout', body: {});
   }
 
+  Future<Map<String, dynamic>> currentUser() async {
+    final json = await _get('/auth/me');
+    return json['user'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateProfile({
+    required String name,
+    required String email,
+    String? phone,
+  }) async {
+    final json = await _patch(
+      '/auth/me',
+      body: {'name': name, 'email': email, 'phone': phone},
+    );
+    final user = json['user'] as Map<String, dynamic>;
+
+    await _sessionStore.updateUser(
+      name: user['name'] as String,
+      email: user['email'] as String,
+    );
+
+    return user;
+  }
+
+  Future<void> requestPasswordReset({required String email}) async {
+    await _post(
+      '/auth/password-reset/request',
+      body: {'email': email},
+      authenticated: false,
+    );
+  }
+
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    await _post(
+      '/auth/password-reset/confirm',
+      body: {
+        'email': email,
+        'token': token,
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+      authenticated: false,
+    );
+  }
+
   Future<List<Bike>> bikes() async {
     final json = await _get('/bikes');
     return (json['data'] as List<dynamic>)
@@ -146,6 +196,18 @@ class ApiClient {
     final response = await http.post(
       Uri.parse('$baseUrl$path'),
       headers: await _headers(authenticated: authenticated),
+      body: jsonEncode(body),
+    );
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> _patch(
+    String path, {
+    required Map<String, dynamic> body,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl$path'),
+      headers: await _headers(),
       body: jsonEncode(body),
     );
     return _decode(response);

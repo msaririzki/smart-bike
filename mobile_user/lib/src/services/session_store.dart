@@ -15,6 +15,11 @@ class SessionStore {
     return prefs.getString(_nameKey);
   }
 
+  Future<String?> get userEmail async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_emailKey);
+  }
+
   Future<void> saveSession({
     required String token,
     required String name,
@@ -22,6 +27,12 @@ class SessionStore {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
+    await prefs.setString(_nameKey, name);
+    await prefs.setString(_emailKey, email);
+  }
+
+  Future<void> updateUser({required String name, required String email}) async {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_nameKey, name);
     await prefs.setString(_emailKey, email);
   }

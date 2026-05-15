@@ -7,7 +7,7 @@
         <label>
             Hak Akses
             <select name="role">
-                @foreach(['all', 'user', 'admin', 'superadmin', 'device'] as $option)
+                @foreach(['all', 'user', 'admin', 'superadmin'] as $option)
                     <option value="{{ $option }}" @selected($role === $option)>{{ $option === 'all' ? 'semua' : ($adminRoleLabels[$option] ?? $option) }}</option>
                 @endforeach
             </select>
