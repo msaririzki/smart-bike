@@ -234,8 +234,7 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const bikes = @json($mapBikes);
@@ -417,8 +416,23 @@
             };
 
             renderBikes(bikes);
-            setTimeout(() => map.invalidateSize(), 100);
-            setTimeout(() => map.invalidateSize(), 500);
+            
+            // Fix: Gunakan setTimeout 200ms setelah DOM siap untuk mencegah kotak abu-abu
+            const applyMapFix = () => {
+                setTimeout(() => {
+                    map.invalidateSize();
+                    if (currentBounds.length > 0) {
+                        fitMapToBounds();
+                    }
+                }, 200);
+            };
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', applyMapFix);
+            } else {
+                applyMapFix();
+            }
+
             mapCenterButton?.addEventListener('click', fitMapToBounds);
             setInterval(refreshBikes, 10000);
         } else if (mapElement) {
@@ -440,6 +454,17 @@
                     toggleCardsText.textContent = 'Lebih Sedikit';
                     toggleCardsIcon.innerHTML = '<path d="M18 15l-6-6-6 6"/>';
                 }
+                
+                // Panggil invalidateSize saat ukuran kontainer berubah
+                setTimeout(() => {
+                    if (window.L) {
+                        const mapElem = document.getElementById('bike-map');
+                        if (mapElem && mapElem._leaflet_id) {
+                             // Minimal fix: dispatch resize event to trigger Leaflet's internal invalidateSize
+                            window.dispatchEvent(new Event('resize'));
+                        }
+                    }
+                }, 200);
             });
         }
 
