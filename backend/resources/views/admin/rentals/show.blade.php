@@ -243,7 +243,7 @@
             };
 
             renderRoute(routePoints);
-            
+
             // Fix: Gunakan setTimeout 200ms setelah DOM siap untuk mencegah kotak abu-abu
             const applyMapFix = () => {
                 setTimeout(() => {

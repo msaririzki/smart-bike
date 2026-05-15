@@ -418,7 +418,7 @@
             };
 
             renderBikes(bikes);
-            
+
             // Fix: Gunakan setTimeout 200ms setelah DOM siap untuk mencegah kotak abu-abu
             const applyMapFix = () => {
                 setTimeout(() => {
@@ -456,13 +456,13 @@
                     toggleCardsText.textContent = 'Lebih Sedikit';
                     toggleCardsIcon.innerHTML = '<path d="M18 15l-6-6-6 6"/>';
                 }
-                
+
                 // Panggil invalidateSize saat ukuran kontainer berubah
                 setTimeout(() => {
                     if (window.L) {
                         const mapElem = document.getElementById('bike-map');
                         if (mapElem && mapElem._leaflet_id) {
-                             // Minimal fix: dispatch resize event to trigger Leaflet's internal invalidateSize
+                            // Minimal fix: dispatch resize event to trigger Leaflet's internal invalidateSize
                             window.dispatchEvent(new Event('resize'));
                         }
                     }
