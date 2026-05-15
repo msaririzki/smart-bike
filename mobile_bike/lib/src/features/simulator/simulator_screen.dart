@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -285,11 +286,13 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Stack(
               children: [
-                const SizedBox(height: 32),
-                // Premium Warning Icon with Gradient
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 32),
+                    // Premium Warning Icon with Gradient
                 Container(
                   width: 100,
                   height: 100,
@@ -390,12 +393,14 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                               Icon(Icons.attach_money_rounded,
                                   color: Color(0xFFD97706), size: 20),
                               SizedBox(width: 8),
-                              Text(
-                                'Tarif idle: Rp200 per 5 menit',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF92400E),
+                              Expanded(
+                                child: Text(
+                                  'Tarif idle: Rp200 per 5 menit',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF92400E),
+                                  ),
                                 ),
                               ),
                             ],
@@ -405,46 +410,26 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
-                // Buttons
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      // Continue Button (Emerald Green)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _idleDialogOpen = false;
-                          },
-                          icon: const Icon(Icons.play_arrow_rounded, size: 28),
-                          label: const Text(
-                            'Saya Lanjutkan',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF065F46),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 8,
-                            shadowColor:
-                                const Color(0xFF065F46).withValues(alpha: .3),
-                          ),
-                        ),
-                      ),
-                    ],
+                    const SizedBox(height: 32),
+                  ],
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _idleDialogOpen = false;
+                      },
+                    ),
                   ),
                 ),
-                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -1336,51 +1321,113 @@ class _SimulatorScreenState extends State<SimulatorScreen>
             ),
           ),
         Positioned(
-          top: MediaQuery.of(context).padding.top + 140,
+          top: MediaQuery.of(context).padding.top + 90,
           left: 0,
           right: 0,
           child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xCC000000),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: const Color(0xFF334155)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                        blurRadius: 30,
+                        spreadRadius: -5,
+                      ),
+                    ],
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // Kiri: Angka Kecepatan
                       Text(
                         (_speedKmh ?? rental.currentSpeedKmh ?? 0.0)
                             .toStringAsFixed(1),
                         style: const TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white),
+                          fontSize: 64,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.0,
+                          letterSpacing: -2.0,
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      const Text('km/h',
-                          style: TextStyle(
-                              fontSize: 18, color: Color(0xFF9CA3AF))),
+                      const SizedBox(width: 20),
+                      // Kanan: Detail & Label
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isGpsWarmupActive
+                                    ? Icons.sync_rounded
+                                    : Icons.speed_rounded,
+                                color: _isGpsWarmupActive
+                                    ? const Color(0xFFFBBF24)
+                                    : const Color(0xFF38BDF8),
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _isGpsWarmupActive ? 'MENGUNCI' : 'KECEPATAN',
+                                style: TextStyle(
+                                  color: _isGpsWarmupActive
+                                      ? const Color(0xFFFBBF24)
+                                      : const Color(0xFF38BDF8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.gps_fixed,
+                                  size: 12, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Text(
+                                _accuracyMeters == null
+                                    ? 'GPS -'
+                                    : 'Akurasi ${_accuracyMeters!.toStringAsFixed(0)}m',
+                                style: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'km/h',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFE2E8F0),
+                              height: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                  if (_isGpsWarmupActive) ...[
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Mengunci GPS',
-                      style: TextStyle(
-                        color: Color(0xFFE2E8F0),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
           ),
@@ -1549,8 +1596,8 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                 ],
               ),
               child: IconButton(
-                icon: const Icon(Icons.power_settings_new_rounded),
-                color: const Color(0xff1f2937),
+                icon: const Icon(Icons.logout_rounded),
+                color: const Color(0xFFEF4444),
                 onPressed: () {
                   showDialog(
                     context: context,
@@ -2426,24 +2473,7 @@ class _MiniRouteMap extends StatelessWidget {
               ],
             ),
           ),
-          Positioned(
-            left: 12,
-            top: MediaQuery.of(context).padding.top + 100,
-            child: _MapChip(
-              icon: Icons.route_outlined,
-              label: pointCount == 0 ? 'Jalur belum ada' : '$pointCount titik',
-            ),
-          ),
-          Positioned(
-            right: 12,
-            top: MediaQuery.of(context).padding.top + 100,
-            child: _MapChip(
-              icon: Icons.gps_fixed,
-              label: latestAccuracyMeters == null
-                  ? 'GPS -'
-                  : '${latestAccuracyMeters!.toStringAsFixed(0)} m',
-            ),
-          ),
+
           Positioned(
             right: 12,
             bottom: 150,
@@ -2842,42 +2872,7 @@ class _MapSegmentButton<T> extends StatelessWidget {
   }
 }
 
-class _MapChip extends StatelessWidget {
-  const _MapChip({
-    required this.icon,
-    required this.label,
-  });
 
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xCC020617),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFF334155)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: const Color(0xFF67E8F9)),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFFE2E8F0),
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _LegendDot extends StatelessWidget {
   const _LegendDot({required this.color});
