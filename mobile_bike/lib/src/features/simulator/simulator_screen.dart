@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlong;
@@ -59,6 +61,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
 
   bool _sending = false;
   StreamSubscription<Position>? _positionSub;
+  StreamSubscription<CompassEvent>? _compassSub;
   StreamSubscription<List<ConnectivityResult>>? _networkSub;
   Timer? _heartbeatTimer;
   Timer? _batteryTimer;
@@ -97,7 +100,12 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   int _gpsWarmupSampleCount = 0;
   bool _gpsWarmupComplete = false;
   double _smoothedSpeedKmh = 0;
+  double? _compassHeadingDegrees;
+  DateTime? _lastCompassAt;
+  double? _headingDegrees;
   _BikeMapType _mapType = _BikeMapType.standard;
+  _MapFollowMode _followMode = _MapFollowMode.auto;
+  bool _mapControlsExpanded = false;
   final MapController _mapController = MapController();
 
   bool get _hasActiveRental => _summary?.rental != null;
@@ -111,6 +119,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     _loadBike();
     _loadRentalSummary();
     _ensureLocationReady(requestIfDenied: true, showMessage: false);
+    _listenCompass();
     _listenNetwork();
     _loadBattery();
     _summaryTimer = Timer.periodic(
@@ -132,6 +141,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   void dispose() {
     _stopStream();
     unawaited(_disableWakeLock());
+    _compassSub?.cancel();
     _networkSub?.cancel();
     _batteryTimer?.cancel();
     _summaryTimer?.cancel();
@@ -153,6 +163,50 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     try {
       await WakelockPlus.disable();
     } catch (_) {}
+  }
+
+  void _listenCompass() {
+    final events = FlutterCompass.events;
+    if (events == null) return;
+
+    _compassSub = events.listen(
+      (event) {
+        final heading = _normalizeHeading(
+          event.headingForCameraMode ?? event.heading,
+        );
+        if (heading == null || !mounted) return;
+
+        final now = DateTime.now();
+        final lastCompassAt = _lastCompassAt;
+        if (lastCompassAt != null &&
+            now.difference(lastCompassAt) < const Duration(milliseconds: 250)) {
+          return;
+        }
+
+        setState(() {
+          _lastCompassAt = now;
+          _compassHeadingDegrees = _smoothHeading(
+            _compassHeadingDegrees,
+            heading,
+            .3,
+          );
+
+          final speed = _speedKmh ?? 0;
+          if (_headingDegrees == null || speed < _minReliableSpeedKmh) {
+            _headingDegrees = _smoothHeading(
+              _headingDegrees,
+              _compassHeadingDegrees!,
+              .35,
+            );
+          }
+        });
+
+        if (_followMode == _MapFollowMode.auto && _routePoints.isNotEmpty) {
+          _rotateMapToHeading();
+        }
+      },
+      onError: (_) {},
+    );
   }
 
   Future<void> _loadBike() async {
@@ -232,11 +286,13 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Stack(
               children: [
-                const SizedBox(height: 32),
-                // Premium Warning Icon with Gradient
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 32),
+                    // Premium Warning Icon with Gradient
                 Container(
                   width: 100,
                   height: 100,
@@ -337,12 +393,14 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                               Icon(Icons.attach_money_rounded,
                                   color: Color(0xFFD97706), size: 20),
                               SizedBox(width: 8),
-                              Text(
-                                'Tarif idle: Rp200 per 5 menit',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF92400E),
+                              Expanded(
+                                child: Text(
+                                  'Tarif idle: Rp200 per 5 menit',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF92400E),
+                                  ),
                                 ),
                               ),
                             ],
@@ -352,46 +410,26 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
-                // Buttons
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      // Continue Button (Emerald Green)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _idleDialogOpen = false;
-                          },
-                          icon: const Icon(Icons.play_arrow_rounded, size: 28),
-                          label: const Text(
-                            'Saya Lanjutkan',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF065F46),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 8,
-                            shadowColor:
-                                const Color(0xFF065F46).withValues(alpha: .3),
-                          ),
-                        ),
-                      ),
-                    ],
+                    const SizedBox(height: 32),
+                  ],
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _idleDialogOpen = false;
+                      },
+                    ),
                   ),
                 ),
-                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -773,6 +811,9 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     _gpsWarmupStartedAt = null;
     _gpsWarmupSampleCount = 0;
     _gpsWarmupComplete = false;
+    _headingDegrees = null;
+    _compassHeadingDegrees = null;
+    _lastCompassAt = null;
     _resetSpeedSmoothing();
     _speedKmh = 0;
   }
@@ -817,11 +858,14 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     required String message,
     double distance = 0,
   }) {
+    final previous = _lastAcceptedGpsPoint;
+    final headingDegrees = _headingFromPosition(pos, previous);
     final point = _RoutePoint(
       latitude: pos.latitude,
       longitude: pos.longitude,
       accuracyMeters: pos.accuracy,
       recordedAt: sampledAt,
+      headingDegrees: headingDegrees ?? previous?.headingDegrees,
     );
 
     _lastAcceptedGpsPoint = point;
@@ -829,13 +873,22 @@ class _SimulatorScreenState extends State<SimulatorScreen>
 
     setState(() {
       _speedKmh = speedKmh;
+      if (point.headingDegrees != null) {
+        _headingDegrees = _smoothHeading(
+          _headingDegrees,
+          point.headingDegrees!,
+          .45,
+        );
+      }
       _lastServerMsg = message;
       _addRoutePoint(
         latitude: point.latitude,
         longitude: point.longitude,
         accuracyMeters: point.accuracyMeters,
+        headingDegrees: _headingDegrees ?? point.headingDegrees,
       );
     });
+    _updateMapCamera();
 
     _sendLocation(pos, speedKmh: serverSpeedKmh);
   }
@@ -927,12 +980,14 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     required double latitude,
     required double longitude,
     required double accuracyMeters,
+    double? headingDegrees,
   }) {
     final next = _RoutePoint(
       latitude: latitude,
       longitude: longitude,
       accuracyMeters: accuracyMeters,
       recordedAt: DateTime.now(),
+      headingDegrees: headingDegrees,
     );
 
     if (_routePoints.isNotEmpty) {
@@ -952,6 +1007,97 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     if (_routePoints.length > _maxRoutePoints) {
       _routePoints.removeRange(0, _routePoints.length - _maxRoutePoints);
     }
+  }
+
+  double? _headingFromPosition(Position pos, _RoutePoint? previous) {
+    final compassHeading = _freshCompassHeading;
+    final gpsHeading = _normalizeHeading(pos.heading);
+    if (previous == null) return compassHeading ?? gpsHeading;
+
+    final distance = _haversineMeters(
+      previous.latitude,
+      previous.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+    if (distance < _minRouteDistanceMeters) {
+      return compassHeading ?? gpsHeading ?? previous.headingDegrees;
+    }
+
+    return _bearingDegrees(
+      previous.latitude,
+      previous.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+  }
+
+  double? get _freshCompassHeading {
+    final heading = _compassHeadingDegrees;
+    final sampledAt = _lastCompassAt;
+    if (heading == null || sampledAt == null) return null;
+    if (DateTime.now().difference(sampledAt) > const Duration(seconds: 3)) {
+      return null;
+    }
+    return heading;
+  }
+
+  double _smoothHeading(double? current, double next, double factor) {
+    final normalized = _normalizeHeading(next) ?? 0;
+    if (current == null) return normalized;
+
+    final delta = ((normalized - current + 540) % 360) - 180;
+    return (current + delta * factor + 360) % 360;
+  }
+
+  double? _normalizeHeading(double? degrees) {
+    if (degrees == null || !degrees.isFinite || degrees < 0) return null;
+    final normalized = degrees % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
+  }
+
+  double _bearingDegrees(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    final fromLat = _toRadians(lat1);
+    final toLat = _toRadians(lat2);
+    final lonDelta = _toRadians(lon2 - lon1);
+    final y = math.sin(lonDelta) * math.cos(toLat);
+    final x = math.cos(fromLat) * math.sin(toLat) -
+        math.sin(fromLat) * math.cos(toLat) * math.cos(lonDelta);
+    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  }
+
+  void _updateMapCamera({bool force = false}) {
+    if (_routePoints.isEmpty) return;
+
+    final latest = _routePoints.last;
+    final target = latlong.LatLng(latest.latitude, latest.longitude);
+    final isAuto = _followMode == _MapFollowMode.auto;
+    final rotation =
+        isAuto ? (_headingDegrees ?? latest.headingDegrees ?? 0) : 0.0;
+    final zoom = _currentMapZoom ?? 17.0;
+
+    if (!isAuto && !force) return;
+
+    _mapController.moveAndRotate(target, zoom, rotation);
+  }
+
+  double? get _currentMapZoom {
+    try {
+      return _mapController.camera.zoom;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _rotateMapToHeading() {
+    if (_routePoints.isEmpty || _followMode != _MapFollowMode.auto) return;
+    final latest = _routePoints.last;
+    _mapController.rotate(_headingDegrees ?? latest.headingDegrees ?? 0);
   }
 
   Future<void> _sendHeartbeat() async {
@@ -1130,8 +1276,24 @@ class _SimulatorScreenState extends State<SimulatorScreen>
             points: List.unmodifiable(_routePoints),
             latestAccuracyMeters:
                 _accuracyMeters ?? rental.latestLocationPoint?.accuracyMeters,
+            latestHeadingDegrees: _headingDegrees,
             mapType: _mapType,
-            onMapTypeChanged: (value) => setState(() => _mapType = value),
+            onMapTypeChanged: (value) => setState(() {
+              _mapType = value;
+              _mapControlsExpanded = false;
+            }),
+            followMode: _followMode,
+            onFollowModeChanged: (value) {
+              setState(() {
+                _followMode = value;
+                _mapControlsExpanded = false;
+              });
+              _updateMapCamera(force: true);
+            },
+            controlsExpanded: _mapControlsExpanded,
+            onControlsToggle: () => setState(
+              () => _mapControlsExpanded = !_mapControlsExpanded,
+            ),
             mapController: _mapController,
           ),
         ),
@@ -1159,58 +1321,122 @@ class _SimulatorScreenState extends State<SimulatorScreen>
             ),
           ),
         Positioned(
-          top: MediaQuery.of(context).padding.top + 140,
+          top: MediaQuery.of(context).padding.top + 90,
           left: 0,
           right: 0,
           child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xCC000000),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: const Color(0xFF334155)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                        blurRadius: 30,
+                        spreadRadius: -5,
+                      ),
+                    ],
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // Kiri: Angka Kecepatan
                       Text(
                         (_speedKmh ?? rental.currentSpeedKmh ?? 0.0)
                             .toStringAsFixed(1),
                         style: const TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white),
+                          fontSize: 64,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.0,
+                          letterSpacing: -2.0,
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      const Text('km/h',
-                          style: TextStyle(
-                              fontSize: 18, color: Color(0xFF9CA3AF))),
+                      const SizedBox(width: 20),
+                      // Kanan: Detail & Label
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isGpsWarmupActive
+                                    ? Icons.sync_rounded
+                                    : Icons.speed_rounded,
+                                color: _isGpsWarmupActive
+                                    ? const Color(0xFFFBBF24)
+                                    : const Color(0xFF38BDF8),
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _isGpsWarmupActive ? 'MENGUNCI' : 'KECEPATAN',
+                                style: TextStyle(
+                                  color: _isGpsWarmupActive
+                                      ? const Color(0xFFFBBF24)
+                                      : const Color(0xFF38BDF8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.gps_fixed,
+                                  size: 12, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Text(
+                                _accuracyMeters == null
+                                    ? 'GPS -'
+                                    : 'Akurasi ${_accuracyMeters!.toStringAsFixed(0)}m',
+                                style: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'km/h',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFE2E8F0),
+                              height: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                  if (_isGpsWarmupActive) ...[
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Mengunci GPS',
-                      style: TextStyle(
-                        color: Color(0xFFE2E8F0),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
           ),
         ),
-        Positioned(
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
           right: 16,
-          bottom: 220,
+          bottom: _mapControlsExpanded ? 305 : 216,
           child: Container(
             decoration: const BoxDecoration(
               color: Colors.white,
@@ -1225,18 +1451,15 @@ class _SimulatorScreenState extends State<SimulatorScreen>
               color: const Color(0xff1f2937),
               onPressed: () {
                 if (_routePoints.isNotEmpty) {
-                  final last = _routePoints.last;
-                  _mapController.move(
-                    latlong.LatLng(last.latitude, last.longitude),
-                    17,
-                  );
+                  _updateMapCamera(force: true);
                 } else if (rental.latestLocationPoint?.latitude != null) {
-                  _mapController.move(
+                  _mapController.moveAndRotate(
                     latlong.LatLng(
                       rental.latestLocationPoint!.latitude!,
                       rental.latestLocationPoint!.longitude!,
                     ),
                     17,
+                    0,
                   );
                 }
               },
@@ -1373,8 +1596,8 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                 ],
               ),
               child: IconButton(
-                icon: const Icon(Icons.power_settings_new_rounded),
-                color: const Color(0xff1f2937),
+                icon: const Icon(Icons.logout_rounded),
+                color: const Color(0xFFEF4444),
                 onPressed: () {
                   showDialog(
                     context: context,
@@ -2040,12 +2263,14 @@ class _RoutePoint {
     required this.longitude,
     required this.accuracyMeters,
     required this.recordedAt,
+    this.headingDegrees,
   });
 
   final double latitude;
   final double longitude;
   final double accuracyMeters;
   final DateTime recordedAt;
+  final double? headingDegrees;
 }
 
 class _PendingLocationUpdate {
@@ -2102,12 +2327,23 @@ class _ModernStatColumn extends StatelessWidget {
 }
 
 enum _BikeMapType {
-  standard('Standar'),
-  satellite('Satelit');
+  standard('Standar', Icons.map_outlined),
+  satellite('Satelit', Icons.satellite_alt_outlined);
 
-  const _BikeMapType(this.label);
+  const _BikeMapType(this.label, this.icon);
 
   final String label;
+  final IconData icon;
+}
+
+enum _MapFollowMode {
+  auto('Auto', Icons.explore_outlined),
+  manual('Manual', Icons.pan_tool_alt_outlined);
+
+  const _MapFollowMode(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
 }
 
 class _MiniRouteMap extends StatelessWidget {
@@ -2115,16 +2351,26 @@ class _MiniRouteMap extends StatelessWidget {
     this.height = 170,
     required this.points,
     required this.latestAccuracyMeters,
+    required this.latestHeadingDegrees,
     required this.mapType,
     required this.onMapTypeChanged,
+    required this.followMode,
+    required this.onFollowModeChanged,
+    required this.controlsExpanded,
+    required this.onControlsToggle,
     this.mapController,
   });
 
   final double height;
   final List<_RoutePoint> points;
   final double? latestAccuracyMeters;
+  final double? latestHeadingDegrees;
   final _BikeMapType mapType;
   final ValueChanged<_BikeMapType> onMapTypeChanged;
+  final _MapFollowMode followMode;
+  final ValueChanged<_MapFollowMode> onFollowModeChanged;
+  final bool controlsExpanded;
+  final VoidCallback onControlsToggle;
   final MapController? mapController;
 
   static const _fallbackCenter = latlong.LatLng(-8.583235, 116.116768);
@@ -2136,6 +2382,12 @@ class _MiniRouteMap extends StatelessWidget {
         .toList(growable: false);
     final latestPoint = mapPoints.isEmpty ? _fallbackCenter : mapPoints.last;
     final pointCount = points.length;
+    final latestHeading = latestHeadingDegrees ??
+        (points.isEmpty ? null : points.last.headingDegrees);
+    final markerRotation =
+        followMode == _MapFollowMode.auto ? 0.0 : (latestHeading ?? 0);
+    final initialRotation =
+        followMode == _MapFollowMode.auto ? (latestHeading ?? 0) : 0.0;
     final isSatellite = mapType == _BikeMapType.satellite;
     final routeColor =
         isSatellite ? const Color(0xFF22D3EE) : const Color(0xFF0EA5E9);
@@ -2157,6 +2409,7 @@ class _MiniRouteMap extends StatelessWidget {
               options: MapOptions(
                 initialCenter: latestPoint,
                 initialZoom: pointCount == 0 ? 15 : 17,
+                initialRotation: initialRotation,
                 minZoom: 5,
                 maxZoom: 19,
                 interactionOptions: const InteractionOptions(
@@ -2213,36 +2466,24 @@ class _MiniRouteMap extends StatelessWidget {
                         icon: Icons.navigation_rounded,
                         color: const Color(0xFF22C55E),
                         size: 42,
+                        rotationDegrees: markerRotation,
                       ),
                     ],
                   ),
               ],
             ),
           ),
-          Positioned(
-            left: 12,
-            top: MediaQuery.of(context).padding.top + 100,
-            child: _MapChip(
-              icon: Icons.route_outlined,
-              label: pointCount == 0 ? 'Jalur belum ada' : '$pointCount titik',
-            ),
-          ),
+
           Positioned(
             right: 12,
-            top: MediaQuery.of(context).padding.top + 100,
-            child: _MapChip(
-              icon: Icons.gps_fixed,
-              label: latestAccuracyMeters == null
-                  ? 'GPS -'
-                  : '${latestAccuracyMeters!.toStringAsFixed(0)} m',
-            ),
-          ),
-          Positioned(
-            right: 12,
-            bottom: 42,
-            child: _MapTypeToggle(
-              value: mapType,
-              onChanged: onMapTypeChanged,
+            bottom: 150,
+            child: _MapControlsDock(
+              expanded: controlsExpanded,
+              onToggle: onControlsToggle,
+              followMode: followMode,
+              onFollowModeChanged: onFollowModeChanged,
+              mapType: mapType,
+              onMapTypeChanged: onMapTypeChanged,
             ),
           ),
           if (pointCount < 2)
@@ -2269,7 +2510,7 @@ class _MiniRouteMap extends StatelessWidget {
             ),
           const Positioned(
             left: 12,
-            bottom: 10,
+            bottom: 156,
             child: Row(
               children: [
                 _LegendDot(color: Color(0xFF38BDF8)),
@@ -2296,6 +2537,7 @@ class _MiniRouteMap extends StatelessWidget {
   TileLayer _buildTileLayer() {
     if (mapType == _BikeMapType.satellite) {
       return TileLayer(
+        key: const ValueKey('satellite-base-tiles'),
         urlTemplate:
             'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         userAgentPackageName: 'com.smartbike.mobile_bike',
@@ -2304,6 +2546,7 @@ class _MiniRouteMap extends StatelessWidget {
     }
 
     return TileLayer(
+      key: const ValueKey('standard-base-tiles'),
       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       userAgentPackageName: 'com.smartbike.mobile_bike',
       maxNativeZoom: 19,
@@ -2312,6 +2555,7 @@ class _MiniRouteMap extends StatelessWidget {
 
   TileLayer _buildLabelLayer() {
     return TileLayer(
+      key: const ValueKey('satellite-label-tiles'),
       urlTemplate:
           'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
       subdomains: const ['a', 'b', 'c', 'd'],
@@ -2325,6 +2569,7 @@ class _MiniRouteMap extends StatelessWidget {
     required IconData icon,
     required Color color,
     required double size,
+    double rotationDegrees = 0,
   }) {
     return Marker(
       point: point,
@@ -2343,8 +2588,160 @@ class _MiniRouteMap extends StatelessWidget {
             ),
           ],
         ),
-        child: Icon(icon, color: color, size: size * .58),
+        child: Transform.rotate(
+          angle: rotationDegrees * math.pi / 180,
+          child: Icon(icon, color: color, size: size * .58),
+        ),
       ),
+    );
+  }
+}
+
+class _MapControlsDock extends StatelessWidget {
+  const _MapControlsDock({
+    required this.expanded,
+    required this.onToggle,
+    required this.followMode,
+    required this.onFollowModeChanged,
+    required this.mapType,
+    required this.onMapTypeChanged,
+  });
+
+  final bool expanded;
+  final VoidCallback onToggle;
+  final _MapFollowMode followMode;
+  final ValueChanged<_MapFollowMode> onFollowModeChanged;
+  final _BikeMapType mapType;
+  final ValueChanged<_BikeMapType> onMapTypeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!expanded) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onToggle,
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .96),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x26000000),
+                  blurRadius: 16,
+                  offset: Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFF0F172A),
+                  size: 22,
+                ),
+                Positioned(
+                  right: 9,
+                  bottom: 9,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .96),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26000000),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(left: 8, right: 8),
+                child: Text(
+                  'Mode peta',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onToggle,
+                child: const Padding(
+                  padding: EdgeInsets.all(7),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 16,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _MapFollowToggle(
+            value: followMode,
+            onChanged: onFollowModeChanged,
+          ),
+          const SizedBox(height: 6),
+          _MapTypeToggle(
+            value: mapType,
+            onChanged: onMapTypeChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapFollowToggle extends StatelessWidget {
+  const _MapFollowToggle({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final _MapFollowMode value;
+  final ValueChanged<_MapFollowMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _MapSegmentedControl<_MapFollowMode>(
+      options: _MapFollowMode.values,
+      value: value,
+      labelFor: (mode) => mode.label,
+      iconFor: (mode) => mode.icon,
+      onChanged: onChanged,
     );
   }
 }
@@ -2360,85 +2757,122 @@ class _MapTypeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _MapSegmentedControl<_BikeMapType>(
+      options: _BikeMapType.values,
+      value: value,
+      labelFor: (type) => type.label,
+      iconFor: (type) => type.icon,
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _MapSegmentedControl<T> extends StatelessWidget {
+  const _MapSegmentedControl({
+    required this.options,
+    required this.value,
+    required this.labelFor,
+    required this.iconFor,
+    required this.onChanged,
+  });
+
+  final List<T> options;
+  final T value;
+  final String Function(T value) labelFor;
+  final IconData Function(T value) iconFor;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xE6020617),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFF334155)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .18),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: _BikeMapType.values.map((type) {
-          final selected = type == value;
-          return InkWell(
-            borderRadius: BorderRadius.circular(999),
-            onTap: () => onChanged(type),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: selected ? const Color(0xFF22C55E) : Colors.transparent,
-                borderRadius: BorderRadius.circular(999),
+        children: options
+            .map(
+              (option) => _MapSegmentButton<T>(
+                value: option,
+                selected: option == value,
+                label: labelFor(option),
+                icon: iconFor(option),
+                onSelected: onChanged,
               ),
-              child: Text(
-                type.label,
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _MapSegmentButton<T> extends StatelessWidget {
+  const _MapSegmentButton({
+    required this.value,
+    required this.selected,
+    required this.label,
+    required this.icon,
+    required this.onSelected,
+  });
+
+  final T value;
+  final bool selected;
+  final String label;
+  final IconData icon;
+  final ValueChanged<T> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = selected ? Colors.white : const Color(0xFF475569);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => onSelected(value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          height: 38,
+          constraints: const BoxConstraints(minWidth: 58),
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF10B981) : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withValues(alpha: .28),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 15, color: foreground),
+              const SizedBox(width: 5),
+              Text(
+                label,
                 style: TextStyle(
-                  color: selected ? const Color(0xFF052E16) : Colors.white,
+                  color: foreground,
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class _MapChip extends StatelessWidget {
-  const _MapChip({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xCC020617),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFF334155)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: const Color(0xFF67E8F9)),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFFE2E8F0),
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
+
+
 
 class _LegendDot extends StatelessWidget {
   const _LegendDot({required this.color});

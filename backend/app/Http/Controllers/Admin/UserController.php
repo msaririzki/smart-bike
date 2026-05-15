@@ -38,10 +38,6 @@ class UserController extends Controller
         ]);
     }
 
-    public function create(): View
-    {
-        return view('admin.users.create');
-    }
 
     public function store(Request $request): RedirectResponse
     {

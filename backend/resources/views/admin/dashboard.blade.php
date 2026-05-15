@@ -34,10 +34,12 @@
         .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
         .leaflet-popup-content { margin: 0; width: 320px !important; }
         .map-popup { padding: 0; font-family: inherit; }
-        .map-popup-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.25rem; background: linear-gradient(135deg, #0f766e, #14b8a6); color: white; }
+        .map-popup-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.25rem 2.5rem 1.25rem 1.25rem; background: linear-gradient(135deg, #0f766e, #14b8a6); color: white; }
         .map-popup-title { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.025em; }
-        .map-popup-subtitle { margin: 0.25rem 0 0 0; font-size: 0.875rem; opacity: 0.9; }
+        .map-popup-subtitle { margin: 0.25rem 0 0 0; font-size: 0.875rem; color: rgba(255, 255, 255, 0.9); }
         .map-popup-header .badge { background: rgba(255, 255, 255, 0.2); color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; border: 1px solid rgba(255, 255, 255, 0.3); backdrop-filter: blur(4px); }
+        .leaflet-popup-close-button { color: rgba(255, 255, 255, 0.8) !important; right: 12px !important; top: 12px !important; font-size: 18px !important; width: 24px !important; height: 24px !important; line-height: 24px !important; text-align: center !important; }
+        .leaflet-popup-close-button:hover { color: white !important; background: transparent !important; }
         .map-popup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
         .map-popup-item { display: flex; flex-direction: column; gap: 0.25rem; }
         .map-popup-label { font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -234,8 +236,7 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const bikes = @json($mapBikes);
@@ -284,7 +285,7 @@
                     : '-';
                 const rentalLink = bike.active_rental?.detail_url
                     ? `<a href="${escapeHtml(bike.active_rental.detail_url)}">Lihat Rental</a>`
-                    : '<span class="muted">Belum ada rental aktif</span>';
+                    : '<span style="color: #64748b;">Belum ada rental aktif</span>';
 
                 return `
                     <div class="map-popup">
@@ -417,8 +418,23 @@
             };
 
             renderBikes(bikes);
-            setTimeout(() => map.invalidateSize(), 100);
-            setTimeout(() => map.invalidateSize(), 500);
+
+            // Fix: Gunakan setTimeout 200ms setelah DOM siap untuk mencegah kotak abu-abu
+            const applyMapFix = () => {
+                setTimeout(() => {
+                    map.invalidateSize();
+                    if (currentBounds.length > 0) {
+                        fitMapToBounds();
+                    }
+                }, 200);
+            };
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', applyMapFix);
+            } else {
+                applyMapFix();
+            }
+
             mapCenterButton?.addEventListener('click', fitMapToBounds);
             setInterval(refreshBikes, 10000);
         } else if (mapElement) {
@@ -440,6 +456,17 @@
                     toggleCardsText.textContent = 'Lebih Sedikit';
                     toggleCardsIcon.innerHTML = '<path d="M18 15l-6-6-6 6"/>';
                 }
+
+                // Panggil invalidateSize saat ukuran kontainer berubah
+                setTimeout(() => {
+                    if (window.L) {
+                        const mapElem = document.getElementById('bike-map');
+                        if (mapElem && mapElem._leaflet_id) {
+                            // Minimal fix: dispatch resize event to trigger Leaflet's internal invalidateSize
+                            window.dispatchEvent(new Event('resize'));
+                        }
+                    }
+                }, 200);
             });
         }
 
