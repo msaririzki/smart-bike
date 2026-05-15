@@ -34,7 +34,8 @@ class SimulatorScreen extends StatefulWidget {
   State<SimulatorScreen> createState() => _SimulatorScreenState();
 }
 
-class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProviderStateMixin {
+class _SimulatorScreenState extends State<SimulatorScreen>
+    with SingleTickerProviderStateMixin {
   static const double _maxAcceptedGpsAccuracyMeters = 50;
   static const double _maxAcceptedJumpSpeedKmh = 80;
   static const double _minRouteDistanceMeters = 1.5;
@@ -49,7 +50,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
 
   final _gps = GpsService();
   final _battery = Battery();
-
 
   Bike? _bike;
   DeviceRentalSummary? _summary;
@@ -79,7 +79,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
   int? _activeRentalId;
   String _lastServerMsg = 'Belum ada pengiriman';
 
-
   String _locationMode = 'Belum aktif';
   bool _checkingLocationAccess = true;
   bool _locationAccessGranted = false;
@@ -98,8 +97,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
   int _gpsWarmupSampleCount = 0;
   bool _gpsWarmupComplete = false;
   double _smoothedSpeedKmh = 0;
-  DateTime? _lastSignificantMovementAt;
-  bool _pointsLoaded = false;
   _BikeMapType _mapType = _BikeMapType.standard;
   final MapController _mapController = MapController();
 
@@ -110,7 +107,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    unawaited(WakelockPlus.enable());
+    unawaited(_enableWakeLock());
     _loadBike();
     _loadRentalSummary();
     _ensureLocationReady(requestIfDenied: true, showMessage: false);
@@ -134,7 +131,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
   @override
   void dispose() {
     _stopStream();
-    unawaited(WakelockPlus.disable());
+    unawaited(_disableWakeLock());
     _networkSub?.cancel();
     _batteryTimer?.cancel();
     _summaryTimer?.cancel();
@@ -142,6 +139,20 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
     _refreshController.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  Future<void> _enableWakeLock() async {
+    try {
+      await WakelockPlus.enable();
+    } catch (_) {
+      // Browser preview can reject Wake Lock permission; tracking should continue.
+    }
+  }
+
+  Future<void> _disableWakeLock() async {
+    try {
+      await WakelockPlus.disable();
+    } catch (_) {}
   }
 
   Future<void> _loadBike() async {
@@ -176,7 +187,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
     }
   }
 
-
   void _handleIdleAlert(ActiveBikeRental? rental) {
     if (!mounted) return;
 
@@ -205,7 +215,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
       barrierDismissible: true,
       builder: (context) {
         final isBilling = rental.status == 'idle_billing';
-        
+
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(horizontal: 24),
@@ -267,9 +277,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Text(
-                    isBilling 
-                      ? 'Sepeda Anda terdeteksi diam terlalu lama dan biaya idle sudah aktif.'
-                      : 'Sepeda Anda tidak bergerak selama beberapa menit terakhir.',
+                    isBilling
+                        ? 'Sepeda Anda terdeteksi diam terlalu lama dan biaya idle sudah aktif.'
+                        : 'Sepeda Anda tidak bergerak selama beberapa menit terakhir.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 15,
@@ -295,14 +305,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.info_outline_rounded, 
-                              color: Color(0xFFD97706), size: 24),
+                            const Icon(Icons.info_outline_rounded,
+                                color: Color(0xFFD97706), size: 24),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                isBilling 
-                                  ? 'Biaya idle sedang berjalan. Total: ${_formatRupiah(rental.idleCost)}. Harap segera lanjutkan perjalanan untuk menghentikan denda.'
-                                  : 'Pilih lanjut jika masih memakai sepeda. Jika tetap diam, biaya idle akan segera berjalan.',
+                                isBilling
+                                    ? 'Biaya idle sedang berjalan. Total: ${_formatRupiah(rental.idleCost)}. Harap segera lanjutkan perjalanan untuk menghentikan denda.'
+                                    : 'Pilih lanjut jika masih memakai sepeda. Jika tetap diam, biaya idle akan segera berjalan.',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF92400E),
@@ -316,17 +326,18 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
                         const SizedBox(height: 16),
                         // Fee Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFFAF0),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Row(
+                          child: const Row(
                             children: [
-                              const Icon(Icons.attach_money_rounded, 
-                                color: Color(0xFFD97706), size: 20),
-                              const SizedBox(width: 8),
-                              const Text(
+                              Icon(Icons.attach_money_rounded,
+                                  color: Color(0xFFD97706), size: 20),
+                              SizedBox(width: 8),
+                              Text(
                                 'Tarif idle: Rp200 per 5 menit',
                                 style: TextStyle(
                                   fontSize: 14,
@@ -372,7 +383,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
                               borderRadius: BorderRadius.circular(16),
                             ),
                             elevation: 8,
-                            shadowColor: const Color(0xFF065F46).withValues(alpha: .3),
+                            shadowColor:
+                                const Color(0xFF065F46).withValues(alpha: .3),
                           ),
                         ),
                       ),
@@ -459,10 +471,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
   }
 
   Future<void> _openLocationSettings() async {
-    if (_locationAccessStatus == LocationAccessStatus.deniedForever) {
-      await Geolocator.openAppSettings();
-    } else {
-      await Geolocator.openLocationSettings();
+    try {
+      if (_locationAccessStatus == LocationAccessStatus.deniedForever) {
+        await Geolocator.openAppSettings();
+      } else {
+        await Geolocator.openLocationSettings();
+      }
+    } catch (_) {
+      _showMessage('Pengaturan lokasi tidak tersedia di platform ini.');
     }
 
     await _ensureLocationReady(requestIfDenied: false, showMessage: false);
@@ -482,8 +498,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
   }
 
   Future<void> _startStream({bool requestPermission = true}) async {
-
-
     final granted = requestPermission
         ? await _ensureLocationReady(requestIfDenied: true)
         : _locationAccessGranted;
@@ -575,7 +589,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
         distance: 0,
         message: 'Mengunci GPS awal.',
       );
-      _lastSignificantMovementAt = DateTime.now();
       return;
     }
 
@@ -642,7 +655,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
   }
 
   void _stopStream() {
-
     _stopRealGps();
     _stopHeartbeat();
     if (mounted) {
@@ -674,10 +686,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
   }
-
-
-
-
 
   double _targetDisplaySpeedKmh(Position pos, double impliedSpeedKmh) {
     final gpsSpeedKmh =
@@ -767,7 +775,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
     _gpsWarmupComplete = false;
     _resetSpeedSmoothing();
     _speedKmh = 0;
-    _lastSignificantMovementAt = DateTime.now();
   }
 
   DateTime _effectiveGpsSampleTime(Position pos) {
@@ -819,12 +826,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
 
     _lastAcceptedGpsPoint = point;
     _lastStationarySentAt = null;
-
-    // Only update movement timer if movement is significant (e.g. > 20m)
-    // to prevent GPS jitter from resetting the idle timer
-    if (distance > 20) {
-      _lastSignificantMovementAt = DateTime.now();
-    }
 
     setState(() {
       _speedKmh = speedKmh;
@@ -974,6 +975,34 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _openDeviceDetails(
+    Bike bike,
+    ActiveBikeRental? rental,
+  ) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DeviceDetailsScreen(
+          api: widget.api,
+          bike: bike,
+          rental: rental,
+          displaySpeed: _speedKmh ?? rental?.currentSpeedKmh ?? 0,
+          batteryPercent: _batteryPercent,
+          networkType: _networkType,
+          pointsSent: _routePoints.length,
+          lastSentAt: _lastSentAt,
+          locationMode: _locationMode,
+          streaming: _streaming,
+          now: _now,
+          locationAccessGranted: _locationAccessGranted,
+          locationAccessStatus: _locationAccessStatus,
+          lastGpsReadAt: _lastGpsReadAt,
+          accuracyMeters:
+              _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
+        ),
+      ),
     );
   }
 
@@ -1395,7 +1424,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
           children: [
             // Header Awal (Content Lowered)
             Container(
-              padding: const EdgeInsets.only(top: 35, bottom: 15, left: 16, right: 16),
+              padding: const EdgeInsets.only(
+                  top: 35, bottom: 15, left: 16, right: 16),
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.only(
@@ -1417,7 +1447,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 24),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                          size: 24),
                       color: const Color(0xFF0F172A),
                     ),
                   ),
@@ -1433,34 +1464,40 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
                   Align(
                     alignment: Alignment.centerRight,
                     child: IconButton(
-                      onPressed: _isRefreshing ? null : () async {
-                        setState(() => _isRefreshing = true);
-                        _refreshController.repeat(); // Mulai berputar
-                        
-                        try {
-                          // Memanggil ulang data dari server
-                          await Future.wait([
-                            _loadBike(),
-                            _loadRentalSummary(),
-                            _loadBattery(),
-                            Future.delayed(const Duration(milliseconds: 800)), // Minimal durasi putaran
-                          ]);
-                        } finally {
-                          if (mounted) {
-                            _refreshController.stop(); // Berhenti berputar
-                            _refreshController.reset();
-                            setState(() => _isRefreshing = false);
-                            
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Data berhasil diperbarui dari server'),
-                                duration: Duration(seconds: 1),
-                                backgroundColor: Color(0xFF10B981),
-                              ),
-                            );
-                          }
-                        }
-                      },
+                      onPressed: _isRefreshing
+                          ? null
+                          : () async {
+                              setState(() => _isRefreshing = true);
+                              _refreshController.repeat(); // Mulai berputar
+
+                              try {
+                                // Memanggil ulang data dari server
+                                await Future.wait([
+                                  _loadBike(),
+                                  _loadRentalSummary(),
+                                  _loadBattery(),
+                                  Future.delayed(const Duration(
+                                      milliseconds:
+                                          800)), // Minimal durasi putaran
+                                ]);
+                              } finally {
+                                if (mounted) {
+                                  _refreshController
+                                      .stop(); // Berhenti berputar
+                                  _refreshController.reset();
+                                  setState(() => _isRefreshing = false);
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Data berhasil diperbarui dari server'),
+                                      duration: Duration(seconds: 1),
+                                      backgroundColor: Color(0xFF10B981),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
                       icon: RotationTransition(
                         turns: _refreshController,
                         child: const Icon(Icons.refresh_rounded, size: 32),
@@ -1474,13 +1511,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
             const SizedBox(height: 8),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
-                    _sectionHeader('Status Koneksi & GPS', 'Pantau real-time koneksi perangkat dengan server'),
+                    _sectionHeader('Status Koneksi & GPS',
+                        'Pantau real-time koneksi perangkat dengan server'),
                     _Panel(
                       child: _StatusBanner(
                         streaming: _streaming,
@@ -1492,7 +1530,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
                       ),
                     ),
                     const SizedBox(height: 24),
-                    _sectionHeader('Informasi Sepeda & Perangkat', 'Identitas unit, status daya baterai, dan stabilitas transmisi data'),
+                    _sectionHeader('Informasi Sepeda & Perangkat',
+                        'Identitas unit, status daya baterai, dan stabilitas transmisi data'),
                     _Panel(
                       child: _DeviceSummary(
                         bike: bike,
@@ -1502,10 +1541,32 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
                         locationMode: _locationMode,
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _openDeviceDetails(bike, rental);
+                        },
+                        icon: const Icon(Icons.open_in_new_rounded),
+                        label: const Text('Buka detail perangkat'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0F172A),
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 24),
-                    _sectionHeader('Ringkasan Perjalanan', 'Statistik kecepatan, jarak, dan estimasi biaya sewa'),
+                    _sectionHeader('Ringkasan Perjalanan',
+                        'Statistik kecepatan, jarak, dan estimasi biaya sewa'),
                     _Panel(
-                      backgroundColor: const Color(0xFF10B981), // Bright Emerald Green
+                      backgroundColor:
+                          const Color(0xFF10B981), // Bright Emerald Green
                       child: _CompactStatsRow(
                         speedKmh: _smoothedSpeedKmh,
                         distanceKm: rental?.totalDistanceKilometers ?? 0,
@@ -1513,18 +1574,23 @@ class _SimulatorScreenState extends State<SimulatorScreen> with SingleTickerProv
                       ),
                     ),
                     const SizedBox(height: 32),
-                    _sectionHeader('Status Kesiapan Perangkat', 'Informasi dan ringkasan diagnostik sensor serta izin akses perangkat secara real-time'),
+                    _sectionHeader('Status Kesiapan Perangkat',
+                        'Informasi dan ringkasan diagnostik sensor serta izin akses perangkat secara real-time'),
                     _FieldTestChecklist(
                       locationAccess: _locationAccessGranted,
-                      gpsEnabled: _locationAccessStatus != LocationAccessStatus.serviceDisabled,
+                      gpsEnabled: _locationAccessStatus !=
+                          LocationAccessStatus.serviceDisabled,
                       autoStart: _streaming,
                       networkType: _networkType,
                       lastGpsAt: _lastGpsReadAt,
                       lastServerAt: _lastSentAt,
-                      accuracyMeters: _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
+                      accuracyMeters: _accuracyMeters ??
+                          rental?.latestLocationPoint?.accuracyMeters,
                       rentalActive: rental != null,
                     ),
-                    const SizedBox(height: 40), // Ruang ekstra di bawah agar kartu terakhir terlihat penuh
+                    const SizedBox(
+                        height:
+                            40), // Ruang ekstra di bawah agar kartu terakhir terlihat penuh
                   ],
                 ),
               ),
@@ -1694,7 +1760,9 @@ class _CheckRow extends StatelessWidget {
             size: 20,
             color: ok
                 ? const Color(0xFF12B76A)
-                : (isWarning ? const Color(0xFFF79009) : const Color(0xFFF04438)),
+                : (isWarning
+                    ? const Color(0xFFF79009)
+                    : const Color(0xFFF04438)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1815,7 +1883,8 @@ class _StatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = streaming ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+    final statusColor =
+        streaming ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
     return _Panel(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1830,7 +1899,7 @@ class _StatusBanner extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: statusColor.withOpacity(0.4),
+                      color: statusColor.withValues(alpha: 0.4),
                       blurRadius: 8,
                       spreadRadius: 2,
                     ),
@@ -1872,14 +1941,17 @@ class _StatusBanner extends StatelessWidget {
           const SizedBox(height: 16),
           _StatusRow(
             label: 'Penerimaan GPS',
-            value: lastGpsReadAt != null ? _timeDiff(lastGpsReadAt!) : 'Belum ada',
+            value:
+                lastGpsReadAt != null ? _timeDiff(lastGpsReadAt!) : 'Belum ada',
             icon: Icons.location_on_rounded,
             isActive: lastGpsReadAt != null,
           ),
           const SizedBox(height: 12),
           _StatusRow(
             label: 'Sinkronisasi Server',
-            value: lastSentAt != null ? _timeDiff(lastSentAt!) : 'Menghubungkan...',
+            value: lastSentAt != null
+                ? _timeDiff(lastSentAt!)
+                : 'Menghubungkan...',
             icon: Icons.cloud_upload_rounded,
             isActive: sending,
           ),
@@ -1895,7 +1967,8 @@ class _StatusBanner extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF64748B)),
+                  const Icon(Icons.info_outline_rounded,
+                      size: 14, color: Color(0xFF64748B)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1934,7 +2007,10 @@ class _StatusRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: isActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
+        Icon(icon,
+            size: 18,
+            color:
+                isActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
         const SizedBox(width: 10),
         Text(
           label,
@@ -1954,77 +2030,6 @@ class _StatusRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _IdleAlertBanner extends StatelessWidget {
-  const _IdleAlertBanner({required this.rental});
-
-  final ActiveBikeRental rental;
-
-  @override
-  Widget build(BuildContext context) {
-    final isBilling = rental.status == 'idle_billing';
-    final background =
-        isBilling ? const Color(0xFFFEF3F2) : const Color(0xFFFFFAEB);
-    final border =
-        isBilling ? const Color(0xFFFECDCA) : const Color(0xFFFEDF89);
-    final iconColor =
-        isBilling ? const Color(0xFFB42318) : const Color(0xFFB54708);
-    final title =
-        isBilling ? 'Biaya Tambahan Aktif' : 'Peringatan: Sepeda Diam';
-    final message = isBilling
-        ? 'Biaya tambahan (Idle Fee) sedang berjalan sekarang. Total: ${_formatRupiah(rental.idleCost)}.'
-        : 'Segera lanjutkan perjalanan untuk menghindari denda biaya tambahan.';
-
-    return _Panel(
-      borderColor: border,
-      backgroundColor: background,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .75),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              isBilling
-                  ? Icons.warning_amber_rounded
-                  : Icons.notifications_active_rounded,
-              color: iconColor,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: iconColor,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: const TextStyle(
-                    color: Color(0xFF475467),
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -2232,7 +2237,6 @@ class _MiniRouteMap extends StatelessWidget {
                   : '${latestAccuracyMeters!.toStringAsFixed(0)} m',
             ),
           ),
-
           Positioned(
             right: 12,
             bottom: 42,
@@ -2539,35 +2543,6 @@ class _StatusDotState extends State<_StatusDot>
       ),
     );
   }
-
-  Widget _sectionHeader(String title, String subtitle) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF1F4D30),
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1F4D30).withValues(alpha: 0.6),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 String _formatRupiah(int value) {
@@ -2589,17 +2564,6 @@ String _timeDiff(DateTime dt) {
   if (diff.inSeconds < 60) return '${diff.inSeconds}s';
   if (diff.inMinutes < 60) return '${diff.inMinutes}m';
   return '${diff.inHours}j';
-}
-
-String _relativeTimeLabel(DateTime? dt) {
-  if (dt == null) return 'Belum ada';
-  return '${_timeDiff(dt)} lalu';
-}
-
-bool _isFresh(DateTime? dt, Duration maxAge) {
-  if (dt == null) return false;
-  final age = DateTime.now().difference(dt);
-  return !age.isNegative && age <= maxAge;
 }
 
 double _haversineMeters(
@@ -2663,15 +2627,15 @@ class _CompactStatsRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-              const Text(
-                'Speed',
-                style: TextStyle(
-                  fontSize: 13, // Diperbesar (dari 10 ke 13)
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white, // Lebih cerah (dari white70 ke white)
-                  letterSpacing: 0.5,
+                const Text(
+                  'Speed',
+                  style: TextStyle(
+                    fontSize: 13, // Diperbesar (dari 10 ke 13)
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white, // Lebih cerah (dari white70 ke white)
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
                 const SizedBox(height: 4),
                 FittedBox(
                   fit: BoxFit.scaleDown,
@@ -2702,7 +2666,7 @@ class _CompactStatsRow extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Pemisah
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2711,7 +2675,7 @@ class _CompactStatsRow extends StatelessWidget {
               color: Colors.white24,
             ),
           ),
-          
+
           // Sisi Kanan: Jarak dan Biaya (Ditumpuk)
           Expanded(
             flex: 15,
@@ -2741,79 +2705,6 @@ class _CompactStatsRow extends StatelessWidget {
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final String unit;
-  final IconData icon;
-  final Color color;
-  final bool compact;
-
-  const _MetricCard({
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.icon,
-    required this.color,
-    this.compact = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _Panel(
-      backgroundColor: color,
-      borderColor: Colors.transparent,
-      padding: EdgeInsets.all(compact ? 12 : 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: Colors.white70),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white70,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: compact ? 20 : 28,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              ),
-              if (unit.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                Text(
-                  unit,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CompactInfoRow extends StatelessWidget {
   const _CompactInfoRow({
     required this.label,
@@ -2831,7 +2722,8 @@ class _CompactInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final baseColor = color ?? (emphasized ? const Color(0xFF12B76A) : const Color(0xFF64748B));
+    final baseColor = color ??
+        (emphasized ? const Color(0xFF12B76A) : const Color(0xFF64748B));
     final labelColor = color?.withValues(alpha: 0.7) ?? const Color(0xFF64748B);
 
     return Row(
@@ -2844,7 +2736,9 @@ class _CompactInfoRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 13, // Diperbesar (dari 10 ke 13)
               fontWeight: FontWeight.w900,
-              color: color != null ? Colors.white.withValues(alpha: 0.9) : labelColor,
+              color: color != null
+                  ? Colors.white.withValues(alpha: 0.9)
+                  : labelColor,
             ),
           ),
         ),
@@ -2853,7 +2747,10 @@ class _CompactInfoRow extends StatelessWidget {
           style: TextStyle(
             fontSize: emphasized ? 18 : 16, // Diperbesar (dari 12/14 ke 16/18)
             fontWeight: emphasized ? FontWeight.w900 : FontWeight.w800,
-            color: color ?? (emphasized ? const Color(0xFF064E3B) : const Color(0xFF0F172A)),
+            color: color ??
+                (emphasized
+                    ? const Color(0xFF064E3B)
+                    : const Color(0xFF0F172A)),
           ),
         ),
       ],
@@ -2888,7 +2785,8 @@ class _DeviceSummary extends StatelessWidget {
                 color: const Color(0xFFF0FDF4),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.pedal_bike_rounded, size: 24, color: Color(0xFF10B981)),
+              child: const Icon(Icons.pedal_bike_rounded,
+                  size: 24, color: Color(0xFF10B981)),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -2993,8 +2891,8 @@ class _MetricItemSmall extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontSize: 10, 
-              fontWeight: FontWeight.w800, 
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
               color: color.withValues(alpha: 0.8),
               letterSpacing: 0.8,
             ),
@@ -3014,5 +2912,3 @@ class _MetricItemSmall extends StatelessWidget {
     );
   }
 }
-
-

@@ -81,7 +81,8 @@ class DeviceDetailsScreen extends StatelessWidget {
           const SizedBox(height: 12),
           _FieldTestChecklist(
             locationAccess: locationAccessGranted,
-            gpsEnabled: locationAccessStatus.toString() != 'LocationAccessStatus.serviceDisabled',
+            gpsEnabled: locationAccessStatus.toString() !=
+                'LocationAccessStatus.serviceDisabled',
             autoStart: streaming,
             networkType: networkType,
             lastGpsAt: lastGpsReadAt,
@@ -204,7 +205,8 @@ class _CompactInfoRow extends StatelessWidget {
       children: [
         Icon(icon,
             size: 14,
-            color: emphasized ? const Color(0xFF2F9E38) : const Color(0xFF667085)),
+            color:
+                emphasized ? const Color(0xFF2F9E38) : const Color(0xFF667085)),
         const SizedBox(width: 6),
         Text(
           label,
@@ -219,7 +221,8 @@ class _CompactInfoRow extends StatelessWidget {
           style: TextStyle(
             fontSize: emphasized ? 14 : 12,
             fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
-            color: emphasized ? const Color(0xFF1F4D30) : const Color(0xFF101828),
+            color:
+                emphasized ? const Color(0xFF1F4D30) : const Color(0xFF101828),
           ),
         ),
       ],
@@ -258,7 +261,8 @@ class _DeviceAndRentalSummary extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.pedal_bike_rounded, size: 18, color: Color(0xFF2F9E38)),
+              const Icon(Icons.pedal_bike_rounded,
+                  size: 18, color: Color(0xFF2F9E38)),
               const SizedBox(width: 8),
               Text(
                 '${bike.code} - ${bike.name}',
@@ -444,7 +448,8 @@ class _CheckRow extends StatelessWidget {
           Container(
             width: 24,
             height: 24,
-            decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+            decoration:
+                BoxDecoration(color: background, shape: BoxShape.circle),
             child: Icon(
               ok ? Icons.check_rounded : Icons.priority_high_rounded,
               size: 16,
