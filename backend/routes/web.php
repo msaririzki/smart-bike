@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\MonitoringController;
 use App\Http\Controllers\Admin\RentalController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\SearchController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::middleware(['auth', 'role:admin,superadmin'])->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/', DashboardController::class)->name('dashboard');
+        Route::get('search', [SearchController::class, 'index'])->name('search');
         Route::get('dashboard/map-data', [DashboardController::class, 'mapData'])->name('dashboard.map-data');
         Route::get('monitoring-bikes', [MonitoringController::class, 'index'])->name('monitoring.index');
         Route::get('monitoring-bikes/{bike}', [MonitoringController::class, 'show'])->name('monitoring.show');
@@ -32,6 +34,8 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('rentals/{rental}', [RentalController::class, 'show'])->name('rentals.show');
         Route::get('rentals/{rental}/route-map-data', [RentalController::class, 'routeMapData'])->name('rentals.route-map-data');
         Route::get('users', [UserController::class, 'index'])->name('users.index');
+        Route::get('users/create', [UserController::class, 'create'])->name('users.create');
+        Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
         Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');

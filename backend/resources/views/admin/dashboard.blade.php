@@ -100,7 +100,7 @@
         }
     </style>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h1 style="margin: 0; color: #0f172a; font-size: 1.75rem;">Dasbor Ringkasan</h1>
+        <h1 style="margin: 0; color: #0f172a; font-size: 1.75rem;">Dasbor</h1>
         <button id="toggleCardsBtn" type="button" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-weight: 500; transition: all 0.2s; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
             <span id="toggleCardsText">Lihat Lainnya</span>
             <svg id="toggleCardsIcon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
