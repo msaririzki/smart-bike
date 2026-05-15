@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../models/rental.dart';
 import '../../services/api_client.dart';
+import '../../theme/app_colors.dart';
 import 'active_rental_detail.dart';
 import 'idle_warning_dialog.dart';
 import 'map_widget.dart';
@@ -419,7 +420,10 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 253, 255, 254),
       appBar: AppBar(
-        title: const Text('Rental Aktif', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          'Rental Aktif',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         backgroundColor: const Color.fromARGB(255, 253, 255, 254),
         foregroundColor: const Color(0xff073f3a),
         elevation: 0,
@@ -442,7 +446,7 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
           : RefreshIndicator(
               onRefresh: _loadRental,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                 children: [
                   if (_error != null) _ErrorBanner(message: _error!),
                   if (rental == null)
@@ -463,8 +467,6 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                           currency: _currency,
                           duration: _durationFor(rental),
                           routePoints: List.unmodifiable(_routePoints),
-                          isFinishing: _isFinishing,
-                          onFinish: () => _finishRental(),
                           idleBillingAmount: _idleBillingAmount,
                           idleBillingIntervalSeconds:
                               _idleBillingIntervalSeconds,
@@ -472,6 +474,36 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
                       ],
                     ),
                 ],
+              ),
+            ),
+      bottomNavigationBar: rental == null
+          ? null
+          : SafeArea(
+              minimum: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+              child: FilledButton.icon(
+                onPressed: _isFinishing ? null : () => _finishRental(),
+                icon: _isFinishing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.stop_circle_outlined),
+                label: Text(
+                  _isFinishing ? 'Menyelesaikan...' : 'Selesaikan Sewa',
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primaryLight,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
               ),
             ),
     );
