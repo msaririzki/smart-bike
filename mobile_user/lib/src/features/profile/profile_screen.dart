@@ -23,7 +23,6 @@ class ProfileScreen extends StatefulWidget {
 
 class ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
-  String? _error;
   String _name = '-';
   String _email = '-';
   String _phone = '-';
@@ -40,7 +39,6 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
-      _error = null;
     });
 
     try {
@@ -67,7 +65,6 @@ class ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
         _isLoading = false;
       });
     }
@@ -118,7 +115,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                 );
                 
                 if (!mounted) return;
-                Navigator.of(sheetContext).pop();
+                if (sheetContext.mounted) {
+                  Navigator.of(sheetContext).pop();
+                }
                 _showMessage('Profil berhasil diperbarui');
                 loadProfile();
               } on ApiException catch (e) {
@@ -360,8 +359,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                   passwordConfirmation: confirmController.text,
                 );
                 
-                if (!mounted) return;
-                Navigator.of(sheetContext).pop();
+                if (sheetContext.mounted) {
+                  Navigator.of(sheetContext).pop();
+                }
                 _showMessage('Password berhasil diubah. Silakan masuk kembali.');
                 widget.onLogout();
               } on ApiException catch (e) {
@@ -735,7 +735,7 @@ class _SheetBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: const Color(0xffecfdf5),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -978,7 +978,6 @@ class _ProfileActionTile extends StatelessWidget {
     required this.iconBgColor,
     required this.iconColor,
     this.onTap,
-    this.trailing,
     this.textColor = const Color(0xff1e293b),
     this.showChevron = true,
   });
@@ -989,7 +988,6 @@ class _ProfileActionTile extends StatelessWidget {
   final Color iconBgColor;
   final Color iconColor;
   final VoidCallback? onTap;
-  final Widget? trailing;
   final Color textColor;
   final bool showChevron;
 
@@ -1036,8 +1034,7 @@ class _ProfileActionTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (trailing != null) trailing!,
-            if (trailing == null && showChevron)
+            if (showChevron)
               const Icon(Icons.chevron_right_rounded, color: Color(0xffcbd5e1), size: 24),
           ],
         ),

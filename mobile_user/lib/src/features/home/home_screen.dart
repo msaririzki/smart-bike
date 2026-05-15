@@ -1356,13 +1356,11 @@ class _SectionHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.onTap,
-    this.actionLabel = 'Lihat semua',
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onTap;
-  final String actionLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1390,7 +1388,7 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         if (onTap != null)
-          TextButton(onPressed: onTap, child: Text(actionLabel)),
+          TextButton(onPressed: onTap, child: const Text('Lihat semua')),
       ],
     );
   }
@@ -1399,13 +1397,9 @@ class _SectionHeader extends StatelessWidget {
 class _SoftIcon extends StatelessWidget {
   const _SoftIcon({
     required this.icon,
-    this.color = AppColors.primaryLight,
-    this.backgroundColor = const Color(0xffecfdf5),
   });
 
   final IconData icon;
-  final Color color;
-  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1413,10 +1407,10 @@ class _SoftIcon extends StatelessWidget {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: const Color(0xffecfdf5),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, color: color, size: 23),
+      child: Icon(icon, color: AppColors.primaryLight, size: 23),
     );
   }
 }
@@ -1490,38 +1484,6 @@ class _ComingSoonPage extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _SheetBanner extends StatelessWidget {
-  const _SheetBanner({
-    required this.icon,
-    required this.message,
-    required this.color,
-    required this.backgroundColor,
-  });
-
-  final IconData icon;
-  final String message;
-  final Color color;
-  final Color backgroundColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 10),
-          Expanded(child: Text(message)),
-        ],
       ),
     );
   }
