@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import '../../models/rental_history.dart';
 import '../../services/api_client.dart';
@@ -408,11 +409,12 @@ class HistoryScreenState extends State<HistoryScreen> {
 
     return ListView.separated(
       controller: _scrollController,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       itemCount:
           filteredHistory.length +
           3, // Summary + Filters + Items + Loading Indicator
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      separatorBuilder: (context, index) =>
+          SizedBox(height: index < 2 ? 14 : 10),
       itemBuilder: (context, index) {
         if (index == 0) {
           return _HistorySummaryHeader(history: _history!);
@@ -843,60 +845,84 @@ class _HistorySummaryHeader extends StatelessWidget {
         : '${totalCo2Gram.toStringAsFixed(0)} g';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 24),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.primaryLight,
+        color: AppColors.primaryDark,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xff269276).withValues(alpha: 0.2),
+            color: AppColors.primaryDark.withValues(alpha: 0.18),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Column(
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          _GoalTracker(history: history),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _StatItem(
-                label: 'Jarak',
-                value: totalKm.toStringAsFixed(1),
-                unit: 'km',
-              ),
-              _StatDivider(),
-              _StatItem(label: 'Sewa', value: '$totalRentals', unit: 'kali'),
-              _StatDivider(),
-              _StatItem(label: 'Estimasi', value: co2Text, unit: 'CO2'),
-            ],
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Divider(color: Colors.white24, height: 1),
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Aktivitas 7 Hari',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _WeeklyBarChart(history: history),
-                  ],
+          Positioned(
+            right: -330,
+            top: 90,
+            child: Opacity(
+              opacity: 0.08,
+              child: SvgPicture.asset(
+                'assets/flowbike4.svg',
+                width: 600,
+                colorFilter: const ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.srcIn,
                 ),
+              ),
+            ),
+          ),
+          Column(
+            children: [
+              _GoalTracker(history: history),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _StatItem(
+                    label: 'Jarak',
+                    value: totalKm.toStringAsFixed(1),
+                    unit: 'km',
+                  ),
+                  _StatDivider(),
+                  _StatItem(
+                    label: 'Sewa',
+                    value: '$totalRentals',
+                    unit: 'kali',
+                  ),
+                  _StatDivider(),
+                  _StatItem(label: 'Estimasi', value: co2Text, unit: 'CO2'),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Divider(color: Colors.white24, height: 1),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Aktivitas 7 Hari',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _WeeklyBarChart(history: history),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1080,114 +1106,158 @@ class _HistoryCard extends StatelessWidget {
     final timeFormat = DateFormat('HH:mm');
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xfff1f5f9), width: 1.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xffe5e7eb), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xff133c36).withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                if (isSelectionMode) ...[
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Checkbox(
-                      value: isSelected,
-                      onChanged: (v) => onTap(),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      activeColor: const Color(0xff269276),
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -54,
+                top: -28,
+                child: Opacity(
+                  opacity: 0.045,
+                  child: SvgPicture.asset(
+                    'assets/flowbike4.svg',
+                    width: 170,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.primaryDark,
+                      BlendMode.srcIn,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                ],
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xfff0fdf4),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.pedal_bike_rounded,
-                    color: Color(0xff23866f),
-                    size: 20,
-                  ),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 13,
+                ),
+                child: Row(
+                  children: [
+                    if (isSelectionMode) ...[
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: isSelected,
+                          onChanged: (v) => onTap(),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          activeColor: AppColors.primaryLight,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xffe6f4ea),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xffc7e8d1)),
+                      ),
+                      child: const Icon(
+                        Icons.pedal_bike_rounded,
+                        color: AppColors.primaryDark,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  history.bike?.code ?? 'SMART BIKE',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xff133c36),
+                                    height: 1.05,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _buildMiniStatusBadge(history.status),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
                           Text(
-                            history.bike?.code ?? 'SMART BIKE',
+                            '${dateFormat.format(history.startedAt)} • ${timeFormat.format(history.startedAt)}',
                             style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.black87,
+                              fontSize: 13,
+                              color: Color(0xff6b7280),
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          _buildMiniStatusBadge(history.status),
+                          const SizedBox(height: 7),
+                          Row(
+                            children: [
+                              _HistoryMeta(
+                                icon: Icons.route_rounded,
+                                value:
+                                    '${history.totalDistanceKilometers.toStringAsFixed(2)} km',
+                              ),
+                              const SizedBox(width: 10),
+                              _HistoryMeta(
+                                icon: Icons.timer_outlined,
+                                value: history.durationString,
+                              ),
+                            ],
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${dateFormat.format(history.startedAt)} • ${timeFormat.format(history.startedAt)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xff94a3b8),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      currency.format(history.totalCost),
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.primaryLight,
-                      ),
                     ),
-                    const SizedBox(height: 2),
-                    Row(
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.timer_outlined,
-                          size: 12,
-                          color: Color(0xff94a3b8),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          history.durationString,
-                          style: const TextStyle(
+                        const Text(
+                          'Total',
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xff94a3b8),
-                            fontWeight: FontWeight.w600,
+                            color: Color(0xff6b7280),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          currency.format(history.totalCost),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.primaryLight,
+                            height: 1,
                           ),
                         ),
                       ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1201,35 +1271,61 @@ class _HistoryCard extends StatelessWidget {
 
     switch (status.toLowerCase()) {
       case 'completed':
-        color = const Color(0xff23866f);
-        bgColor = const Color(0xffe8f7f2);
+        color = AppColors.primaryDark;
+        bgColor = const Color(0xffe6f4ea);
         label = 'Selesai';
         break;
       case 'cancelled':
-        color = const Color(0xffd14148);
-        bgColor = const Color(0xffffecef);
+        color = const Color(0xffb42318);
+        bgColor = const Color(0xfffff1f3);
         label = 'Batal';
         break;
       default:
-        color = const Color(0xff2563eb);
-        bgColor = const Color(0xffdbeafe);
+        color = const Color(0xff175cd3);
+        bgColor = const Color(0xffeff8ff);
         label = 'Aktif';
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
           color: color,
         ),
       ),
+    );
+  }
+}
+
+class _HistoryMeta extends StatelessWidget {
+  const _HistoryMeta({required this.icon, required this.value});
+
+  final IconData icon;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: const Color(0xff6b7280)),
+        const SizedBox(width: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xff4b5563),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1434,16 +1530,9 @@ class _WeeklyBarChart extends StatelessWidget {
                     width: 14,
                     height: (value * 40).clamp(6, 40).toDouble(),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: index == 6
-                            ? [const Color(0xff4ade80), Colors.white]
-                            : [
-                                Colors.white.withValues(alpha: 0.4),
-                                Colors.white.withValues(alpha: 0.1),
-                              ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
+                      color: index == 6
+                          ? const Color(0xffbbf7d0)
+                          : Colors.white.withValues(alpha: 0.26),
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(4),
                       ),
@@ -1451,8 +1540,8 @@ class _WeeklyBarChart extends StatelessWidget {
                           ? [
                               BoxShadow(
                                 color: const Color(
-                                  0xff4ade80,
-                                ).withValues(alpha: 0.3),
+                                  0xffbbf7d0,
+                                ).withValues(alpha: 0.24),
                                 blurRadius: 4,
                                 offset: const Offset(0, 2),
                               ),

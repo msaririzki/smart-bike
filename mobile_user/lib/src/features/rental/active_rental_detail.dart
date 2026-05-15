@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../models/rental.dart';
-import 'idle_badge_widget.dart';
 import 'map_widget.dart';
 import 'package:mobile_user/src/theme/app_colors.dart';
 
@@ -13,8 +12,6 @@ class ActiveRentalDetail extends StatelessWidget {
     required this.currency,
     required this.duration,
     required this.routePoints,
-    required this.isFinishing,
-    required this.onFinish,
     this.idleBillingAmount,
     this.idleBillingIntervalSeconds,
     super.key,
@@ -24,8 +21,6 @@ class ActiveRentalDetail extends StatelessWidget {
   final NumberFormat currency;
   final Duration duration;
   final List<LatLng> routePoints;
-  final bool isFinishing;
-  final VoidCallback onFinish;
   final int? idleBillingAmount;
   final int? idleBillingIntervalSeconds;
 
@@ -37,12 +32,16 @@ class ActiveRentalDetail extends StatelessWidget {
     final longitude = rental.longitude;
     final screenSize = MediaQuery.sizeOf(context);
     final compact = screenSize.width < 380 || screenSize.height < 720;
-    final mapHeight = compact ? 190.0 : 250.0;
+    final mapHeight = compact ? 176.0 : 220.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _StatusHeader(status: rental.status),
+        _BikeStatusPanel(
+          code: bike?.code ?? 'Bike',
+          name: bike?.name ?? 'Sepeda',
+          status: rental.status,
+        ),
         if (rental.status == 'idle_billing') ...[
           const SizedBox(height: 10),
           _IdleBillingExplanation(
@@ -51,9 +50,7 @@ class ActiveRentalDetail extends StatelessWidget {
             intervalSeconds: idleBillingIntervalSeconds,
           ),
         ],
-        const SizedBox(height: 16),
-        _BikePanel(code: bike?.code ?? 'Bike', name: bike?.name ?? 'Sepeda'),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         if (latitude != null && longitude != null) ...[
           SizedBox(
             height: mapHeight,
@@ -64,12 +61,27 @@ class ActiveRentalDetail extends StatelessWidget {
               accuracyRadius: rental.gpsAccuracyMeters ?? 0,
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            'Lokasi: ${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: const Color(0xff667085)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(
+                Icons.place_outlined,
+                size: 16,
+                color: Color(0xff6b7280),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xff6b7280),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
           if (routePoints.length >= 2) ...[
             const SizedBox(height: 4),
@@ -81,73 +93,16 @@ class ActiveRentalDetail extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
         ] else ...[
           const _LocationUnavailableCard(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
         ],
-        _ConnectionPanel(rental: rental),
-        const SizedBox(height: 16),
-        _MetricGrid(
-          children: [
-            _MetricCard(
-              icon: Icons.route,
-              label: 'Total Jarak',
-              value: '${rental.totalDistanceKilometers.toStringAsFixed(2)} km',
-              helper: '${rental.totalDistanceMeters.toStringAsFixed(1)} m',
-            ),
-            _MetricCard(
-              icon: Icons.speed,
-              label: 'Kecepatan',
-              value: '${speed.toStringAsFixed(1)} km/h',
-              helper: 'Terkini',
-            ),
-            _MetricCard(
-              icon: Icons.timer_outlined,
-              label: 'Durasi',
-              value: _formatDuration(duration),
-              helper: 'Berjalan',
-            ),
-            _MetricCard(
-              icon: Icons.payments_outlined,
-              label: 'Biaya Jarak',
-              value: currency.format(rental.distanceCost),
-              helper: 'Distance billing',
-            ),
-            _MetricCard(
-              icon: Icons.hourglass_bottom,
-              label: 'Biaya Idle',
-              value: currency.format(rental.idleCost),
-              helper: 'Idle billing',
-            ),
-            _MetricCard(
-              icon: Icons.receipt_long,
-              label: 'Total Biaya',
-              value: currency.format(rental.totalCost),
-              helper: 'Akumulasi',
-              emphasized: true,
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        FilledButton.icon(
-          onPressed: isFinishing ? null : onFinish,
-          icon: isFinishing
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.stop_circle_outlined),
-          label: Text(isFinishing ? 'Menyelesaikan...' : 'Selesaikan Sewa'),
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.primaryLight,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
+        _RentalDataPanel(
+          rental: rental,
+          currency: currency,
+          duration: duration,
+          speed: speed,
         ),
       ],
     );
@@ -173,9 +128,15 @@ class ActiveRentalDetail extends StatelessWidget {
   }
 }
 
-class _StatusHeader extends StatelessWidget {
-  const _StatusHeader({required this.status});
+class _BikeStatusPanel extends StatelessWidget {
+  const _BikeStatusPanel({
+    required this.code,
+    required this.name,
+    required this.status,
+  });
 
+  final String code;
+  final String name;
   final String status;
 
   @override
@@ -183,41 +144,67 @@ class _StatusHeader extends StatelessWidget {
     final style = _statusStyle(status);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: style.background,
-        border: Border.all(color: style.border),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.primaryDark,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(style.icon, color: style.foreground),
-          const SizedBox(width: 12),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+            child: const Icon(Icons.pedal_bike, color: Colors.white, size: 25),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Status Rental',
-                  style: Theme.of(context).textTheme.labelMedium,
+                  code,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
+                  ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  style.label,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: style.foreground,
-                    fontWeight: FontWeight.w700,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFa7c4b8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          Flexible(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: FittedBox(child: StatusBadge(status: status)),
-            ),
-          ),
+          const SizedBox(width: 8),
+          FittedBox(child: _CompactStatusPill(style: style)),
         ],
       ),
     );
@@ -229,24 +216,52 @@ class _StatusHeader extends StatelessWidget {
         label: 'IDLE WARNING',
         icon: Icons.warning_amber_rounded,
         foreground: Color(0xffb54708),
-        background: Color(0xfffffaeb),
-        border: Color(0xfffedf89),
       ),
       'idle_billing' => const _StatusStyle(
         label: 'IDLE BILLING',
         icon: Icons.hourglass_bottom,
         foreground: Color(0xffc2410c),
-        background: Color(0xfffff7ed),
-        border: Color(0xffffb27a),
       ),
       _ => const _StatusStyle(
-        label: 'ACTIVE',
+        label: 'AKTIF',
         icon: Icons.check_circle_outline,
-        foreground: Color(0xff027a48),
-        background: Color(0xffecfdf3),
-        border: Color(0xffabefc6),
+        foreground: Color(0xffbbf7d0),
       ),
     };
+  }
+}
+
+class _CompactStatusPill extends StatelessWidget {
+  const _CompactStatusPill({required this.style});
+
+  final _StatusStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(style.icon, size: 12, color: style.foreground),
+          const SizedBox(width: 4),
+          Text(
+            style.label,
+            style: TextStyle(
+              color: style.foreground,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -255,58 +270,11 @@ class _StatusStyle {
     required this.label,
     required this.icon,
     required this.foreground,
-    required this.background,
-    required this.border,
   });
 
   final String label;
   final IconData icon;
   final Color foreground;
-  final Color background;
-  final Color border;
-}
-
-class _BikePanel extends StatelessWidget {
-  const _BikePanel({required this.code, required this.name});
-
-  final String code;
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xffd0d5dd)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            backgroundColor: Color(0xffccfbf1),
-            child: Icon(Icons.pedal_bike, color: AppColors.primaryDark),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  code,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.primaryDark,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(name, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _LocationUnavailableCard extends StatelessWidget {
@@ -353,39 +321,91 @@ class _LocationUnavailableCard extends StatelessWidget {
   }
 }
 
-class _ConnectionPanel extends StatelessWidget {
-  const _ConnectionPanel({required this.rental});
+class _RentalDataPanel extends StatelessWidget {
+  const _RentalDataPanel({
+    required this.rental,
+    required this.currency,
+    required this.duration,
+    required this.speed,
+  });
 
   final Rental rental;
+  final NumberFormat currency;
+  final Duration duration;
+  final double speed;
 
   @override
   Widget build(BuildContext context) {
     final lastUpdate = rental.lastLocationUpdateAt;
     final networkType = rental.networkType;
     final accuracy = rental.gpsAccuracyMeters;
-    final relativeTime = _formatRelativeTime(lastUpdate);
+    final lastUpdateText = lastUpdate == null
+        ? 'Belum ada data GPS'
+        : '${DateFormat('HH:mm:ss').format(lastUpdate)} (${_formatRelativeTime(lastUpdate)})';
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xffd0d5dd)),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xffe5e7eb)),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xff133c36).withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _GpsQualityBadge(accuracy: accuracy),
-          const SizedBox(height: 12),
-          _ConnectionRow(
-            icon: Icons.update,
-            label: 'GPS sepeda terakhir',
-            value: lastUpdate == null
-                ? 'Belum ada data GPS'
-                : '${DateFormat('HH:mm:ss, dd MMM yyyy').format(lastUpdate)} ($relativeTime)',
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 2),
+            child: Text(
+              'Detail Sewa',
+              style: TextStyle(
+                color: Color(0xff133c36),
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
-          const SizedBox(height: 10),
-          _ConnectionRow(
+          const SizedBox(height: 12),
+          _TotalCostHighlight(
+            total: currency.format(rental.totalCost),
+            distanceCost: currency.format(rental.distanceCost),
+            idleCost: currency.format(rental.idleCost),
+          ),
+          const SizedBox(height: 12),
+          _GpsQualityBadge(accuracy: accuracy),
+          const SizedBox(height: 14),
+          _DetailRow(
+            icon: Icons.timer_outlined,
+            label: 'Durasi',
+            value: ActiveRentalDetail._formatDuration(duration),
+          ),
+          const _DataDivider(),
+          _DetailRow(
+            icon: Icons.route_rounded,
+            label: 'Total jarak',
+            value: '${rental.totalDistanceKilometers.toStringAsFixed(2)} km',
+            helper: '${rental.totalDistanceMeters.toStringAsFixed(1)} m',
+          ),
+          const _DataDivider(),
+          _DetailRow(
+            icon: Icons.speed_rounded,
+            label: 'Kecepatan',
+            value: '${speed.toStringAsFixed(1)} km/h',
+          ),
+          const _DataDivider(),
+          _DetailRow(
+            icon: Icons.update_rounded,
+            label: 'GPS terakhir',
+            value: lastUpdateText,
+          ),
+          const _DataDivider(),
+          _DetailRow(
             icon: Icons.network_cell_outlined,
             label: 'Network',
             value: (networkType == null || networkType.isEmpty)
@@ -393,10 +413,10 @@ class _ConnectionPanel extends StatelessWidget {
                 : networkType,
           ),
           if (accuracy != null) ...[
-            const SizedBox(height: 10),
-            _ConnectionRow(
-              icon: Icons.gps_fixed,
-              label: 'Akurasi GPS',
+            const _DataDivider(),
+            _DetailRow(
+              icon: Icons.gps_fixed_rounded,
+              label: 'Akurasi',
               value: '${accuracy.toStringAsFixed(1)} m',
             ),
           ],
@@ -405,11 +425,7 @@ class _ConnectionPanel extends StatelessWidget {
     );
   }
 
-  String _formatRelativeTime(DateTime? dateTime) {
-    if (dateTime == null) {
-      return 'GPS belum tersedia';
-    }
-
+  String _formatRelativeTime(DateTime dateTime) {
     final diff = DateTime.now().difference(dateTime);
     if (diff.isNegative || diff.inSeconds < 5) {
       return 'Baru saja';
@@ -424,6 +440,132 @@ class _ConnectionPanel extends StatelessWidget {
       return '${diff.inHours} jam lalu';
     }
     return '${diff.inDays} hari lalu';
+  }
+}
+
+class _TotalCostHighlight extends StatelessWidget {
+  const _TotalCostHighlight({
+    required this.total,
+    required this.distanceCost,
+    required this.idleCost,
+  });
+
+  final String total;
+  final String distanceCost;
+  final String idleCost;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xfff0fdf4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xffbbf7d0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: Colors.white,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Total biaya berjalan',
+                  style: TextStyle(
+                    color: Color(0xff1f4d30),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              total,
+              style: const TextStyle(
+                color: Color(0xff133c36),
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                height: 1,
+                letterSpacing: -0.8,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _CostChip(label: 'Jarak', value: distanceCost),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _CostChip(label: 'Idle', value: idleCost),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CostChip extends StatelessWidget {
+  const _CostChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xffdcfce7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xff6b7280),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xff133c36),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -486,122 +628,86 @@ class _GpsQualityBadge extends StatelessWidget {
   }
 }
 
-class _ConnectionRow extends StatelessWidget {
-  const _ConnectionRow({
+class _DataDivider extends StatelessWidget {
+  const _DataDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 10),
+      child: Divider(height: 1, color: Color(0xffedf0f2)),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
     required this.icon,
     required this.label,
     required this.value,
+    this.helper,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final String? helper;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppColors.primaryDark),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: const Color(0xffecfdf5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: AppColors.primaryLight),
         ),
-        Flexible(
+        const SizedBox(width: 12),
+        Expanded(
           child: Text(
-            value,
-            textAlign: TextAlign.right,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xff4b5563),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 150),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                value,
+                textAlign: TextAlign.right,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              if (helper != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  helper!,
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xff6b7280),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 620 ? 3 : 2;
-        return GridView.count(
-          crossAxisCount: columns,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: columns == 3 ? 1.8 : 1.35,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          children: children,
-        );
-      },
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.helper,
-    this.emphasized = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final String helper;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: emphasized ? const Color(0xfff0fdfa) : Colors.white,
-        border: Border.all(
-          color: emphasized ? const Color(0xff5eead4) : const Color(0xffd0d5dd),
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            color: emphasized ? AppColors.primaryDark : const Color(0xff475467),
-          ),
-          const Spacer(),
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
-          const SizedBox(height: 3),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            helper,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: const Color(0xff667085)),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -635,9 +741,7 @@ class _IdleBillingExplanation extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.red.shade50, Colors.orange.shade50],
-        ),
+        color: const Color(0xfffff1f3),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.red.shade200.withValues(alpha: 0.6)),
       ),
