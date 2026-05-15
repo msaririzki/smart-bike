@@ -49,6 +49,8 @@ class _SmartBikeUserAppState extends State<SmartBikeUserApp> {
   Future<void> _handleLogout() async {
     try {
       await _api.logout();
+    } on ApiException {
+      // Token bisa sudah tidak valid, misalnya setelah reset password.
     } finally {
       await _sessionStore.clear();
       setState(() => _isLoggedIn = false);
