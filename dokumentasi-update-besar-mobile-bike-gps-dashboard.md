@@ -78,7 +78,7 @@ Tracking GPS sekarang memakai foreground notification Android.
 
 Notifikasi yang muncul:
 
-```text
+```texta
 Smart Bike sedang mengirim lokasi
 GPS sepeda aktif agar admin dan penyewa bisa memantau lokasi.
 ```
