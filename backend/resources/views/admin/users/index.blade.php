@@ -1,7 +1,13 @@
 @extends('layouts.admin', ['title' => 'Manajemen Pengguna'])
 
 @section('content')
-    <h1>Manajemen Pengguna</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h1 style="margin: 0;">Manajemen Pengguna</h1>
+        <button type="button" class="button" onclick="document.getElementById('create-user-modal').style.display = 'flex'" style="background: #0d9488;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Tambah Pengguna
+        </button>
+    </div>
 
     <form class="card toolbar" method="get" action="{{ route('admin.users.index') }}">
         <label>
@@ -24,6 +30,60 @@
             </div>
         </div>
     </form>
+
+    <!-- Modal Tambah User -->
+    <div id="create-user-modal" class="modal-overlay" style="{{ $errors->any() ? 'display: flex;' : '' }}">
+        <div class="card" style="max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #0f766e;">Tambah Pengguna Baru</h2>
+                <button type="button" onclick="document.getElementById('create-user-modal').style.display = 'none'" style="background: none; border: none; cursor: pointer; color: #64748b;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <form method="post" action="{{ route('admin.users.store') }}">
+                @csrf
+                <div style="margin-bottom: 16px;">
+                    <label for="name">Nama Lengkap <span style="color: #dc2626;">*</span></label>
+                    <input type="text" id="name" name="name" value="{{ old('name') }}" required placeholder="Contoh: Budi Santoso">
+                    @error('name') <p class="error" style="font-size: 12px; margin-top: 4px;">{{ $message }}</p> @enderror
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label for="email">Email <span style="color: #dc2626;">*</span></label>
+                    <input type="email" id="email" name="email" value="{{ old('email') }}" required placeholder="budi@example.com">
+                    @error('email') <p class="error" style="font-size: 12px; margin-top: 4px;">{{ $message }}</p> @enderror
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label for="phone">Nomor Telepon <span style="color: #dc2626;">*</span></label>
+                    <input type="text" id="phone" name="phone" value="{{ old('phone') }}" required placeholder="08123456789">
+                    @error('phone') <p class="error" style="font-size: 12px; margin-top: 4px;">{{ $message }}</p> @enderror
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label for="create_role">Hak Akses <span style="color: #dc2626;">*</span></label>
+                    <select id="create_role" name="role" required>
+                        <option value="user" @selected(old('role') == 'user')>Member (Aplikasi Mobile)</option>
+                        <option value="admin" @selected(old('role') == 'admin')>Admin</option>
+                        <option value="superadmin" @selected(old('role') == 'superadmin')>Super Admin</option>
+                    </select>
+                    @error('role') <p class="error" style="font-size: 12px; margin-top: 4px;">{{ $message }}</p> @enderror
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <label for="password">Password <span style="color: #dc2626;">*</span></label>
+                    <input type="password" id="password" name="password" required placeholder="Minimal 8 karakter">
+                    @error('password') <p class="error" style="font-size: 12px; margin-top: 4px;">{{ $message }}</p> @enderror
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="button" class="button secondary" onclick="document.getElementById('create-user-modal').style.display = 'none'" style="flex: 1;">Batal</button>
+                    <button type="submit" class="button" style="flex: 2; background: #0d9488;">Simpan User</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <div class="table-responsive">
         <table>
