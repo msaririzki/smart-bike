@@ -123,8 +123,7 @@
         </table>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" crossorigin=""></script>
     <script>
         const routePoints = @json($routePoints);
         const routeDataUrl = @json(route('admin.rentals.route-map-data', $rental));
@@ -244,8 +243,23 @@
             };
 
             renderRoute(routePoints);
-            setTimeout(() => routeMap.invalidateSize(), 100);
-            setTimeout(() => routeMap.invalidateSize(), 500);
+
+            // Fix: Gunakan setTimeout 200ms setelah DOM siap untuk mencegah kotak abu-abu
+            const applyMapFix = () => {
+                setTimeout(() => {
+                    routeMap.invalidateSize();
+                    if (currentRouteCoordinates.length > 0) {
+                        fitRouteToBounds();
+                    }
+                }, 200);
+            };
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', applyMapFix);
+            } else {
+                applyMapFix();
+            }
+
             routeMapCenterButton?.addEventListener('click', fitRouteToBounds);
             setInterval(refreshRoute, 10000);
         } else if (routeMapElement) {

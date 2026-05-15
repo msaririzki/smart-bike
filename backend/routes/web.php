@@ -34,7 +34,6 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('rentals/{rental}', [RentalController::class, 'show'])->name('rentals.show');
         Route::get('rentals/{rental}/route-map-data', [RentalController::class, 'routeMapData'])->name('rentals.route-map-data');
         Route::get('users', [UserController::class, 'index'])->name('users.index');
-        Route::get('users/create', [UserController::class, 'create'])->name('users.create');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
