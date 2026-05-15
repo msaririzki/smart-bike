@@ -1385,9 +1385,11 @@ class _SimulatorScreenState extends State<SimulatorScreen>
             ),
           ),
         ),
-        Positioned(
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
           right: 16,
-          bottom: 270,
+          bottom: _mapControlsExpanded ? 305 : 216,
           child: Container(
             decoration: const BoxDecoration(
               color: Colors.white,
