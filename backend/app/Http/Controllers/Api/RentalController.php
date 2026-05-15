@@ -47,12 +47,14 @@ class RentalController extends Controller
 
     public function history(Request $request): JsonResponse
     {
+        $perPage = min(max((int) $request->integer('per_page', 10), 1), 50);
+
         return response()->json([
             'data' => Rental::query()
                 ->with('bike')
                 ->where('user_id', $request->user()->id)
                 ->latest('started_at')
-                ->paginate(20),
+                ->paginate($perPage),
         ]);
     }
 

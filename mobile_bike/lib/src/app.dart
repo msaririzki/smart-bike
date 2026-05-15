@@ -27,7 +27,18 @@ class _AppState extends State<App> {
   }
 
   Future<void> _checkSession() async {
-    final logged = await _session.isLoggedIn;
+    var logged = await _session.isLoggedIn;
+    if (logged) {
+      try {
+        await _api.currentUser();
+      } on ApiException {
+        await _session.clearSession();
+        logged = false;
+      } catch (_) {
+        logged = false;
+      }
+    }
+
     if (mounted) {
       setState(() {
         _loggedIn = logged;

@@ -166,8 +166,11 @@ class ApiClient {
     return json['data'] as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> rentalHistory({int page = 1}) async {
-    final json = await _get('/rentals/history?page=$page');
+  Future<Map<String, dynamic>> rentalHistory({
+    int page = 1,
+    int perPage = 10,
+  }) async {
+    final json = await _get('/rentals/history?page=$page&per_page=$perPage');
     return json['data'] as Map<String, dynamic>;
   }
 

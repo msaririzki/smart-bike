@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../models/bike.dart';
 import '../../models/rental.dart';
@@ -222,6 +224,8 @@ class _DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<_DashboardPage> {
+  static const _bikePageSize = 10;
+
   final _currency = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp',
@@ -231,7 +235,10 @@ class _DashboardPageState extends State<_DashboardPage> {
   List<Bike> _bikes = const [];
   List<RentalHistory> _historyPreview = const [];
   Rental? _activeRental;
+  LatLng? _userPosition;
+  int _bikePage = 0;
   bool _isLoading = true;
+  bool _isLocatingUser = false;
   bool _isBusy = false;
   String? _error;
 
@@ -263,6 +270,7 @@ class _DashboardPageState extends State<_DashboardPage> {
       setState(() {
         _bikes = results[0] as List<Bike>;
         _activeRental = results[1] as Rental?;
+        _bikePage = 0;
         _historyPreview = historyItems
             .take(3)
             .map((item) => RentalHistory.fromJson(item as Map<String, dynamic>))
@@ -280,6 +288,50 @@ class _DashboardPageState extends State<_DashboardPage> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+
+    if (mounted && _error == null) {
+      _loadUserPositionInBackground();
+    }
+  }
+
+  Future<void> _loadUserPositionInBackground() async {
+    if (_isLocatingUser) return;
+
+    setState(() => _isLocatingUser = true);
+    final position = await _currentUserPosition();
+    if (!mounted) return;
+
+    setState(() {
+      _userPosition = position;
+      _bikePage = 0;
+      _isLocatingUser = false;
+    });
+  }
+
+  Future<LatLng?> _currentUserPosition() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      return LatLng(position.latitude, position.longitude);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -329,8 +381,58 @@ class _DashboardPageState extends State<_DashboardPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  List<Bike> get _sortedBikes {
+    final userPosition = _userPosition;
+    final bikes = List<Bike>.from(_bikes);
+    if (userPosition == null) return bikes;
+
+    bikes.sort((a, b) {
+      final aDistance = _distanceToBike(a) ?? double.infinity;
+      final bDistance = _distanceToBike(b) ?? double.infinity;
+      return aDistance.compareTo(bDistance);
+    });
+    return bikes;
+  }
+
+  double? _distanceToBike(Bike bike) {
+    final userPosition = _userPosition;
+    final latitude = bike.latitude;
+    final longitude = bike.longitude;
+    if (userPosition == null || latitude == null || longitude == null) {
+      return null;
+    }
+
+    return const Distance().as(
+      LengthUnit.Meter,
+      userPosition,
+      LatLng(latitude, longitude),
+    );
+  }
+
+  String get _bikeSectionSubtitle {
+    if (_isLocatingUser) {
+      return 'Lokasi dicek di background, daftar langsung bisa dipakai.';
+    }
+    if (_userPosition == null) {
+      return 'Aktifkan lokasi untuk urutan sepeda terdekat.';
+    }
+    return 'Diurutkan dari sepeda terdekat.';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bikes = _sortedBikes;
+    final bikePageCount = (bikes.length / _bikePageSize).ceil();
+    final safeBikePage = bikePageCount == 0
+        ? 0
+        : _bikePage.clamp(0, bikePageCount - 1);
+    if (safeBikePage != _bikePage) {
+      _bikePage = safeBikePage;
+    }
+    final bikeStart = safeBikePage * _bikePageSize;
+    final bikeEnd = (bikeStart + _bikePageSize).clamp(0, bikes.length);
+    final visibleBikes = bikes.sublist(bikeStart, bikeEnd);
+
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primaryLight),
@@ -370,17 +472,18 @@ class _DashboardPageState extends State<_DashboardPage> {
           const SizedBox(height: 12),
           _HistoryPreviewList(history: _historyPreview, currency: _currency),
           const SizedBox(height: 28),
-          const _SectionHeader(
+          _SectionHeader(
             title: 'Sepeda tersedia',
-            subtitle: 'Ketuk Lacak untuk melihat lokasi sepeda di peta.',
+            subtitle: _bikeSectionSubtitle,
           ),
           const SizedBox(height: 12),
-          if (_bikes.isEmpty)
+          if (bikes.isEmpty)
             const _EmptyState()
-          else
-            for (final bike in _bikes) ...[
+          else ...[
+            for (final bike in visibleBikes)
               _BikeListTile(
                 bike: bike,
+                distanceMeters: _distanceToBike(bike),
                 isBusy: _isBusy || _activeRental != null,
                 onTrack: (selectedBike) {
                   final homeState = context
@@ -391,7 +494,23 @@ class _DashboardPageState extends State<_DashboardPage> {
                   });
                 },
               ),
+            if (bikePageCount > 1) ...[
+              const SizedBox(height: 4),
+              _BikePaginationBar(
+                currentPage: safeBikePage,
+                pageCount: bikePageCount,
+                totalItems: bikes.length,
+                startItem: bikeStart + 1,
+                endItem: bikeEnd,
+                onPrevious: safeBikePage == 0
+                    ? null
+                    : () => setState(() => _bikePage = safeBikePage - 1),
+                onNext: safeBikePage >= bikePageCount - 1
+                    ? null
+                    : () => setState(() => _bikePage = safeBikePage + 1),
+              ),
             ],
+          ],
         ],
       ),
     );
@@ -755,50 +874,83 @@ class _HistoryPreviewList extends StatelessWidget {
     }
 
     final dateFormat = DateFormat('d MMM', 'id_ID');
+    final timeFormat = DateFormat('HH:mm');
 
     return Column(
       children: [
         for (final item in history) ...[
-          Row(
-            children: [
-              SizedBox(
-                width: 48,
-                child: Text(
-                  dateFormat.format(item.startedAt),
-                  style: const TextStyle(
-                    color: Color(0xff6b7280),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.bike?.code ?? 'SMART BIKE',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${item.durationString} - ${item.totalDistanceKilometers.toStringAsFixed(1)} km',
+          LayoutBuilder(
+            builder: (_, constraints) {
+              final totalText = currency.format(item.totalCost);
+              final priceWidth = (totalText.length * 8.2).clamp(44.0, 96.0);
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 48,
+                    child: Text(
+                      dateFormat.format(item.startedAt),
                       style: const TextStyle(
                         color: Color(0xff6b7280),
-                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              Text(
-                currency.format(item.totalCost),
-                style: const TextStyle(
-                  color: AppColors.primaryLight,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 88,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.bike?.code ?? 'SMART BIKE',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${item.durationString} - ${item.totalDistanceKilometers.toStringAsFixed(1)} km',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xff6b7280),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: _HistoryTimeRail(
+                        start: timeFormat.format(item.startedAt),
+                        end: item.endedAt == null
+                            ? 'jalan'
+                            : timeFormat.format(item.endedAt!),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: priceWidth,
+                    child: Text(
+                      totalText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        color: AppColors.primaryLight,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           if (item != history.last)
             const Padding(
@@ -811,14 +963,84 @@ class _HistoryPreviewList extends StatelessWidget {
   }
 }
 
+class _HistoryTimeRail extends StatelessWidget {
+  const _HistoryTimeRail({required this.start, required this.end});
+
+  final String start;
+  final String end;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          start,
+          style: const TextStyle(
+            color: Color(0xff6b7280),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                height: 2,
+                decoration: BoxDecoration(
+                  color: const Color(0xffd1fae5),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [_TimeRailDot(), _TimeRailDot()],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          end,
+          style: const TextStyle(
+            color: AppColors.primaryDark,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TimeRailDot extends StatelessWidget {
+  const _TimeRailDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1),
+      ),
+    );
+  }
+}
+
 class _BikeListTile extends StatelessWidget {
   const _BikeListTile({
     required this.bike,
+    required this.distanceMeters,
     required this.isBusy,
     required this.onTrack,
   });
 
   final Bike bike;
+  final double? distanceMeters;
   final bool isBusy;
   final void Function(Bike bike) onTrack;
 
@@ -829,59 +1051,295 @@ class _BikeListTile extends StatelessWidget {
     final statusColor = available
         ? AppColors.primaryLight
         : const Color(0xffdc2626);
+    final battery = bike.batteryPercent ?? 0;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xffe5e7eb)),
+      ),
       child: Row(
         children: [
-          _SoftIcon(
-            icon: Icons.pedal_bike_rounded,
-            color: available ? AppColors.primaryLight : const Color(0xffdc2626),
-            backgroundColor: available
-                ? const Color(0xffecfdf5)
-                : const Color(0xfffff1f2),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: available
+                      ? const Color(0xffe6f4ea)
+                      : const Color(0xfffff1f3),
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: available
+                        ? const Color(0xffc7e8d1)
+                        : const Color(0xffffccd2),
+                  ),
+                ),
+                child: Icon(
+                  Icons.pedal_bike_rounded,
+                  color: statusColor,
+                  size: 22,
+                ),
+              ),
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  bike.code,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Text(
+                        bike.code,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xff133c36),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          height: 1.05,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 6,
+                      child: Text(
+                        bike.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          color: Color(0xff6b7280),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          height: 1.05,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  '${bike.name} - ${bike.isOnline ? 'online' : 'offline'} - baterai ${bike.batteryPercent ?? 0}%',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xff6b7280)),
+                const SizedBox(height: 7),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _BikeTableMetric(
+                        icon: bike.isOnline
+                            ? Icons.wifi_rounded
+                            : Icons.wifi_off_rounded,
+                        label: bike.isOnline ? 'Online' : 'Offline',
+                        color: bike.isOnline
+                            ? AppColors.primaryDark
+                            : const Color(0xff9ca3af),
+                      ),
+                    ),
+                    Expanded(
+                      child: _BikeTableMetric(
+                        icon: _batteryIcon(battery),
+                        label: '$battery%',
+                        color: _batteryColor(battery),
+                      ),
+                    ),
+                    Expanded(
+                      child: _BikeTableMetric(
+                        icon: Icons.near_me_outlined,
+                        label: _formatDistance(distanceMeters),
+                        color: const Color(0xff4b5563),
+                        alignEnd: true,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          Text(
-            bike.status,
-            style: TextStyle(
-              color: statusColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(width: 10),
-          FilledButton.icon(
+          const SizedBox(width: 6),
+          IconButton.filledTonal(
+            tooltip: 'Lacak sepeda',
             onPressed: available && hasCoords && !isBusy
                 ? () => onTrack(bike)
                 : null,
-            icon: const Icon(Icons.location_on_outlined, size: 18),
-            label: const Text('Lacak'),
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xffecfdf5),
+              foregroundColor: AppColors.primaryDark,
+              disabledBackgroundColor: const Color(0xfff3f4f6),
+              disabledForegroundColor: const Color(0xff9ca3af),
+              minimumSize: const Size(36, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.location_pin, size: 19),
           ),
         ],
       ),
+    );
+  }
+
+  static String _formatDistance(double? meters) {
+    if (meters == null) return '-';
+    if (meters >= 1000) return '${(meters / 1000).toStringAsFixed(1)} km';
+    return '${meters.round()} m';
+  }
+
+  static IconData _batteryIcon(int battery) {
+    if (battery >= 80) return Icons.battery_full_rounded;
+    if (battery >= 50) return Icons.battery_5_bar_rounded;
+    if (battery >= 20) return Icons.battery_3_bar_rounded;
+    return Icons.battery_alert_rounded;
+  }
+
+  static Color _batteryColor(int battery) {
+    if (battery >= 50) return AppColors.primaryDark;
+    if (battery >= 20) return const Color(0xffb54708);
+    return const Color(0xffb42318);
+  }
+}
+
+class _BikeTableMetric extends StatelessWidget {
+  const _BikeTableMetric({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.alignEnd = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: alignEnd
+          ? MainAxisAlignment.end
+          : MainAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BikePaginationBar extends StatelessWidget {
+  const _BikePaginationBar({
+    required this.currentPage,
+    required this.pageCount,
+    required this.totalItems,
+    required this.startItem,
+    required this.endItem,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int currentPage;
+  final int pageCount;
+  final int totalItems;
+  final int startItem;
+  final int endItem;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xfff8fafc),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xffe5e7eb)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '$startItem-$endItem dari $totalItems sepeda',
+              style: const TextStyle(
+                color: Color(0xff4b5563),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Text(
+            '${currentPage + 1}/$pageCount',
+            style: const TextStyle(
+              color: Color(0xff133c36),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 8),
+          _PaginationIconButton(
+            icon: Icons.chevron_left_rounded,
+            onPressed: onPrevious,
+          ),
+          const SizedBox(width: 6),
+          _PaginationIconButton(
+            icon: Icons.chevron_right_rounded,
+            onPressed: onNext,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaginationIconButton extends StatelessWidget {
+  const _PaginationIconButton({required this.icon, this.onPressed});
+
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filledTonal(
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.primaryDark,
+        disabledBackgroundColor: const Color(0xfff3f4f6),
+        disabledForegroundColor: const Color(0xff9ca3af),
+        minimumSize: const Size(32, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: EdgeInsets.zero,
+      ),
+      icon: Icon(icon, size: 20),
     );
   }
 }

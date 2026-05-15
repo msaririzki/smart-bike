@@ -41,8 +41,16 @@ class ApiClient {
   }
 
   Future<void> logout() async {
-    await _post('/auth/logout', body: {});
-    await _session.clearSession();
+    try {
+      await _post('/auth/logout', body: {});
+    } finally {
+      await _session.clearSession();
+    }
+  }
+
+  Future<Map<String, dynamic>> currentUser() async {
+    final json = await _get('/auth/me');
+    return json['user'] as Map<String, dynamic>;
   }
 
   // ─── Device ──────────────────────────────────────────────────────────────
