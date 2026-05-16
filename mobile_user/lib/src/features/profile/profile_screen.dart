@@ -28,6 +28,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   String _phone = '-';
   String _memberSince = '-';
   int _totalTrips = 0;
+  String? _error;
 
   @override
   void initState() {
@@ -39,36 +40,55 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
+      _error = null;
     });
 
     try {
       final user = await widget.api.currentUser();
       final historyData = await widget.api.rentalHistory(page: 1);
-      
+
       if (!mounted) return;
       setState(() {
-        _name = user['name'] ?? '-';
-        _email = user['email'] ?? '-';
-        _phone = user['phone'] ?? '-';
-        _totalTrips = historyData['total'] ?? 0;
-        
+        _name = _readString(user['name'], fallback: 'Pengguna FlowBike');
+        _email = _readString(user['email']);
+        _phone = _readString(user['phone'], fallback: 'Belum diisi');
+        _totalTrips = (historyData['total'] as num?)?.toInt() ?? 0;
+
         // Simple member since formatting
         final createdAt = DateTime.tryParse(user['created_at'] ?? '');
         if (createdAt != null) {
-          _memberSince = 'Member sejak ${createdAt.day}/${createdAt.month}/${createdAt.year}';
+          _memberSince =
+              'Member sejak ${createdAt.day}/${createdAt.month}/${createdAt.year}';
         } else {
           _memberSince = 'Member aktif';
         }
-        
+
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
+        _error = 'Gagal memuat data profil.';
         _isLoading = false;
       });
     }
   }
+
+  String _readString(dynamic value, {String fallback = '-'}) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty) {
+      return fallback;
+    }
+    return text;
+  }
+
+  bool get _canResetPassword => _email != '-' && _email.contains('@');
 
   void _showMessage(String message) {
     if (!mounted) return;
@@ -84,7 +104,9 @@ class ProfileScreenState extends State<ProfileScreen> {
   Future<void> _showEditProfileSheet() async {
     final nameController = TextEditingController(text: _name);
     final emailController = TextEditingController(text: _email);
-    final phoneController = TextEditingController(text: _phone == 'Belum diisi' ? '' : _phone);
+    final phoneController = TextEditingController(
+      text: _phone == 'Belum diisi' ? '' : _phone,
+    );
     final formKey = GlobalKey<FormState>();
     var isBusy = false;
     String? sheetError;
@@ -101,7 +123,7 @@ class ProfileScreenState extends State<ProfileScreen> {
           builder: (context, setSheetState) {
             Future<void> saveProfile() async {
               if (!formKey.currentState!.validate()) return;
-              
+
               setSheetState(() {
                 isBusy = true;
                 sheetError = null;
@@ -111,9 +133,11 @@ class ProfileScreenState extends State<ProfileScreen> {
                 await widget.api.updateProfile(
                   name: nameController.text.trim(),
                   email: emailController.text.trim(),
-                  phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
+                  phone: phoneController.text.trim().isEmpty
+                      ? null
+                      : phoneController.text.trim(),
                 );
-                
+
                 if (!mounted) return;
                 if (sheetContext.mounted) {
                   Navigator.of(sheetContext).pop();
@@ -134,7 +158,12 @@ class ProfileScreenState extends State<ProfileScreen> {
             }
 
             return Padding(
-              padding: EdgeInsets.fromLTRB(28, 20, 28, 28 + MediaQuery.of(context).viewInsets.bottom),
+              padding: EdgeInsets.fromLTRB(
+                28,
+                20,
+                28,
+                28 + MediaQuery.of(context).viewInsets.bottom,
+              ),
               child: Form(
                 key: formKey,
                 child: Column(
@@ -167,7 +196,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                           onPressed: () => Navigator.pop(sheetContext),
                           child: const Text(
                             'Batal',
-                            style: TextStyle(color: Color(0xff64748b), fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              color: Color(0xff64748b),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -194,7 +226,8 @@ class ProfileScreenState extends State<ProfileScreen> {
                         label: 'Nama Lengkap',
                         icon: Icons.person_rounded,
                       ),
-                      validator: (v) => v == null || v.isEmpty ? 'Nama wajib diisi' : null,
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Nama wajib diisi' : null,
                     ),
                     const SizedBox(height: 20),
                     TextFormField(
@@ -205,7 +238,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                         label: 'Email',
                         icon: Icons.alternate_email_rounded,
                       ),
-                      validator: (v) => v == null || !v.contains('@') ? 'Email tidak valid' : null,
+                      validator: (v) => v == null || !v.contains('@')
+                          ? 'Email tidak valid'
+                          : null,
                     ),
                     const SizedBox(height: 20),
                     TextFormField(
@@ -223,7 +258,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryLight.withValues(alpha: 0.25),
+                            color: AppColors.primaryLight.withValues(
+                              alpha: 0.25,
+                            ),
                             blurRadius: 15,
                             offset: const Offset(0, 8),
                           ),
@@ -234,22 +271,34 @@ class ProfileScreenState extends State<ProfileScreen> {
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primaryLight,
                           padding: const EdgeInsets.symmetric(vertical: 18),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         child: isBusy
                             ? const SizedBox(
-                                width: 20, 
-                                height: 20, 
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
                               )
                             : const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.check_circle_outline_rounded, size: 20),
+                                  Icon(
+                                    Icons.check_circle_outline_rounded,
+                                    size: 20,
+                                  ),
                                   SizedBox(width: 10),
                                   Text(
                                     'Simpan Perubahan',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -269,10 +318,17 @@ class ProfileScreenState extends State<ProfileScreen> {
     phoneController.dispose();
   }
 
-  InputDecoration _buildInputDecoration({required String label, required IconData icon}) {
+  InputDecoration _buildInputDecoration({
+    required String label,
+    required IconData icon,
+  }) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Color(0xff64748b), fontSize: 14, fontWeight: FontWeight.w500),
+      labelStyle: const TextStyle(
+        color: Color(0xff64748b),
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
       prefixIcon: Icon(icon, color: AppColors.primaryLight, size: 22),
       filled: true,
       fillColor: const Color(0xfff8fafc),
@@ -297,6 +353,11 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _showPasswordResetSheet() async {
+    if (!_canResetPassword) {
+      _showMessage('Email akun belum tersedia untuk reset password.');
+      return;
+    }
+
     final codeController = TextEditingController();
     final passwordController = TextEditingController();
     final confirmController = TextEditingController();
@@ -342,7 +403,9 @@ class ProfileScreenState extends State<ProfileScreen> {
 
             Future<void> confirmReset() async {
               if (passwordController.text != confirmController.text) {
-                setSheetState(() => sheetError = 'Konfirmasi password tidak cocok');
+                setSheetState(
+                  () => sheetError = 'Konfirmasi password tidak cocok',
+                );
                 return;
               }
 
@@ -358,11 +421,13 @@ class ProfileScreenState extends State<ProfileScreen> {
                   password: passwordController.text,
                   passwordConfirmation: confirmController.text,
                 );
-                
+
                 if (sheetContext.mounted) {
                   Navigator.of(sheetContext).pop();
                 }
-                _showMessage('Password berhasil diubah. Silakan masuk kembali.');
+                _showMessage(
+                  'Password berhasil diubah. Silakan masuk kembali.',
+                );
                 widget.onLogout();
               } on ApiException catch (e) {
                 setSheetState(() {
@@ -379,7 +444,12 @@ class ProfileScreenState extends State<ProfileScreen> {
 
             return SafeArea(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(24, 8, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  8,
+                  24,
+                  24 + MediaQuery.of(context).viewInsets.bottom,
+                ),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -387,14 +457,19 @@ class ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Text(
                         'Reset Password',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        isCodeSent 
-                          ? 'Masukkan kode yang Anda terima dan password baru.' 
-                          : 'Kami akan mengirimkan kode verifikasi ke email Anda.',
-                        style: const TextStyle(color: Color(0xff64748b), fontSize: 13),
+                        isCodeSent
+                            ? 'Masukkan kode yang Anda terima dan password baru.'
+                            : 'Kami akan mengirimkan kode verifikasi ke email Anda.',
+                        style: const TextStyle(
+                          color: Color(0xff64748b),
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       if (sheetError != null) ...[
@@ -418,9 +493,16 @@ class ProfileScreenState extends State<ProfileScreen> {
                       if (!isCodeSent)
                         FilledButton(
                           onPressed: isBusy ? null : requestCode,
-                          child: isBusy 
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('Kirim Kode Verifikasi'),
+                          child: isBusy
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Kirim Kode Verifikasi'),
                         )
                       else ...[
                         TextField(
@@ -452,9 +534,16 @@ class ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 32),
                         FilledButton(
                           onPressed: isBusy ? null : confirmReset,
-                          child: isBusy 
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('Simpan Password Baru'),
+                          child: isBusy
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Simpan Password Baru'),
                         ),
                       ],
                     ],
@@ -484,11 +573,18 @@ class ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final body = _isLoading
-        ? const Center(child: CircularProgressIndicator(color: AppColors.primaryLight))
+        ? const Center(
+            child: CircularProgressIndicator(color: AppColors.primaryLight),
+          )
         : RefreshIndicator(
             onRefresh: loadProfile,
             child: ListView(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + widget.bottomPadding),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                20 + widget.bottomPadding,
+              ),
               children: [
                 _ProfileHero(
                   initials: _initials,
@@ -497,6 +593,15 @@ class ProfileScreenState extends State<ProfileScreen> {
                   memberSince: _memberSince,
                   onEdit: _showEditProfileSheet,
                 ),
+                if (_error != null) ...[
+                  const SizedBox(height: 16),
+                  _SheetBanner(
+                    icon: Icons.error_outline_rounded,
+                    message: _error!,
+                    color: Theme.of(context).colorScheme.error,
+                    backgroundColor: const Color(0xfffff1f2),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 _ProfileMetricsGrid(totalTrips: _totalTrips),
                 const SizedBox(height: 32),
@@ -532,7 +637,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                       subtitle: 'Ganti kata sandi secara berkala',
                       iconBgColor: const Color(0xfffff7ed),
                       iconColor: const Color(0xfff97316),
-                      onTap: _showPasswordResetSheet,
+                      onTap: _canResetPassword ? _showPasswordResetSheet : null,
                     ),
                   ],
                 ),
@@ -570,7 +675,10 @@ class ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 253, 255, 254),
       appBar: AppBar(
-        title: const Text('Profil', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          'Profil',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -627,7 +735,10 @@ class _ProfileHero extends StatelessWidget {
               child: SvgPicture.asset(
                 'assets/flowbike4.svg',
                 width: 550,
-                colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                colorFilter: const ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
           ),
@@ -677,7 +788,11 @@ class _ProfileHero extends StatelessWidget {
                               color: Colors.white.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.edit_outlined, color: Colors.white, size: 16),
+                            child: const Icon(
+                              Icons.edit_outlined,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
                         ),
                       ],
@@ -692,7 +807,10 @@ class _ProfileHero extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
@@ -735,7 +853,7 @@ class _SheetBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xffecfdf5),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -745,7 +863,11 @@ class _SheetBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: color.withValues(alpha: 0.9), fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: color.withValues(alpha: 0.9),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -753,7 +875,6 @@ class _SheetBanner extends StatelessWidget {
     );
   }
 }
-
 
 class _ProfileMetricsGrid extends StatelessWidget {
   const _ProfileMetricsGrid({required this.totalTrips});
@@ -962,7 +1083,11 @@ class _ProfileInfoTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xffcbd5e1), size: 24),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xffcbd5e1),
+              size: 24,
+            ),
           ],
         ),
       ),
@@ -1035,7 +1160,11 @@ class _ProfileActionTile extends StatelessWidget {
               ),
             ),
             if (showChevron)
-              const Icon(Icons.chevron_right_rounded, color: Color(0xffcbd5e1), size: 24),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xffcbd5e1),
+                size: 24,
+              ),
           ],
         ),
       ),
