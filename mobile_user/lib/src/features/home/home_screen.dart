@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../models/bike.dart';
+import '../../models/notification_model.dart';
 import '../../models/rental.dart';
 import '../../models/rental_history.dart';
 import '../../services/api_client.dart';
+import '../../services/notification_service.dart';
 import '../../theme/app_colors.dart';
 import '../history/history_screen.dart';
 import '../rental/active_rental_screen.dart';
@@ -43,37 +45,9 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Notifikasi',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 16),
-                const _NotificationRow(
-                  icon: Icons.lock_open_rounded,
-                  title: 'Scan QR untuk sewa',
-                  subtitle:
-                      'Mulai sewa dengan memindai QR dari perangkat sepeda.',
-                ),
-                const SizedBox(height: 12),
-                const _NotificationRow(
-                  icon: Icons.receipt_long_outlined,
-                  title: 'Riwayat sudah tersimpan',
-                  subtitle: 'Detail biaya dan durasi bisa dicek kapan saja.',
-                ),
-              ],
-            ),
-          ),
-        );
+        return const _NotificationSheet();
       },
     );
   }
@@ -1443,6 +1417,120 @@ class _NotificationRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _NotificationSheet extends StatefulWidget {
+  const _NotificationSheet();
+
+  @override
+  State<_NotificationSheet> createState() => _NotificationSheetState();
+}
+
+class _NotificationSheetState extends State<_NotificationSheet> {
+  final NotificationService _service = NotificationService();
+  List<NotificationData> _notifications = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    try {
+      final data = await _service.getNotifications();
+      if (mounted) {
+        setState(() {
+          _notifications = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Gagal memuat notifikasi';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Notifikasi',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 16),
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator(color: AppColors.primaryLight))
+            else if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red))
+            else if (_notifications.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: Text('Belum ada notifikasi', style: TextStyle(color: Colors.grey))),
+              )
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _notifications.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = _notifications[index];
+                    final isSewa = item.type == 'sewa';
+                    return GestureDetector(
+                      onTap: () {
+                        if (!item.isRead) {
+                          _service.markAsRead(item.id);
+                          setState(() {
+                            // Optimistic update locally
+                            _notifications[index] = NotificationData(
+                              id: item.id,
+                              userId: item.userId,
+                              title: item.title,
+                              message: item.message,
+                              type: item.type,
+                              isRead: true,
+                              createdAt: item.createdAt,
+                            );
+                          });
+                        }
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: item.isRead ? Colors.transparent : AppColors.primaryLight.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: EdgeInsets.all(item.isRead ? 0 : 8.0),
+                        child: _NotificationRow(
+                          icon: isSewa ? Icons.directions_bike_rounded : Icons.campaign_rounded,
+                          title: item.title,
+                          subtitle: item.message,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
