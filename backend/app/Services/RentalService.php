@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Bike;
 use App\Models\Rental;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -43,6 +44,13 @@ class RentalService
 
             $bike->update(['status' => 'in_use']);
 
+            NotificationService::send(
+                $user->id,
+                'Sewa Dimulai',
+                "Sewa sepeda {$bike->code} telah dimulai. Selamat bersepeda!",
+                'sewa'
+            );
+
             return $rental->load('bike');
         });
     }
@@ -57,7 +65,7 @@ class RentalService
             return $rental->load('bike', 'billingLogs');
         }
 
-        return DB::transaction(function () use ($rental) {
+        return DB::transaction(function () use ($user, $rental) {
             $rental->update([
                 'status' => Rental::STATUS_COMPLETED,
                 'ended_at' => now(),
@@ -65,6 +73,14 @@ class RentalService
             ]);
 
             $rental->bike()->update(['status' => 'available']);
+
+            $totalCostFormat = number_format($rental->total_cost, 0, ',', '.');
+            NotificationService::send(
+                $user->id,
+                'Sewa Selesai',
+                "Sewa sepeda {$rental->bike->code} selesai. Total biaya: Rp {$totalCostFormat}.",
+                'sewa'
+            );
 
             return $rental->refresh()->load('bike', 'billingLogs');
         });
