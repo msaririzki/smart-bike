@@ -1,7 +1,12 @@
 @extends('layouts.admin', ['title' => 'Detail Rental'])
 
 @section('content')
-    <p><a href="{{ route('admin.rentals.index') }}">Kembali ke Rental</a></p>
+    <div style="margin-bottom: 24px;">
+        <a href="{{ route('admin.rentals.index') }}" class="button secondary" style="display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            Kembali ke Rental
+        </a>
+    </div>
     <h1>Rental #{{ $rental->id }}</h1>
 
     <div class="grid">

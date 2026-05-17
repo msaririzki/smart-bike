@@ -38,8 +38,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
         Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');
-        Route::get('notifications/create', [\App\Http\Controllers\Admin\NotificationController::class, 'create'])->name('notifications.create');
-        Route::post('notifications', [\App\Http\Controllers\Admin\NotificationController::class, 'store'])->name('notifications.store');
+        Route::resource('notifications', \App\Http\Controllers\Admin\NotificationController::class)->except('show');
     });
 
     Route::middleware(['auth', 'role:superadmin'])->group(function (): void {

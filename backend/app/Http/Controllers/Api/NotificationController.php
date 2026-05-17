@@ -8,9 +8,6 @@ use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
-    /**
-     * Get all notifications for the authenticated user, including global announcements.
-     */
     public function index(Request $request)
     {
         $user = $request->user();
@@ -20,15 +17,47 @@ class NotificationController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        $readIds = \Illuminate\Support\Facades\DB::table('notification_reads')
+            ->where('user_id', $user->id)
+            ->pluck('notification_id')
+            ->toArray();
+
+        foreach ($notifications as $notif) {
+            if ($notif->user_id === null) {
+                // Determine read status from pivot for broadcast notifications
+                $notif->is_read = in_array($notif->id, $readIds);
+            }
+        }
+
         return response()->json([
             'status' => 'success',
             'data' => $notifications,
         ]);
     }
 
-    /**
-     * Mark a specific notification as read.
-     */
+    public function unreadCount(Request $request)
+    {
+        $user = $request->user();
+
+        $personalUnread = Notification::where('user_id', $user->id)->where('is_read', false)->count();
+
+        $readBroadcastIds = \Illuminate\Support\Facades\DB::table('notification_reads')
+            ->where('user_id', $user->id)
+            ->pluck('notification_id')
+            ->toArray();
+
+        $broadcastUnread = Notification::whereNull('user_id')
+            ->whereNotIn('id', $readBroadcastIds)
+            ->count();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'count' => $personalUnread + $broadcastUnread,
+            ],
+        ]);
+    }
+
     public function markAsRead(Request $request, $id)
     {
         $user = $request->user();
@@ -40,13 +69,16 @@ class NotificationController extends Controller
             ->where('id', $id)
             ->firstOrFail();
 
-        // For global notifications, marking as read for a specific user would require a pivot table.
-        // For simplicity in this local version, we'll only actually update the 'is_read' flag
-        // if it's a personal notification. Global notifications might remain unread, or we just
-        // let it update the global flag (which affects everyone).
-        // Let's assume we only update personal ones for now, or just update it anyway.
         if ($notification->user_id !== null) {
             $notification->update(['is_read' => true]);
+        } else {
+            \Illuminate\Support\Facades\DB::table('notification_reads')->updateOrInsert([
+                'user_id' => $user->id,
+                'notification_id' => $notification->id,
+            ], [
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
 
         return response()->json([

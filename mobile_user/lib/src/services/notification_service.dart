@@ -22,7 +22,27 @@ class NotificationService {
       final List<dynamic> data = jsonResponse['data'];
       return data.map((json) => NotificationData.fromJson(json)).toList();
     } else {
-      throw Exception('Failed to load notifications');
+      throw Exception('Failed to load notifications (Status: ${response.statusCode}): ${response.body}');
+    }
+  }
+
+  Future<int> getUnreadCount() async {
+    final token = await SessionStore().token;
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.get(
+      Uri.parse('${ApiClient.baseUrl}/notifications/unread-count'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      return jsonResponse['data']['count'] as int;
+    } else {
+      throw Exception('Failed to load unread count (Status: ${response.statusCode})');
     }
   }
 
@@ -39,6 +59,7 @@ class NotificationService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to mark notification as read');
+      throw Exception('Failed to mark notification as read (Status: ${response.statusCode})');
     }
+  }
 }

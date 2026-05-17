@@ -24,8 +24,10 @@ class NotificationData {
       title: json['title'],
       message: json['message'],
       type: json['type'] ?? 'pengumuman',
-      isRead: json['is_read'] ?? false,
-      createdAt: DateTime.parse(json['created_at']).toLocal(),
+      isRead: json['is_read'] == true || json['is_read'] == 1,
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at']).toLocal() 
+          : DateTime.now(),
     );
   }
 
