@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../models/bike.dart';
-import '../../models/notification_model.dart';
+
 import '../../models/rental.dart';
 import '../../models/rental_history.dart';
 import '../../services/api_client.dart';
@@ -13,6 +13,7 @@ import '../../services/notification_service.dart';
 import '../../theme/app_colors.dart';
 import '../history/history_screen.dart';
 import '../rental/active_rental_screen.dart';
+import '../rental/map_test_screen.dart';
 
 import '../rental/qr_scan_screen.dart';
 import '../profile/profile_screen.dart';
@@ -30,6 +31,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  Bike? _focusBike;
   final _dashboardKey = GlobalKey<_DashboardPageState>();
   final _historyKey = GlobalKey<HistoryScreenState>();
   final NotificationService _notificationService = NotificationService();
@@ -151,10 +153,12 @@ class _HomeScreenState extends State<HomeScreen> {
             api: widget.api,
             onOpenScanner: _openQrScanner,
           ),
-          const _ComingSoonPage(
-            icon: Icons.map_rounded,
-            title: 'Peta',
-            message: 'Fitur Peta sedang dalam pengembangan.',
+          MapTestScreen(
+            key: ValueKey(_focusBike?.id ?? 'map'),
+            api: widget.api,
+            showScaffold: false,
+            bottomPadding: 92,
+            focusBike: _focusBike,
           ),
           const _ComingSoonPage(
             icon: Icons.qr_code_scanner_rounded,
@@ -180,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: (index) {
           if (index == 1) {
             setState(() {
+              _focusBike = null;
               _selectedIndex = index;
             });
           } else if (index == 2) {
@@ -480,6 +485,7 @@ class _DashboardPageState extends State<_DashboardPage> {
                   final homeState = context
                       .findAncestorStateOfType<_HomeScreenState>();
                   homeState?.setState(() {
+                    homeState._focusBike = selectedBike;
                     homeState._selectedIndex = 1;
                   });
                 },

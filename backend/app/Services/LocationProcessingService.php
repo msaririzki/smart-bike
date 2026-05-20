@@ -31,7 +31,7 @@ class LocationProcessingService
             ->firstOrFail();
 
         return DB::transaction(function () use ($bike, $data): array {
-            $recordedAt = isset($data['recorded_at']) ? Carbon::parse($data['recorded_at']) : now();
+            $recordedAt = (isset($data['recorded_at']) ? Carbon::parse($data['recorded_at']) : now())->setTimezone(config('app.timezone'));
             $rental = Rental::query()
                 ->where('bike_id', $bike->id)
                 ->whereIn('status', [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING])

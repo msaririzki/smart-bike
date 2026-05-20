@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Bike;
 use App\Models\Rental;
 use App\Models\User;
-use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -44,22 +43,6 @@ class RentalService
 
             $bike->update(['status' => 'in_use']);
 
-            NotificationService::send(
-                $user->id,
-                'Sewa Dimulai',
-                "Sewa sepeda {$bike->code} telah dimulai. Selamat bersepeda!",
-                'sewa',
-                [
-                    'rental_id' => $rental->id,
-                    'rental_status' => 'started',
-                    'bike_code' => $bike->code,
-                    'started_at' => now()->toIso8601String(),
-                    'start_location' => 'Shelter Utama',
-                    'battery' => ($bike->battery_percent ?? 85) . '% / Baik',
-                    'safety_notes' => 'Pastikan standar sepeda sudah dinaikkan. Selalu parkirkan kembali sepeda di shelter resmi terdekat agar terhindar dari denda tambahan.',
-                ]
-            );
-
             return $rental->load('bike');
         });
     }
@@ -74,7 +57,7 @@ class RentalService
             return $rental->load('bike', 'billingLogs');
         }
 
-        return DB::transaction(function () use ($user, $rental) {
+        return DB::transaction(function () use ($rental) {
             $rental->update([
                 'status' => Rental::STATUS_COMPLETED,
                 'ended_at' => now(),
@@ -82,25 +65,6 @@ class RentalService
             ]);
 
             $rental->bike()->update(['status' => 'available']);
-
-            $totalCostFormat = number_format($rental->total_cost, 0, ',', '.');
-            NotificationService::send(
-                $user->id,
-                'Sewa Selesai',
-                "Sewa sepeda {$rental->bike->code} selesai. Total biaya: Rp {$totalCostFormat}.",
-                'sewa',
-                [
-                    'rental_id' => $rental->id,
-                    'rental_status' => 'completed',
-                    'bike_code' => $rental->bike->code,
-                    'started_at' => $rental->started_at->toIso8601String(),
-                    'ended_at' => now()->toIso8601String(),
-                    'duration_minutes' => $rental->started_at->diffInMinutes(now()),
-                    'distance_meters' => $rental->total_distance_meters ?? 0,
-                    'total_cost' => $rental->total_cost,
-                    'end_location' => 'Shelter Utama',
-                ]
-            );
 
             return $rental->refresh()->load('bike', 'billingLogs');
         });

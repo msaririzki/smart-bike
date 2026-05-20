@@ -22,7 +22,7 @@ class ApiClient {
 
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.200.102.43:9000/api', // Terhubung ke IP Laptop Anda
+    defaultValue: 'https://bike.ikydev.site/api',
   );
 
   final SessionStore _sessionStore;
