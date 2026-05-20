@@ -26,8 +26,11 @@ class NotificationController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'message' => 'required|string',
+            'type' => 'required|in:pengumuman,promosi',
             'target' => 'required|in:all,specific',
             'user_id' => 'required_if:target,specific|nullable|exists:users,id',
+            'start_time' => 'nullable|date',
+            'end_time' => 'nullable|date|after_or_equal:start_time',
         ]);
 
         $userId = $validated['target'] === 'specific' ? $validated['user_id'] : null;
@@ -36,10 +39,17 @@ class NotificationController extends Controller
             'user_id' => $userId,
             'title' => $validated['title'],
             'message' => $validated['message'],
-            'type' => 'pengumuman',
+            'type' => $validated['type'],
+            'start_time' => !empty($validated['start_time']) ? \Carbon\Carbon::parse($validated['start_time'])->format('Y-m-d H:i:s') : null,
+            'end_time' => !empty($validated['end_time']) ? \Carbon\Carbon::parse($validated['end_time'])->format('Y-m-d H:i:s') : null,
         ]);
 
         return redirect()->route('admin.notifications.index')->with('success', 'Pengumuman berhasil dikirim!');
+    }
+
+    public function show(Notification $notification)
+    {
+        return view('admin.notifications.show', compact('notification'));
     }
 
     public function edit(Notification $notification)
@@ -53,8 +63,11 @@ class NotificationController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'message' => 'required|string',
+            'type' => 'required|in:pengumuman,promosi',
             'target' => 'required|in:all,specific',
             'user_id' => 'required_if:target,specific|nullable|exists:users,id',
+            'start_time' => 'nullable|date',
+            'end_time' => 'nullable|date|after_or_equal:start_time',
         ]);
 
         $userId = $validated['target'] === 'specific' ? $validated['user_id'] : null;
@@ -63,6 +76,9 @@ class NotificationController extends Controller
             'user_id' => $userId,
             'title' => $validated['title'],
             'message' => $validated['message'],
+            'type' => $validated['type'],
+            'start_time' => !empty($validated['start_time']) ? \Carbon\Carbon::parse($validated['start_time'])->format('Y-m-d H:i:s') : null,
+            'end_time' => !empty($validated['end_time']) ? \Carbon\Carbon::parse($validated['end_time'])->format('Y-m-d H:i:s') : null,
         ]);
 
         return redirect()->route('admin.notifications.index')->with('success', 'Pengumuman berhasil diperbarui!');

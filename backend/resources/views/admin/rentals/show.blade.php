@@ -1,13 +1,12 @@
 @extends('layouts.admin', ['title' => 'Detail Rental'])
 
 @section('content')
-    <div style="margin-bottom: 24px;">
-        <a href="{{ route('admin.rentals.index') }}" class="button secondary" style="display: inline-flex; align-items: center; gap: 8px;">
-            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-            Kembali ke Rental
+    <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 24px;">
+        <a href="{{ route('admin.rentals.index') }}" class="button secondary" style="padding: 8px;" title="Kembali">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
         </a>
+        <h1 style="margin: 0;">Rental #{{ $rental->id }}</h1>
     </div>
-    <h1>Rental #{{ $rental->id }}</h1>
 
     <div class="grid">
         <div class="card">

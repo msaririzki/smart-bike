@@ -15,13 +15,14 @@ class NotificationService
      * @param string $type 'sewa' or 'pengumuman'
      * @return Notification
      */
-    public static function send(?int $userId, string $title, string $message, string $type = 'pengumuman'): Notification
+    public static function send(?int $userId, string $title, string $message, string $type = 'pengumuman', ?array $data = null): Notification
     {
         return Notification::create([
             'user_id' => $userId,
             'title' => $title,
             'message' => $message,
             'type' => $type,
+            'data' => $data,
         ]);
     }
 }

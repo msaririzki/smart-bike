@@ -2,7 +2,7 @@
 
 @section('content')
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <h1 style="margin: 0;">Manajemen Pengguna</h1>
+        <h2 style="margin: 0; color: var(--teal-800);">Manajemen Pengguna</h2>
         <button type="button" class="button" onclick="document.getElementById('create-user-modal').style.display = 'flex'" style="background: #0d9488;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Tambah Pengguna

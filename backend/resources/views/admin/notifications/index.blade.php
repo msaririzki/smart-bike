@@ -5,7 +5,7 @@
 
 @section('content')
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
         <h2 style="margin: 0; color: var(--teal-800);">Daftar Pengumuman</h2>
         <a href="{{ route('admin.notifications.create') }}" class="button">
             <svg style="width: 18px; height: 18px; margin-right: 8px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -33,19 +33,20 @@
             <tbody>
                 @forelse($notifications as $notif)
                     <tr>
-                        <td style="color: #667085; font-size: 13px;">{{ $notif->created_at->format('d M Y, H:i') }}</td>
-                        <td>
+                        <td data-label="Waktu" style="color: #667085; font-size: 13px;">{{ $notif->created_at->format('d M Y, H:i') }}</td>
+                        <td data-label="Judul">
                             <strong style="color: #111827; display: block; margin-bottom: 4px;">{{ $notif->title }}</strong>
-                            <span style="color: #6b7280; font-size: 13px;">{{ Str::limit($notif->message, 50) }}</span>
                         </td>
-                        <td>
+                        <td data-label="Tipe">
                             @if($notif->type === 'sewa')
                                 <span class="badge" style="background: #e0e7ff; color: #4f46e5;">Sewa</span>
+                            @elseif($notif->type === 'promosi')
+                                <span class="badge" style="background: #fce7f3; color: #be185d;">Promosi</span>
                             @else
                                 <span class="badge" style="background: #fef3c7; color: #d97706;">Pengumuman</span>
                             @endif
                         </td>
-                        <td>
+                        <td data-label="Target">
                             @if($notif->user_id)
                                 <span style="color: #374151; display:flex; align-items:center; gap: 4px;">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
@@ -54,19 +55,12 @@
                             @else
                                 <span style="color: var(--teal-700); font-weight: 600; display:flex; align-items:center; gap: 4px;">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                                    Semua Pengguna (Broadcast)
+                                    Semua Pengguna
                                 </span>
                             @endif
                         </td>
-                        <td style="text-align: right;">
-                            <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                <a href="{{ route('admin.notifications.edit', $notif) }}" class="button secondary" style="padding: 6px 10px; font-size: 13px;">Edit</a>
-                                <form action="{{ route('admin.notifications.destroy', $notif) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus pengumuman ini?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="button" style="padding: 6px 10px; font-size: 13px; background: #fee2e2; color: #dc2626; border-color: #fca5a5;">Hapus</button>
-                                </form>
-                            </div>
+                        <td data-label="Aksi" style="text-align: right;">
+                            <a href="{{ route('admin.notifications.show', $notif) }}" class="button secondary" style="padding: 6px 10px; font-size: 13px;">Lihat Detail</a>
                         </td>
                     </tr>
                 @empty

@@ -1,7 +1,7 @@
 @extends('layouts.admin', ['title' => 'Sepeda'])
 
 @section('content')
-    <h1>Data Sepeda & Akun Perangkat</h1>
+    <h2 style="margin: 0; color: var(--teal-800); margin-bottom: 24px;">Data Sepeda & Akun Perangkat</h2>
 
     <div style="display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
         <a href="{{ route('admin.bikes.index') }}" style="text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; color: {{ $tab === 'bikes' ? '#0f766e' : '#64748b' }}; background: {{ $tab === 'bikes' ? '#ccfbf1' : 'transparent' }};">Daftar Sepeda</a>

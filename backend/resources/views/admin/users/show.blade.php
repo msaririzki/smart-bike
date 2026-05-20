@@ -1,8 +1,12 @@
 @extends('layouts.admin', ['title' => 'Detail Pengguna'])
 
 @section('content')
-    <p><a href="{{ route('admin.users.index') }}">Kembali ke Pengguna</a></p>
-    <h1>{{ $targetUser->name }}</h1>
+    <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 24px;">
+        <a href="{{ route('admin.users.index') }}" class="button secondary" style="padding: 8px;" title="Kembali">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
+        </a>
+        <h1 style="margin: 0;">{{ $targetUser->name }}</h1>
+    </div>
 
     <div class="grid">
         <div class="card">

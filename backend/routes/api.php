@@ -27,6 +27,8 @@ Route::middleware(['auth:sanctum', 'role:user,admin,superadmin'])->group(functio
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/{id}/unread', [NotificationController::class, 'markAsUnread']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 });
 
 Route::middleware(['auth:sanctum', 'role:user'])->group(function (): void {

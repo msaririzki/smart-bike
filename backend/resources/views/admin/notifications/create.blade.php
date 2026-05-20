@@ -4,7 +4,7 @@
 @section('header', 'Kirim Pengumuman Global')
 
 @section('content')
-<div class="card" style="max-width: 600px; margin: 0 auto;">
+<div class="card">
     <h2 style="margin-top: 0; color: var(--teal-800); margin-bottom: 24px;">Kirim Pengumuman ke Semua Pengguna</h2>
 
     @if(session('success'))
@@ -17,9 +17,20 @@
     <form action="{{ route('admin.notifications.store') }}" method="POST">
         @csrf
         <div style="margin-bottom: 16px;">
+            <label for="type">Tipe</label>
+            <select id="type" name="type" required onchange="toggleTypeFields()">
+                <option value="pengumuman" {{ old('type') === 'pengumuman' ? 'selected' : '' }}>Pengumuman</option>
+                <option value="promosi" {{ old('type') === 'promosi' ? 'selected' : '' }}>Promosi</option>
+            </select>
+            @error('type')
+                <span style="color: #dc2626; font-size: 12px; margin-top: 4px; display: block;">{{ $message }}</span>
+            @enderror
+        </div>
+
+        <div style="margin-bottom: 16px;">
             <label for="target">Target Pengiriman</label>
             <select id="target" name="target" required onchange="toggleUserSelect()">
-                <option value="all" {{ old('target') === 'all' ? 'selected' : '' }}>Semua Pengguna (Broadcast)</option>
+                <option value="all" {{ old('target') === 'all' ? 'selected' : '' }}>Semua Pengguna</option>
                 <option value="specific" {{ old('target') === 'specific' ? 'selected' : '' }}>Spesifik Pengguna</option>
             </select>
             @error('target')
@@ -56,11 +67,28 @@
 
         <div style="margin-bottom: 24px;">
             <label for="message">Isi Pesan</label>
-            <textarea id="message" name="message" rows="5" required 
-                      placeholder="Masukkan detail pengumuman di sini...">{{ old('message') }}</textarea>
+            <textarea id="message" name="message" rows="10" required 
+                      placeholder="Masukkan detail pengumuman di sini..." style="resize: vertical;">{{ old('message') }}</textarea>
             @error('message')
                 <span style="color: #dc2626; font-size: 12px; margin-top: 4px; display: block;">{{ $message }}</span>
             @enderror
+        </div>
+
+        <div id="time_fields_container" style="display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;">
+            <div id="start_time_group" style="flex: 1; min-width: 200px;">
+                <label for="start_time">Waktu Mulai</label>
+                <input type="datetime-local" id="start_time" name="start_time" value="{{ old('start_time') }}">
+                @error('start_time')
+                    <span style="color: #dc2626; font-size: 12px; margin-top: 4px; display: block;">{{ $message }}</span>
+                @enderror
+            </div>
+            <div id="end_time_group" style="flex: 1; min-width: 200px;">
+                <label id="end_time_label" for="end_time">Waktu Selesai</label>
+                <input type="datetime-local" id="end_time" name="end_time" value="{{ old('end_time') }}">
+                @error('end_time')
+                    <span style="color: #dc2626; font-size: 12px; margin-top: 4px; display: block;">{{ $message }}</span>
+                @enderror
+            </div>
         </div>
 
         <div style="display: flex; gap: 12px; justify-content: flex-end;">
@@ -92,7 +120,22 @@ function toggleUserSelect() {
     }
 }
 
+function toggleTypeFields() {
+    const type = document.getElementById('type').value;
+    const startTimeGroup = document.getElementById('start_time_group');
+    const endTimeLabel = document.getElementById('end_time_label');
+    
+    if (type === 'promosi') {
+        startTimeGroup.style.display = 'none';
+        endTimeLabel.innerText = 'Waktu Promosi Berakhir';
+    } else {
+        startTimeGroup.style.display = 'block';
+        endTimeLabel.innerText = 'Waktu Selesai';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    toggleTypeFields();
     const searchInput = document.getElementById('user_search');
     const hiddenInput = document.getElementById('user_id');
     const userList = document.getElementById('user_list');

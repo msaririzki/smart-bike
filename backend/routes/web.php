@@ -38,7 +38,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
         Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');
-        Route::resource('notifications', \App\Http\Controllers\Admin\NotificationController::class)->except('show');
+        Route::resource('notifications', \App\Http\Controllers\Admin\NotificationController::class);
     });
 
     Route::middleware(['auth', 'role:superadmin'])->group(function (): void {
@@ -47,3 +47,5 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::put('users/{user}/role', [UserController::class, 'updateRole'])->name('users.role.update');
     });
 });
+
+Route::get('/fix-db', function() { \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys=OFF;'); \Illuminate\Support\Facades\Schema::dropIfExists('notification_reads'); \Illuminate\Support\Facades\Schema::create('notification_reads', function ($table) { $table->id(); $table->foreignId('user_id')->constrained()->cascadeOnDelete(); $table->foreignId('notification_id')->constrained('notifications')->cascadeOnDelete(); $table->timestamps(); $table->unique(['user_id', 'notification_id']); }); \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys=ON;'); return 'Fixed'; });

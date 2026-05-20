@@ -86,4 +86,46 @@ class NotificationController extends Controller
             'message' => 'Notification marked as read',
         ]);
     }
+
+    public function markAsUnread(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $notification = Notification::where(function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                      ->orWhereNull('user_id');
+            })
+            ->where('id', $id)
+            ->firstOrFail();
+
+        if ($notification->user_id !== null) {
+            $notification->update(['is_read' => false]);
+        } else {
+            \Illuminate\Support\Facades\DB::table('notification_reads')
+                ->where('user_id', $user->id)
+                ->where('notification_id', $notification->id)
+                ->delete();
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Notification marked as unread',
+        ]);
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $notification = Notification::where('user_id', $user->id)
+            ->where('id', $id)
+            ->firstOrFail();
+
+        $notification->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Notification deleted successfully',
+        ]);
+    }
 }

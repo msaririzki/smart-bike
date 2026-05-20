@@ -62,4 +62,38 @@ class NotificationService {
       throw Exception('Failed to mark notification as read (Status: ${response.statusCode})');
     }
   }
+
+  Future<void> markAsUnread(int id) async {
+    final token = await SessionStore().token;
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.post(
+      Uri.parse('${ApiClient.baseUrl}/notifications/$id/unread'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to mark notification as unread (Status: ${response.statusCode})');
+    }
+  }
+
+  Future<void> deleteNotification(int id) async {
+    final token = await SessionStore().token;
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.delete(
+      Uri.parse('${ApiClient.baseUrl}/notifications/$id'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete notification (Status: ${response.statusCode})');
+    }
+  }
 }

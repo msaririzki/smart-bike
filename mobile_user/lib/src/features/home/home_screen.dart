@@ -16,7 +16,7 @@ import '../rental/active_rental_screen.dart';
 
 import '../rental/qr_scan_screen.dart';
 import '../profile/profile_screen.dart';
-
+import '../notifications/notification_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.api, required this.onLogout, super.key});
@@ -30,7 +30,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  Bike? _focusBike;
   final _dashboardKey = GlobalKey<_DashboardPageState>();
   final _historyKey = GlobalKey<HistoryScreenState>();
   final NotificationService _notificationService = NotificationService();
@@ -61,13 +60,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showNotifications() {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) {
-        return const _NotificationSheet();
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const NotificationScreen()),
     ).then((_) => _loadUnreadCount());
   }
 
@@ -185,7 +180,6 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: (index) {
           if (index == 1) {
             setState(() {
-              _focusBike = null;
               _selectedIndex = index;
             });
           } else if (index == 2) {
@@ -486,7 +480,6 @@ class _DashboardPageState extends State<_DashboardPage> {
                   final homeState = context
                       .findAncestorStateOfType<_HomeScreenState>();
                   homeState?.setState(() {
-                    homeState._focusBike = selectedBike;
                     homeState._selectedIndex = 1;
                   });
                 },
@@ -1405,356 +1398,6 @@ class _SoftIcon extends StatelessWidget {
   }
 }
 
-class _NotificationRow extends StatelessWidget {
-  const _NotificationRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SoftIcon(icon: icon),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 3),
-              Text(subtitle, style: const TextStyle(color: Color(0xff6b7280))),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NotificationSheet extends StatefulWidget {
-  const _NotificationSheet();
-
-  @override
-  State<_NotificationSheet> createState() => _NotificationSheetState();
-}
-
-class _NotificationSheetState extends State<_NotificationSheet> {
-  final NotificationService _service = NotificationService();
-  List<NotificationData> _notifications = [];
-  bool _isLoading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNotifications();
-  }
-
-  String _timeAgo(DateTime d) {
-    Duration diff = DateTime.now().difference(d);
-    if (diff.inDays > 365) return '${(diff.inDays / 365).floor()} tahun yang lalu';
-    if (diff.inDays > 30) return '${(diff.inDays / 30).floor()} bulan yang lalu';
-    if (diff.inDays > 0) return '${diff.inDays} hari yang lalu';
-    if (diff.inHours > 0) return '${diff.inHours} jam yang lalu';
-    if (diff.inMinutes > 0) return '${diff.inMinutes} menit yang lalu';
-    return 'Baru saja';
-  }
-
-  Future<void> _loadNotifications() async {
-    try {
-      final data = await _service.getNotifications();
-      if (mounted) {
-        setState(() {
-          _notifications = data;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Gagal memuat notifikasi: $e';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  void _showNotificationDetail(BuildContext context, NotificationData item, bool isSewa, int index) {
-    if (!item.isRead) {
-      _service.markAsRead(item.id).then((_) {
-        if (mounted) {
-          setState(() {
-            _notifications[index] = NotificationData(
-              id: item.id,
-              userId: item.userId,
-              title: item.title,
-              message: item.message,
-              type: item.type,
-              isRead: true,
-              createdAt: item.createdAt,
-            );
-          });
-          
-          final homeState = context.findAncestorStateOfType<_HomeScreenState>();
-          if (homeState != null) {
-            homeState._loadUnreadCount();
-          }
-        }
-      });
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-        contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isSewa ? const Color(0xffeef2ff) : const Color(0xfffffbeb),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                isSewa ? Icons.directions_bike_rounded : Icons.campaign_rounded,
-                color: isSewa ? const Color(0xff6366f1) : const Color(0xfff59e0b),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _timeAgo(item.createdAt),
-                    style: const TextStyle(fontSize: 12, color: Color(0xff6b7280)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Divider(height: 24),
-            Text(
-              item.message,
-              style: const TextStyle(
-                fontSize: 15,
-                color: Color(0xff374151),
-                height: 1.5,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Notifikasi',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 16),
-            if (_isLoading)
-              const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator(color: AppColors.primaryLight)))
-            else if (_error != null)
-              Center(child: Padding(padding: const EdgeInsets.all(32), child: Text(_error!, style: const TextStyle(color: Colors.red))))
-            else if (_notifications.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 40),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: const BoxDecoration(
-                          color: Color(0xfff3f4f6),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.notifications_off_outlined, size: 48, color: Color(0xff9ca3af)),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Belum ada notifikasi',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xff4b5563)),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Semua pemberitahuan akan muncul di sini',
-                        style: TextStyle(color: Color(0xff6b7280), fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.65,
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _notifications.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final item = _notifications[index];
-                    final isSewa = item.type == 'sewa';
-                    
-                    return InkWell(
-                      onTap: () => _showNotificationDetail(context, item, isSewa, index),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: item.isRead ? const Color(0xfff3f4f6) : const Color(0xffe5e7eb),
-                            width: 1,
-                          ),
-                          boxShadow: item.isRead 
-                              ? [] 
-                              : [BoxShadow(color: AppColors.primaryLight.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
-                        ),
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isSewa ? const Color(0xffeef2ff) : const Color(0xfffffbeb),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSewa ? const Color(0xffe0e7ff) : const Color(0xfffef3c7),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Icon(
-                                isSewa ? Icons.directions_bike_rounded : Icons.campaign_rounded,
-                                color: isSewa ? const Color(0xff6366f1) : const Color(0xfff59e0b),
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          item.title,
-                                          style: TextStyle(
-                                            fontWeight: item.isRead ? FontWeight.w700 : FontWeight.w900,
-                                            fontSize: 15,
-                                            color: item.isRead ? const Color(0xff4b5563) : const Color(0xff111827),
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      if (!item.isRead)
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          margin: const EdgeInsets.only(left: 8),
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xffef4444),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    item.message,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: item.isRead ? const Color(0xff9ca3af) : const Color(0xff6b7280),
-                                      fontSize: 13,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        _timeAgo(item.createdAt),
-                                        style: const TextStyle(
-                                          color: Color(0xff9ca3af),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const Row(
-                                        children: [
-                                          Text(
-                                            'Lihat Detail',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.primaryLight,
-                                            ),
-                                          ),
-                                          SizedBox(width: 2),
-                                          Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.primaryLight),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _ComingSoonPage extends StatelessWidget {
   const _ComingSoonPage({

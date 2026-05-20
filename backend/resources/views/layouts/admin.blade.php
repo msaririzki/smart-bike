@@ -53,7 +53,7 @@
         .nav-logout-btn:hover { background: rgba(220,38,38,0.8); border-color: transparent; }
 
         /* Mobile Header */
-        .mobile-header { display: none; position: fixed; top: 0; left: 0; right: 0; height: 60px; background: var(--teal-800); color: white; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 90; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .mobile-header { display: none; position: sticky; top: 0; height: 60px; background: var(--teal-800); color: white; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 90; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; }
         .mobile-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: white; font-weight: 700; }
         .mobile-brand img { height: 24px; filter: brightness(0) invert(1); }
         .menu-toggle { background: transparent; border: none; color: white; cursor: pointer; padding: 4px; }
@@ -66,7 +66,8 @@
             .sidebar { transform: translateX(-100%); }
             .sidebar.open { transform: translateX(0); }
             .mobile-header { display: flex; }
-            .main-wrapper { margin-left: 0; padding: 80px 16px 32px; width: 100%; }
+            .main-wrapper { margin-left: 0; padding: 24px 16px 32px; width: 100%; }
+            th { top: 60px; } /* Offset table header below mobile header */
             .login-wrapper { padding: 16px; }
             .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 95; }
             .sidebar-overlay.open { display: block; }
@@ -80,6 +81,17 @@
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
 
         /* Base styles */
+        h1, h2, h3, h4, h5, h6 { color: var(--teal-800); margin-top: 0; font-weight: 700; line-height: 1.25; }
+        h1 { font-size: 1.875rem; margin-bottom: 1.5rem; }
+        h2 { font-size: 1.5rem; margin-bottom: 1.25rem; }
+        h3 { font-size: 1.25rem; margin-bottom: 1rem; }
+        
+        @media (max-width: 768px) {
+            h1 { font-size: 1.5rem; margin-bottom: 1.25rem; }
+            h2 { font-size: 1.25rem; margin-bottom: 1rem; }
+            h3 { font-size: 1.125rem; margin-bottom: 0.875rem; }
+        }
+
         .card { background: white; border: 1px solid var(--gray-200); border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.2s ease, box-shadow 0.2s ease; }
         .card:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025); transform: translateY(-2px); }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
@@ -94,7 +106,7 @@
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--teal-700); box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1); }
         
         @media (max-width: 768px) {
-            .table-responsive { margin: 0; padding: 0; overflow-x: visible; }
+            .table-responsive { margin: 0; padding: 0; overflow: visible; max-height: none; }
             .table-responsive table { border: 0; width: 100%; display: block; }
             .table-responsive table thead { border: none; clip: rect(0 0 0 0); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; width: 1px; }
             .table-responsive table tbody { display: block; width: 100%; }
@@ -102,6 +114,8 @@
             .table-responsive table tr:hover td { background-color: transparent; }
             .table-responsive table td { border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center; padding: 10px 4px; font-size: 13px; text-align: right; gap: 12px; word-break: break-word; }
             .table-responsive table td::before { content: attr(data-label); font-weight: 600; color: #64748b; text-transform: uppercase; font-size: 10px; text-align: left; max-width: 40%; line-height: 1.2; }
+            .table-responsive table td[colspan] { display: block; text-align: center; }
+            .table-responsive table td[colspan]::before { display: none; }
             .table-responsive table td:last-child { border-bottom: 0; }
         }
 

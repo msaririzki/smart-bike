@@ -1,7 +1,7 @@
 @extends('layouts.admin', ['title' => 'Rental'])
 
 @section('content')
-    <h1>Rental</h1>
+    <h2 style="margin: 0; color: var(--teal-800); margin-bottom: 24px;">Rental</h2>
 
     <form class="card toolbar" method="get" action="{{ route('admin.rentals.index') }}">
         <label>

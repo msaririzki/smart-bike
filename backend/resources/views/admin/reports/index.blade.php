@@ -1,7 +1,7 @@
 @extends('layouts.admin', ['title' => 'Laporan'])
 
 @section('content')
-    <h1>Laporan</h1>
+    <h2 style="margin: 0; color: var(--teal-800); margin-bottom: 24px;">Laporan</h2>
 
     <div class="grid" style="margin-bottom: 32px;">
         <div class="card stat-card"><span class="muted">Total Pendapatan</span><h2>Rp{{ number_format($totalRevenue, 0, ',', '.') }}</h2></div>
@@ -9,7 +9,7 @@
         <div class="card stat-card"><span class="muted">Jumlah Catatan Sepeda Diam</span><h2>{{ $idleEventCount }}</h2></div>
     </div>
 
-    <h2>Total Rental per Hari</h2>
+    <h3 style="color: var(--teal-800); margin-top: 32px; margin-bottom: 16px;">Total Rental per Hari</h3>
     <div class="table-responsive">
         <table style="margin-bottom: 24px;">
             <thead><tr><th>Tanggal</th><th>Total Rental</th><th>Pendapatan</th><th>Jarak</th></tr></thead>
@@ -28,7 +28,7 @@
         </table>
     </div>
 
-    <h2>Sepeda Paling Sering Dipakai</h2>
+    <h3 style="color: var(--teal-800); margin-top: 32px; margin-bottom: 16px;">Sepeda Paling Sering Dipakai</h3>
     <div class="table-responsive">
         <table style="margin-bottom: 24px;">
             <thead><tr><th>Kode</th><th>Nama</th><th>Total Rental</th><th>Total Jarak</th><th></th></tr></thead>
@@ -39,7 +39,7 @@
                         <td>{{ $bike->name }}</td>
                         <td>{{ $bike->rentals_count }}</td>
                         <td>{{ number_format(($bike->rentals_sum_total_distance_meters ?? 0) / 1000, 2) }} km</td>
-                        <td><a href="{{ route('admin.monitoring.show', $bike) }}" class="button secondary" style="padding: 6px 12px; font-size: 13px;">Lihat Detail</a></td>
+                        <td><a href="{{ route('admin.monitoring.show', ['bike' => $bike->id, 'back_to' => 'reports']) }}" class="button secondary" style="padding: 6px 12px; font-size: 13px;">Lihat Detail</a></td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="muted">Belum ada data sepeda.</td></tr>
@@ -48,7 +48,7 @@
         </table>
     </div>
 
-    <h2>Rental dengan Sepeda Sering Diam</h2>
+    <h3 style="color: var(--teal-800); margin-top: 32px; margin-bottom: 16px;">Rental dengan Sepeda Sering Diam</h3>
     <div class="table-responsive">
         <table>
             <thead><tr><th>Rental</th><th>Pengguna</th><th>Sepeda</th><th>Catatan Sepeda Diam</th><th>Status</th><th></th></tr></thead>

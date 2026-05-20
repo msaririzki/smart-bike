@@ -1,7 +1,7 @@
 @extends('layouts.admin', ['title' => 'Monitoring Sepeda'])
 
 @section('content')
-    <h1>Monitoring Sepeda</h1>
+    <h2 style="margin: 0; color: var(--teal-800); margin-bottom: 24px;">Monitoring Sepeda</h2>
 
     <form class="card toolbar" method="get" action="{{ route('admin.monitoring.index') }}">
         <label>

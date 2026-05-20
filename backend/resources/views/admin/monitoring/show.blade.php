@@ -4,11 +4,16 @@
     @php($statusBadge = $bike->is_online ? $bike->status : 'offline')
     @php($isAvailable = $bike->status === 'available' && $bike->is_online)
 
-    <div style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
-        <a href="{{ route('admin.monitoring.index') }}" style="color: #0f766e; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali ke Monitoring Sepeda
-        </a>
+    <div style="margin-bottom: 24px;">
+        @if(request('back_to') === 'reports')
+            <a href="{{ route('admin.reports.index') }}" class="button secondary" style="padding: 8px;" title="Kembali ke Laporan">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
+            </a>
+        @else
+            <a href="{{ route('admin.monitoring.index') }}" class="button secondary" style="padding: 8px;" title="Kembali ke Monitoring">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
+            </a>
+        @endif
     </div>
 
     <!-- Main Hero Card -->
@@ -16,8 +21,8 @@
         <!-- Header -->
         <div style="background: #0f766e; color: white; padding: 1.5rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <div>
-                <h1 style="margin: 0; font-size: 1.75rem; font-weight: 700; line-height: 1.2;">{{ $bike->code }}</h1>
-                <p style="margin: 0.25rem 0 0 0; font-size: 1rem; opacity: 0.9;">{{ $bike->name }}</p>
+                <h1 style="margin: 0; font-size: 1.75rem; font-weight: 700; line-height: 1.2; color: white;">{{ $bike->code }}</h1>
+                <p style="margin: 0.25rem 0 0 0; font-size: 1rem; opacity: 0.9; color: white;">{{ $bike->name }}</p>
             </div>
             <span style="background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
                 {{ strtoupper($adminStatusLabels[$statusBadge] ?? $statusBadge) }}
