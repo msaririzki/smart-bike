@@ -205,7 +205,9 @@ class NotificationDetailScreen extends StatelessWidget {
         const SizedBox(height: 40),
         OutlinedButton.icon(
           onPressed: () {
-            Share.share('${notification.title}\n\n${notification.message}');
+            SharePlus.instance.share(
+              ShareParams(text: '${notification.title}\n\n${notification.message}'),
+            );
           },
           icon: const Icon(Icons.share_rounded, size: 18),
           label: const Text('Bagikan'),
@@ -285,11 +287,15 @@ class NotificationDetailScreen extends StatelessWidget {
                 } catch (_) {}
               } else if (value == 'copy') {
                 await Clipboard.setData(ClipboardData(text: notification.message));
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Teks pengumuman disalin')));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Teks pengumuman disalin')));
+                }
               } else if (value == 'copy_promo') {
                 final promoCode = notification.data?['promo_code'] ?? notification.message;
                 await Clipboard.setData(ClipboardData(text: promoCode));
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kode promo disalin')));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kode promo disalin')));
+                }
               } else if (value == 'pin' || value == 'unpin') {
                 Navigator.pop(context, value);
               } else {

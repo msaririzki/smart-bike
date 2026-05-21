@@ -34,8 +34,12 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
 
   String _timeAgo(DateTime d) {
     Duration diff = DateTime.now().difference(d);
-    if (diff.inDays > 365) return '${(diff.inDays / 365).floor()} tahun yang lalu';
-    if (diff.inDays > 30) return '${(diff.inDays / 30).floor()} bulan yang lalu';
+    if (diff.inDays > 365) {
+      return '${(diff.inDays / 365).floor()} tahun yang lalu';
+    }
+    if (diff.inDays > 30) {
+      return '${(diff.inDays / 30).floor()} bulan yang lalu';
+    }
     if (diff.inDays > 0) return '${diff.inDays} hari yang lalu';
     if (diff.inHours > 0) return '${diff.inHours} jam yang lalu';
     if (diff.inMinutes > 0) return '${diff.inMinutes} menit yang lalu';

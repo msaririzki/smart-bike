@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BikeController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RentalController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +25,12 @@ Route::middleware(['auth:sanctum', 'role:user,admin,superadmin'])->group(functio
 });
 
 Route::middleware(['auth:sanctum', 'role:user'])->group(function (): void {
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/{notification}/unread', [NotificationController::class, 'markAsUnread']);
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy']);
+
     Route::post('/rentals/start', [RentalController::class, 'start']);
     Route::post('/rentals/start-from-qr', [RentalController::class, 'startFromQr']);
     Route::get('/rentals/active', [RentalController::class, 'active']);
