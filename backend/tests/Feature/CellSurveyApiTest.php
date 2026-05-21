@@ -51,6 +51,9 @@ class CellSurveyApiTest extends TestCase
         $this->assertDatabaseHas('cell_towers', [
             'radio_type' => 'LTE',
             'operator_name' => 'Telkomsel',
+            'operator_label' => 'Telkomsel',
+            'network_operator_code' => '51010',
+            'active_data_subscription_id' => 2,
             'mcc' => '510',
             'mnc' => '10',
             'cell_id' => '123456789',
@@ -65,6 +68,9 @@ class CellSurveyApiTest extends TestCase
             'signal_dbm' => -83,
             'rsrp_dbm' => -95,
             'is_registered' => true,
+            'operator_label' => 'Telkomsel',
+            'network_operator_code' => '51010',
+            'active_data_subscription_id' => 2,
         ]);
     }
 
@@ -131,6 +137,25 @@ class CellSurveyApiTest extends TestCase
         $this->assertSame(0, CellObservation::query()->count());
     }
 
+    public function test_legacy_cell_payload_without_active_data_fields_still_records(): void
+    {
+        Sanctum::actingAs($this->device);
+
+        $payload = $this->payload(['cell_id' => 'legacy-cell']);
+        unset(
+            $payload['cell']['operator_label'],
+            $payload['cell']['network_operator_code'],
+            $payload['cell']['active_data_subscription_id'],
+        );
+
+        $this->postJson('/api/device/location-update', $payload)->assertOk();
+
+        $tower = CellTower::query()->firstOrFail();
+        $this->assertSame('Telkomsel', $tower->operator_label);
+        $this->assertNull($tower->network_operator_code);
+        $this->assertNull($tower->active_data_subscription_id);
+    }
+
     public function test_non_device_role_cannot_submit_cell_survey_data(): void
     {
         $user = User::query()->create([
@@ -151,6 +176,9 @@ class CellSurveyApiTest extends TestCase
         $cell = array_merge([
             'radio_type' => 'LTE',
             'operator_name' => 'Telkomsel',
+            'operator_label' => 'Telkomsel',
+            'network_operator_code' => '51010',
+            'active_data_subscription_id' => 2,
             'mcc' => '510',
             'mnc' => '10',
             'cell_id' => '123456789',

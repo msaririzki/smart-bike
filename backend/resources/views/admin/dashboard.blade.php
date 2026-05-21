@@ -350,11 +350,13 @@
                 const signal = cell.average_signal_dbm === null ? '-' : `${cell.average_signal_dbm} dBm`;
                 const rsrp = cell.average_rsrp_dbm === null ? '-' : `${cell.average_rsrp_dbm} dBm`;
 
+                const operatorLabel = cell.operator_label ?? cell.operator_name ?? 'Cell Terdeteksi';
+
                 return `
                     <div class="map-popup">
                         <div class="map-popup-header" style="background: linear-gradient(135deg, #c2410c, #f97316);">
                             <div>
-                                <h3 class="map-popup-title">${escapeHtml(cell.operator_name ?? 'Cell Terdeteksi')}</h3>
+                                <h3 class="map-popup-title">${escapeHtml(operatorLabel)}</h3>
                                 <div class="map-popup-subtitle">${escapeHtml(cell.radio_type)} - Cell ${escapeHtml(cell.cell_id)}</div>
                             </div>
                             <span class="badge">Estimasi</span>
@@ -363,6 +365,14 @@
                             <div class="map-popup-item">
                                 <span class="map-popup-label">MCC/MNC</span>
                                 <span class="map-popup-value">${escapeHtml(cell.mcc ?? '-')}/${escapeHtml(cell.mnc ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">SIM Data Aktif</span>
+                                <span class="map-popup-value">${escapeHtml(cell.active_data_subscription_id ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Kode Operator</span>
+                                <span class="map-popup-value">${escapeHtml(cell.network_operator_code ?? '-')}</span>
                             </div>
                             <div class="map-popup-item">
                                 <span class="map-popup-label">TAC/LAC</span>
@@ -386,7 +396,7 @@
                             </div>
                         </div>
                         <div class="map-popup-details">
-                            <p><strong>Catatan:</strong> Marker ini adalah estimasi dari observasi perangkat, bukan koordinat tower resmi operator.</p>
+                            <p><strong>Catatan:</strong> Marker ini adalah estimasi dari observasi perangkat, bukan koordinat tower resmi operator. Jika Android mengizinkan, pembacaan mengikuti SIM data aktif.</p>
                             <p><strong>Terakhir terlihat:</strong> ${escapeHtml(cell.last_seen_at ?? '-')}</p>
                         </div>
                     </div>

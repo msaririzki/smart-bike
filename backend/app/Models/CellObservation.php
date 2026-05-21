@@ -20,6 +20,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'rsrq_db',
     'sinr_db',
     'is_registered',
+    'operator_label',
+    'network_operator_code',
+    'active_data_subscription_id',
     'observed_at',
 ])]
 class CellObservation extends Model

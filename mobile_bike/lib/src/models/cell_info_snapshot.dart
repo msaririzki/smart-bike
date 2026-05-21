@@ -2,6 +2,10 @@ class CellInfoSnapshot {
   const CellInfoSnapshot({
     required this.radioType,
     this.operatorName,
+    this.networkOperatorName,
+    this.networkOperatorCode,
+    this.operatorLabel,
+    this.activeDataSubscriptionId,
     this.mcc,
     this.mnc,
     this.cellId,
@@ -16,6 +20,10 @@ class CellInfoSnapshot {
 
   final String radioType;
   final String? operatorName;
+  final String? networkOperatorName;
+  final String? networkOperatorCode;
+  final String? operatorLabel;
+  final int? activeDataSubscriptionId;
   final String? mcc;
   final String? mnc;
   final String? cellId;
@@ -33,9 +41,11 @@ class CellInfoSnapshot {
   }
 
   String get shortLabel {
-    final operator = operatorName == null || operatorName!.isEmpty
-        ? 'Operator'
-        : operatorName!;
+    final operator = operatorLabel == null || operatorLabel!.isEmpty
+        ? operatorName == null || operatorName!.isEmpty
+            ? 'Operator'
+            : operatorName!
+        : operatorLabel!;
     final id = cellId == null || cellId!.isEmpty ? '-' : cellId!;
     return '$operator $radioType/$id';
   }
@@ -44,6 +54,10 @@ class CellInfoSnapshot {
     return CellInfoSnapshot(
       radioType: map['radio_type']?.toString() ?? 'UNKNOWN',
       operatorName: map['operator_name']?.toString(),
+      networkOperatorName: map['network_operator_name']?.toString(),
+      networkOperatorCode: map['network_operator_code']?.toString(),
+      operatorLabel: map['operator_label']?.toString(),
+      activeDataSubscriptionId: _toInt(map['active_data_subscription_id']),
       mcc: map['mcc']?.toString(),
       mnc: map['mnc']?.toString(),
       cellId: map['cell_id']?.toString(),
@@ -61,6 +75,13 @@ class CellInfoSnapshot {
     return {
       'radio_type': radioType,
       if (operatorName != null) 'operator_name': operatorName,
+      if (networkOperatorName != null)
+        'network_operator_name': networkOperatorName,
+      if (networkOperatorCode != null)
+        'network_operator_code': networkOperatorCode,
+      if (operatorLabel != null) 'operator_label': operatorLabel,
+      if (activeDataSubscriptionId != null)
+        'active_data_subscription_id': activeDataSubscriptionId,
       if (mcc != null) 'mcc': mcc,
       if (mnc != null) 'mnc': mnc,
       if (cellId != null) 'cell_id': cellId,

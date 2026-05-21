@@ -15,6 +15,7 @@ import android.telephony.CellInfoLte
 import android.telephony.CellInfoNr
 import android.telephony.CellInfoWcdma
 import android.telephony.CellSignalStrengthLte
+import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.view.WindowManager
 import io.flutter.embedding.engine.FlutterEngine
@@ -48,7 +49,7 @@ class MainActivity : FlutterActivity() {
             return null
         }
 
-        val telephony = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        val telephony = telephonyForActiveDataSubscription()
         val cells = try {
             telephony.allCellInfo
         } catch (_: SecurityException) {
@@ -59,27 +60,44 @@ class MainActivity : FlutterActivity() {
 
         val servingCell = cells.firstOrNull { it.isRegistered } ?: cells.firstOrNull() ?: return null
 
-        return cellInfoToMap(servingCell, telephony.networkOperatorName)
+        return cellInfoToMap(
+            servingCell,
+            telephony.networkOperatorName,
+            telephony.networkOperator,
+            activeDataSubscriptionId(),
+        )
     }
 
-    private fun cellInfoToMap(cell: CellInfo, operatorName: String?): Map<String, Any?>? {
+    private fun cellInfoToMap(
+        cell: CellInfo,
+        operatorName: String?,
+        networkOperatorCode: String?,
+        activeDataSubscriptionId: Int?,
+    ): Map<String, Any?>? {
         return when (cell) {
-            is CellInfoLte -> lteToMap(cell, operatorName)
-            is CellInfoWcdma -> wcdmaToMap(cell, operatorName)
-            is CellInfoGsm -> gsmToMap(cell, operatorName)
-            is CellInfoNr -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) nrToMap(cell, operatorName) else null
+            is CellInfoLte -> lteToMap(cell, operatorName, networkOperatorCode, activeDataSubscriptionId)
+            is CellInfoWcdma -> wcdmaToMap(cell, operatorName, networkOperatorCode, activeDataSubscriptionId)
+            is CellInfoGsm -> gsmToMap(cell, operatorName, networkOperatorCode, activeDataSubscriptionId)
+            is CellInfoNr -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) nrToMap(cell, operatorName, networkOperatorCode, activeDataSubscriptionId) else null
             else -> null
         }
     }
 
-    private fun lteToMap(cell: CellInfoLte, operatorName: String?): Map<String, Any?> {
+    private fun lteToMap(
+        cell: CellInfoLte,
+        operatorName: String?,
+        networkOperatorCode: String?,
+        activeDataSubscriptionId: Int?,
+    ): Map<String, Any?> {
         val identity = cell.cellIdentity
         val signal = cell.cellSignalStrength
+        val mcc = mcc(identity)
+        val mnc = mnc(identity)
 
-        return baseMap("LTE", operatorName, cell.isRegistered).plus(
+        return baseMap("LTE", operatorName, networkOperatorCode, mcc, mnc, activeDataSubscriptionId, cell.isRegistered).plus(
             mapOf(
-                "mcc" to mcc(identity),
-                "mnc" to mnc(identity),
+                "mcc" to mcc,
+                "mnc" to mnc,
                 "cell_id" to cleanInt(identity.ci)?.toString(),
                 "tac_or_lac" to cleanInt(identity.tac)?.toString(),
                 "pci_or_psc" to cleanInt(identity.pci)?.toString(),
@@ -91,16 +109,23 @@ class MainActivity : FlutterActivity() {
         )
     }
 
-    private fun nrToMap(cell: CellInfoNr, operatorName: String?): Map<String, Any?>? {
+    private fun nrToMap(
+        cell: CellInfoNr,
+        operatorName: String?,
+        networkOperatorCode: String?,
+        activeDataSubscriptionId: Int?,
+    ): Map<String, Any?>? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
 
         val identity = cell.cellIdentity as? CellIdentityNr ?: return null
         val signal = cell.cellSignalStrength as? android.telephony.CellSignalStrengthNr
+        val mcc = identity.mccString
+        val mnc = identity.mncString
 
-        return baseMap("NR", operatorName, cell.isRegistered).plus(
+        return baseMap("NR", operatorName, networkOperatorCode, mcc, mnc, activeDataSubscriptionId, cell.isRegistered).plus(
             mapOf(
-                "mcc" to identity.mccString,
-                "mnc" to identity.mncString,
+                "mcc" to mcc,
+                "mnc" to mnc,
                 "cell_id" to cleanLong(identity.nci)?.toString(),
                 "tac_or_lac" to cleanInt(identity.tac)?.toString(),
                 "pci_or_psc" to cleanInt(identity.pci)?.toString(),
@@ -112,14 +137,21 @@ class MainActivity : FlutterActivity() {
         )
     }
 
-    private fun wcdmaToMap(cell: CellInfoWcdma, operatorName: String?): Map<String, Any?> {
+    private fun wcdmaToMap(
+        cell: CellInfoWcdma,
+        operatorName: String?,
+        networkOperatorCode: String?,
+        activeDataSubscriptionId: Int?,
+    ): Map<String, Any?> {
         val identity = cell.cellIdentity
         val signal = cell.cellSignalStrength
+        val mcc = mcc(identity)
+        val mnc = mnc(identity)
 
-        return baseMap("WCDMA", operatorName, cell.isRegistered).plus(
+        return baseMap("WCDMA", operatorName, networkOperatorCode, mcc, mnc, activeDataSubscriptionId, cell.isRegistered).plus(
             mapOf(
-                "mcc" to mcc(identity),
-                "mnc" to mnc(identity),
+                "mcc" to mcc,
+                "mnc" to mnc,
                 "cell_id" to cleanInt(identity.cid)?.toString(),
                 "tac_or_lac" to cleanInt(identity.lac)?.toString(),
                 "pci_or_psc" to cleanInt(identity.psc)?.toString(),
@@ -131,14 +163,21 @@ class MainActivity : FlutterActivity() {
         )
     }
 
-    private fun gsmToMap(cell: CellInfoGsm, operatorName: String?): Map<String, Any?> {
+    private fun gsmToMap(
+        cell: CellInfoGsm,
+        operatorName: String?,
+        networkOperatorCode: String?,
+        activeDataSubscriptionId: Int?,
+    ): Map<String, Any?> {
         val identity = cell.cellIdentity
         val signal = cell.cellSignalStrength
+        val mcc = mcc(identity)
+        val mnc = mnc(identity)
 
-        return baseMap("GSM", operatorName, cell.isRegistered).plus(
+        return baseMap("GSM", operatorName, networkOperatorCode, mcc, mnc, activeDataSubscriptionId, cell.isRegistered).plus(
             mapOf(
-                "mcc" to mcc(identity),
-                "mnc" to mnc(identity),
+                "mcc" to mcc,
+                "mnc" to mnc,
                 "cell_id" to cleanInt(identity.cid)?.toString(),
                 "tac_or_lac" to cleanInt(identity.lac)?.toString(),
                 "pci_or_psc" to null,
@@ -150,12 +189,63 @@ class MainActivity : FlutterActivity() {
         )
     }
 
-    private fun baseMap(radioType: String, operatorName: String?, registered: Boolean): Map<String, Any?> {
+    private fun baseMap(
+        radioType: String,
+        operatorName: String?,
+        networkOperatorCode: String?,
+        mcc: String?,
+        mnc: String?,
+        activeDataSubscriptionId: Int?,
+        registered: Boolean,
+    ): Map<String, Any?> {
         return mapOf(
             "radio_type" to radioType,
             "operator_name" to operatorName?.takeIf { it.isNotBlank() },
+            "network_operator_name" to operatorName?.takeIf { it.isNotBlank() },
+            "network_operator_code" to networkOperatorCode?.takeIf { it.isNotBlank() },
+            "operator_label" to operatorLabel(mcc, mnc, operatorName),
+            "active_data_subscription_id" to activeDataSubscriptionId,
             "is_registered" to registered,
         )
+    }
+
+    private fun telephonyForActiveDataSubscription(): TelephonyManager {
+        val defaultTelephony = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        val subId = activeDataSubscriptionId()
+
+        return if (subId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                defaultTelephony.createForSubscriptionId(subId)
+            } catch (_: Exception) {
+                defaultTelephony
+            }
+        } else {
+            defaultTelephony
+        }
+    }
+
+    private fun activeDataSubscriptionId(): Int? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return null
+
+        return try {
+            val subId = SubscriptionManager.getActiveDataSubscriptionId()
+            subId.takeIf { it != SubscriptionManager.INVALID_SUBSCRIPTION_ID }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun operatorLabel(mcc: String?, mnc: String?, fallbackName: String?): String? {
+        val code = if (!mcc.isNullOrBlank() && !mnc.isNullOrBlank()) "$mcc$mnc" else null
+        val mapped = when (code) {
+            "51010" -> "Telkomsel"
+            "51011" -> "XL"
+            "51089" -> "Tri"
+            "51001", "51021" -> "Indosat/IM3"
+            else -> null
+        }
+
+        return mapped ?: fallbackName?.takeIf { it.isNotBlank() }
     }
 
     private fun mcc(identity: CellIdentityLte): String? =

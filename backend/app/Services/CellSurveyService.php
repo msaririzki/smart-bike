@@ -33,6 +33,9 @@ class CellSurveyService
             [
                 'radio_type' => $normalized['radio_type'],
                 'operator_name' => $normalized['operator_name'],
+                'operator_label' => $normalized['operator_label'],
+                'network_operator_code' => $normalized['network_operator_code'],
+                'active_data_subscription_id' => $normalized['active_data_subscription_id'],
                 'mcc' => $normalized['mcc'],
                 'mnc' => $normalized['mnc'],
                 'cell_id' => $normalized['cell_id'],
@@ -63,6 +66,9 @@ class CellSurveyService
             'rsrq_db' => $normalized['rsrq_db'],
             'sinr_db' => $normalized['sinr_db'],
             'is_registered' => $normalized['is_registered'],
+            'operator_label' => $normalized['operator_label'],
+            'network_operator_code' => $normalized['network_operator_code'],
+            'active_data_subscription_id' => $normalized['active_data_subscription_id'],
             'observed_at' => $observedAt,
         ]);
 
@@ -115,7 +121,10 @@ class CellSurveyService
         return [
             'identity_key' => $identityKey,
             'radio_type' => $radioType,
-            'operator_name' => $this->stringOrNull($cell['operator_name'] ?? null, 100),
+            'operator_name' => $this->stringOrNull($cell['operator_name'] ?? $cell['network_operator_name'] ?? null, 100),
+            'operator_label' => $this->operatorLabel($cell, $mcc, $mnc),
+            'network_operator_code' => $this->stringOrNull($cell['network_operator_code'] ?? null, 20),
+            'active_data_subscription_id' => $this->intOrNull($cell['active_data_subscription_id'] ?? null),
             'mcc' => $mcc,
             'mnc' => $mnc,
             'cell_id' => $cellId,
@@ -138,6 +147,9 @@ class CellSurveyService
 
         $updates = [
             'operator_name' => $cell['operator_name'] ?? $tower->operator_name,
+            'operator_label' => $cell['operator_label'] ?? $tower->operator_label,
+            'network_operator_code' => $cell['network_operator_code'] ?? $tower->network_operator_code,
+            'active_data_subscription_id' => $cell['active_data_subscription_id'] ?? $tower->active_data_subscription_id,
             'pci_or_psc' => $cell['pci_or_psc'] ?? $tower->pci_or_psc,
             'observation_count' => $count + 1,
             'average_signal_dbm' => $this->nextAverage($tower->average_signal_dbm, $count, $cell['signal_dbm']),
@@ -189,5 +201,20 @@ class CellSurveyService
     private function floatOrNull(mixed $value): ?float
     {
         return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function operatorLabel(array $cell, ?string $mcc, ?string $mnc): ?string
+    {
+        $mapped = match (($mcc ?? '') . ($mnc ?? '')) {
+            '51010' => 'Telkomsel',
+            '51011' => 'XL',
+            '51089' => 'Tri',
+            '51001', '51021' => 'Indosat/IM3',
+            default => null,
+        };
+
+        return $mapped
+            ?? $this->stringOrNull($cell['operator_label'] ?? null, 100)
+            ?? $this->stringOrNull($cell['operator_name'] ?? $cell['network_operator_name'] ?? null, 100);
     }
 }

@@ -309,7 +309,7 @@ class _DeviceAndRentalSummary extends StatelessWidget {
                 icon: Icons.cell_tower_rounded),
             const SizedBox(height: 6),
             Text(
-              'MCC/MNC ${cellInfo!.mcc ?? '-'}/${cellInfo!.mnc ?? '-'} · TAC/LAC ${cellInfo!.tacOrLac ?? '-'} · PCI/PSC ${cellInfo!.pciOrPsc ?? '-'} · ${cellInfo!.signalDbm?.toString() ?? '-'} dBm',
+              'SIM data ${cellInfo!.activeDataSubscriptionId?.toString() ?? '-'} · MCC/MNC ${cellInfo!.mcc ?? '-'}/${cellInfo!.mnc ?? '-'} · TAC/LAC ${cellInfo!.tacOrLac ?? '-'} · PCI/PSC ${cellInfo!.pciOrPsc ?? '-'} · ${cellInfo!.signalDbm?.toString() ?? '-'} dBm',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 11, color: Color(0xFF667085)),
             ),
