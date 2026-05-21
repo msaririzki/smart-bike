@@ -22,6 +22,7 @@ class LocationProcessingService
         private readonly BillingService $billing,
         private readonly IdleDetectionService $idleDetection,
         private readonly BikeStatusService $bikeStatus,
+        private readonly CellSurveyService $cellSurvey,
     ) {}
 
     public function process(User $deviceUser, array $data): array
@@ -30,7 +31,7 @@ class LocationProcessingService
             ->where('assigned_device_user_id', $deviceUser->id)
             ->firstOrFail();
 
-        return DB::transaction(function () use ($bike, $data): array {
+        return DB::transaction(function () use ($deviceUser, $bike, $data): array {
             $recordedAt = (isset($data['recorded_at']) ? Carbon::parse($data['recorded_at']) : now())->setTimezone(config('app.timezone'));
             $rental = Rental::query()
                 ->where('bike_id', $bike->id)
@@ -53,7 +54,7 @@ class LocationProcessingService
             $bike->update($bikeUpdates);
 
             if (! $rental) {
-                $point = $this->storePoint($bike, null, $data, $recordedAt, 'no_active_rental');
+                $point = $this->storePoint($deviceUser, $bike, null, $data, $recordedAt, 'no_active_rental');
 
                 return ['bike' => $bike->refresh(), 'rental' => null, 'point' => $point, 'message' => 'Location stored for monitoring only.'];
             }
@@ -62,7 +63,7 @@ class LocationProcessingService
             $maxAccuracy = (float) $this->pricing->get('max_gps_accuracy_meters');
 
             if ($accuracy !== null && $accuracy > $maxAccuracy) {
-                $point = $this->storePoint($bike, $rental, $data, $recordedAt, 'bad_accuracy');
+                $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, 'bad_accuracy');
                 $this->idleDetection->checkIdleWarnings();
 
                 return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'GPS accuracy too low for billing.'];
@@ -76,13 +77,13 @@ class LocationProcessingService
                 ->first();
 
             if (! $previous) {
-                $point = $this->storePoint($bike, $rental, $data, $recordedAt);
+                $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt);
 
                 return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Baseline GPS point stored.'];
             }
 
             if ($recordedAt->lte($previous->recorded_at)) {
-                $point = $this->storePoint($bike, $rental, $data, $recordedAt, 'timestamp_not_forward');
+                $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, 'timestamp_not_forward');
 
                 return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Timestamp ignored because it is not newer than previous point.'];
             }
@@ -96,7 +97,7 @@ class LocationProcessingService
 
             $threshold = $this->movementThresholdMeters($data, $previous);
             if ($distance < $threshold) {
-                $point = $this->storePoint($bike, $rental, $data, $recordedAt, 'below_threshold', $distance);
+                $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, 'below_threshold', $distance);
                 $this->idleDetection->checkIdleWarnings();
 
                 return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Movement below threshold; not billed.'];
@@ -108,19 +109,19 @@ class LocationProcessingService
             $reportedSpeedKmh = isset($data['speed_kmh']) ? (float) $data['speed_kmh'] : null;
 
             if ($this->looksLikeStationaryJitter($reportedSpeedKmh, $distance, $threshold)) {
-                $point = $this->storePoint($bike, $rental, $data, $recordedAt, 'stationary_jitter', $distance);
+                $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, 'stationary_jitter', $distance);
                 $this->idleDetection->checkIdleWarnings();
 
                 return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Stationary GPS jitter ignored; not billed.'];
             }
 
             if ($speedKmh > $maxSpeed) {
-                $point = $this->storePoint($bike, $rental, $data, $recordedAt, 'speed_anomaly', $distance, true);
+                $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, 'speed_anomaly', $distance, true);
 
                 return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Movement ignored as GPS anomaly.'];
             }
 
-            $point = $this->storePoint($bike, $rental, $data, $recordedAt, null, $distance, false, true);
+            $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, null, $distance, false, true);
             $rental->total_distance_meters = (float) $rental->total_distance_meters + $distance;
             $rental->last_movement_at = $recordedAt;
             $rental->save();
@@ -169,6 +170,7 @@ class LocationProcessingService
     }
 
     private function storePoint(
+        User $deviceUser,
         Bike $bike,
         ?Rental $rental,
         array $data,
@@ -178,7 +180,7 @@ class LocationProcessingService
         bool $isAnomaly = false,
         bool $isValidMovement = false,
     ): RentalLocationPoint {
-        return RentalLocationPoint::query()->create([
+        $point = RentalLocationPoint::query()->create([
             'rental_id' => $rental?->id,
             'bike_id' => $bike->id,
             'latitude' => $data['latitude'],
@@ -192,5 +194,9 @@ class LocationProcessingService
             'ignored_reason' => $ignoredReason,
             'recorded_at' => $recordedAt,
         ]);
+
+        $this->cellSurvey->recordObservation($deviceUser, $bike, $rental, $point, $data['cell'] ?? null, $recordedAt);
+
+        return $point;
     }
 }

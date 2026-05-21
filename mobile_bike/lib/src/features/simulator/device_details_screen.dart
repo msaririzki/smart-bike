@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/bike.dart';
+import '../../models/cell_info_snapshot.dart';
 import '../../models/device_rental_summary.dart';
 import '../../services/api_client.dart';
 import 'qr_rental_panel.dart';
@@ -22,6 +23,7 @@ class DeviceDetailsScreen extends StatelessWidget {
     required this.locationAccessStatus,
     required this.lastGpsReadAt,
     required this.accuracyMeters,
+    required this.cellInfo,
     super.key,
   });
 
@@ -40,6 +42,7 @@ class DeviceDetailsScreen extends StatelessWidget {
   final dynamic locationAccessStatus;
   final DateTime? lastGpsReadAt;
   final double? accuracyMeters;
+  final CellInfoSnapshot? cellInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +80,7 @@ class DeviceDetailsScreen extends StatelessWidget {
             locationMode: locationMode,
             streaming: streaming,
             now: now,
+            cellInfo: cellInfo,
           ),
           const SizedBox(height: 12),
           _FieldTestChecklist(
@@ -241,6 +245,7 @@ class _DeviceAndRentalSummary extends StatelessWidget {
     required this.locationMode,
     required this.streaming,
     required this.now,
+    required this.cellInfo,
   });
 
   final Bike bike;
@@ -252,6 +257,7 @@ class _DeviceAndRentalSummary extends StatelessWidget {
   final String locationMode;
   final bool streaming;
   final DateTime now;
+  final CellInfoSnapshot? cellInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -295,6 +301,19 @@ class _DeviceAndRentalSummary extends StatelessWidget {
                   icon: Icons.explore_outlined),
             ],
           ),
+          if (cellInfo != null) ...[
+            const Divider(height: 18),
+            _MetricItemSmall(
+                label: 'BTS/Cell',
+                value: cellInfo!.shortLabel,
+                icon: Icons.cell_tower_rounded),
+            const SizedBox(height: 6),
+            Text(
+              'MCC/MNC ${cellInfo!.mcc ?? '-'}/${cellInfo!.mnc ?? '-'} · TAC/LAC ${cellInfo!.tacOrLac ?? '-'} · PCI/PSC ${cellInfo!.pciOrPsc ?? '-'} · ${cellInfo!.signalDbm?.toString() ?? '-'} dBm',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF667085)),
+            ),
+          ],
         ],
       ),
     );

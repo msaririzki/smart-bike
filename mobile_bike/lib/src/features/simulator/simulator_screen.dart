@@ -12,8 +12,10 @@ import 'package:latlong2/latlong.dart' as latlong;
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../models/bike.dart';
+import '../../models/cell_info_snapshot.dart';
 import '../../models/device_rental_summary.dart';
 import '../../services/api_client.dart';
+import '../../services/cell_info_service.dart';
 import '../../services/gps_service.dart';
 import '../../services/session_store.dart';
 
@@ -52,6 +54,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
 
   final _gps = GpsService();
   final _battery = Battery();
+  final _cellInfo = CellInfoService();
 
   Bike? _bike;
   DeviceRentalSummary? _summary;
@@ -81,6 +84,9 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   DateTime _now = DateTime.now();
   int? _activeRentalId;
   String _lastServerMsg = 'Belum ada pengiriman';
+  CellInfoSnapshot? _currentCell;
+  String? _lastCellKey;
+  String _lastCellEvent = 'Belum ada data BTS';
 
   String _locationMode = 'Belum aktif';
   bool _checkingLocationAccess = true;
@@ -943,6 +949,8 @@ class _SimulatorScreenState extends State<SimulatorScreen>
 
     setState(() => _sending = true);
     try {
+      final cell = _streaming ? await _cellInfo.currentServingCell() : null;
+      _updateCellStatus(cell);
       final res = await widget.api.sendLocationUpdate(
         latitude: pos.latitude,
         longitude: pos.longitude,
@@ -950,6 +958,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
         accuracyMeters: pos.accuracy,
         networkType: _networkType,
         recordedAt: effectiveRecordedAt,
+        cell: cell,
       );
       if (mounted) {
         setState(() {
@@ -973,6 +982,28 @@ class _SimulatorScreenState extends State<SimulatorScreen>
           ),
         );
       }
+    }
+  }
+
+  void _updateCellStatus(CellInfoSnapshot? cell) {
+    if (!mounted || cell == null) return;
+
+    final previousKey = _lastCellKey;
+    final nextKey = cell.identityKey;
+
+    setState(() {
+      _currentCell = cell;
+      if (nextKey != null) {
+        _lastCellKey = nextKey;
+      }
+      _lastCellEvent =
+          previousKey != null && nextKey != null && previousKey != nextKey
+          ? 'Pindah BTS/Cell: ${cell.shortLabel}'
+          : 'BTS aktif: ${cell.shortLabel}';
+    });
+
+    if (previousKey != null && nextKey != null && previousKey != nextKey) {
+      _showMessage('Pindah BTS/Cell: ${cell.shortLabel}');
     }
   }
 
@@ -1147,6 +1178,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
           lastGpsReadAt: _lastGpsReadAt,
           accuracyMeters:
               _accuracyMeters ?? rental?.latestLocationPoint?.accuracyMeters,
+          cellInfo: _currentCell,
         ),
       ),
     );
@@ -1760,6 +1792,8 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                         bike: bike,
                         batteryPercent: _batteryPercent,
                         networkType: _networkType,
+                        cellInfo: _currentCell,
+                        cellEvent: _lastCellEvent,
                         pointsSent: _routePoints.length,
                         locationMode: _locationMode,
                       ),
@@ -3197,6 +3231,8 @@ class _DeviceSummary extends StatelessWidget {
     required this.bike,
     required this.batteryPercent,
     required this.networkType,
+    required this.cellInfo,
+    required this.cellEvent,
     required this.pointsSent,
     required this.locationMode,
   });
@@ -3204,6 +3240,8 @@ class _DeviceSummary extends StatelessWidget {
   final Bike bike;
   final int batteryPercent;
   final String networkType;
+  final CellInfoSnapshot? cellInfo;
+  final String cellEvent;
   final int pointsSent;
   final String locationMode;
 
@@ -3288,6 +3326,13 @@ class _DeviceSummary extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            _MetricItemSmall(
+              label: 'BTS/CELL',
+              value: cellInfo?.shortLabel ?? cellEvent,
+              icon: Icons.cell_tower_rounded,
+              color: const Color(0xFFF97316),
             ),
           ],
         ),

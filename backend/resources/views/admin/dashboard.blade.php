@@ -54,6 +54,8 @@
         .map-popup-footer { display: flex; justify-content: space-between; padding: 1rem 1.25rem; background: white; border-top: 1px solid #f1f5f9; }
         .map-popup-footer a { color: #0f766e; font-weight: 600; font-size: 0.875rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s; }
         .map-popup-footer a:hover { color: #0f172a; text-decoration: underline; }
+        .cell-map-marker { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: #7c2d12; background: #fed7aa; border: 3px solid #fff7ed; box-shadow: 0 8px 18px rgba(124, 45, 18, .26); font-size: 16px; }
+        .cell-layer-button.active { background: #0f766e !important; border-color: #0f766e !important; color: white !important; }
 
 
         @media (max-width: 768px) {
@@ -204,14 +206,15 @@
             </div>
             <div class="map-actions">
                 <span style="font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600;" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
+                <button class="button secondary cell-layer-button" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="cell-layer-toggle">BTS Terdeteksi ({{ $mapCells->count() }})</button>
                 <button class="button secondary" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="bike-map-center" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">Pusatkan Peta</button>
             </div>
         </div>
 
-        <div id="bike-map-empty" class="map-empty" @if($mapBikes->isNotEmpty()) hidden @endif>
+        <div id="bike-map-empty" class="map-empty" @if($mapBikes->isNotEmpty() || $mapCells->isNotEmpty()) hidden @endif>
             Belum ada sepeda yang memiliki data lokasi.
         </div>
-        <div id="bike-map" class="dash-map-canvas" @if($mapBikes->isEmpty()) hidden @endif></div>
+        <div id="bike-map" class="dash-map-canvas" @if($mapBikes->isEmpty() && $mapCells->isEmpty()) hidden @endif></div>
     </div>
 
     <div class="main-content-grid">
@@ -240,11 +243,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const bikes = @json($mapBikes);
+        const cells = @json($mapCells);
         const statusLabels = @json($adminStatusLabels);
         const mapElement = document.getElementById('bike-map');
         const mapEmptyElement = document.getElementById('bike-map-empty');
         const mapCountElement = document.getElementById('bike-map-count');
         const mapCenterButton = document.getElementById('bike-map-center');
+        const cellLayerToggle = document.getElementById('cell-layer-toggle');
         const mapDataUrl = @json(route('admin.dashboard.map-data'));
         const escapeHtml = (value) => String(value ?? '-')
             .replaceAll('&', '&amp;')
@@ -256,8 +261,11 @@
         if (mapElement && window.L) {
             const map = L.map(mapElement).setView([-8.5830, 116.1160], 14);
             const markers = new Map();
+            const cellMarkers = new Map();
+            let cellsVisible = true;
             let hasFittedMap = false;
             let currentBounds = [];
+            let latestCells = cells;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
@@ -330,7 +338,98 @@
                 `;
             };
 
-            const renderBikes = (nextBikes, fitMap = false) => {
+            const cellIcon = () => L.divIcon({
+                className: 'cell-map-marker',
+                html: '&#128246;',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15],
+                popupAnchor: [0, -15],
+            });
+
+            const cellPopupHtml = (cell) => {
+                const signal = cell.average_signal_dbm === null ? '-' : `${cell.average_signal_dbm} dBm`;
+                const rsrp = cell.average_rsrp_dbm === null ? '-' : `${cell.average_rsrp_dbm} dBm`;
+
+                return `
+                    <div class="map-popup">
+                        <div class="map-popup-header" style="background: linear-gradient(135deg, #c2410c, #f97316);">
+                            <div>
+                                <h3 class="map-popup-title">${escapeHtml(cell.operator_name ?? 'Cell Terdeteksi')}</h3>
+                                <div class="map-popup-subtitle">${escapeHtml(cell.radio_type)} - Cell ${escapeHtml(cell.cell_id)}</div>
+                            </div>
+                            <span class="badge">Estimasi</span>
+                        </div>
+                        <div class="map-popup-grid">
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">MCC/MNC</span>
+                                <span class="map-popup-value">${escapeHtml(cell.mcc ?? '-')}/${escapeHtml(cell.mnc ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">TAC/LAC</span>
+                                <span class="map-popup-value">${escapeHtml(cell.tac_or_lac ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">PCI/PSC</span>
+                                <span class="map-popup-value">${escapeHtml(cell.pci_or_psc ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Sinyal Rata-rata</span>
+                                <span class="map-popup-value">${escapeHtml(signal)}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">RSRP Rata-rata</span>
+                                <span class="map-popup-value">${escapeHtml(rsrp)}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Observasi</span>
+                                <span class="map-popup-value">${escapeHtml(cell.observation_count)} data</span>
+                            </div>
+                        </div>
+                        <div class="map-popup-details">
+                            <p><strong>Catatan:</strong> Marker ini adalah estimasi dari observasi perangkat, bukan koordinat tower resmi operator.</p>
+                            <p><strong>Terakhir terlihat:</strong> ${escapeHtml(cell.last_seen_at ?? '-')}</p>
+                        </div>
+                    </div>
+                `;
+            };
+
+            const renderCells = (nextCells) => {
+                const visibleIds = new Set();
+
+                nextCells.forEach((cell) => {
+                    const id = String(cell.id);
+                    const position = [cell.latitude, cell.longitude];
+                    visibleIds.add(id);
+
+                    if (cellMarkers.has(id)) {
+                        cellMarkers.get(id)
+                            .setLatLng(position)
+                            .setPopupContent(cellPopupHtml(cell));
+                    } else {
+                        const marker = L.marker(position, { icon: cellIcon() }).bindPopup(cellPopupHtml(cell), { autoPan: false, className: 'animated-popup' });
+                        cellMarkers.set(id, marker);
+                    }
+
+                    if (cellsVisible && ! map.hasLayer(cellMarkers.get(id))) {
+                        cellMarkers.get(id).addTo(map);
+                    }
+                    if (! cellsVisible && map.hasLayer(cellMarkers.get(id))) {
+                        map.removeLayer(cellMarkers.get(id));
+                    }
+                });
+
+                cellMarkers.forEach((marker, id) => {
+                    if (! visibleIds.has(id)) {
+                        map.removeLayer(marker);
+                        cellMarkers.delete(id);
+                    }
+                });
+
+                cellLayerToggle.textContent = `BTS Terdeteksi (${nextCells.length})`;
+                cellLayerToggle.classList.toggle('active', cellsVisible);
+            };
+
+            const renderMapData = (nextBikes, nextCells, fitMap = false) => {
                 const visibleCodes = new Set();
                 const bounds = [];
 
@@ -372,10 +471,18 @@
                     }
                 });
 
-                mapEmptyElement.hidden = nextBikes.length > 0;
-                mapElement.hidden = nextBikes.length === 0;
-                mapCenterButton.disabled = nextBikes.length === 0;
-                mapCountElement.textContent = `${nextBikes.length} sepeda memiliki data lokasi`;
+                latestCells = nextCells;
+                renderCells(nextCells);
+
+                if (nextBikes.length === 0 && nextCells.length > 0) {
+                    nextCells.forEach((cell) => bounds.push([cell.latitude, cell.longitude]));
+                }
+
+                const hasMapData = nextBikes.length > 0 || nextCells.length > 0;
+                mapEmptyElement.hidden = hasMapData;
+                mapElement.hidden = ! hasMapData;
+                mapCenterButton.disabled = ! hasMapData;
+                mapCountElement.textContent = `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS terdeteksi`;
                 currentBounds = bounds;
 
                 if (bounds.length === 0) {
@@ -411,13 +518,13 @@
                 try {
                     const response = await fetch(mapDataUrl, { headers: { Accept: 'application/json' } });
                     const payload = await response.json();
-                    renderBikes(payload.data ?? []);
+                    renderMapData(payload.data ?? [], payload.cells ?? []);
                 } catch (_error) {
                     mapCountElement.textContent = 'Peta belum bisa diperbarui otomatis';
                 }
             };
 
-            renderBikes(bikes);
+            renderMapData(bikes, cells);
 
             // Fix: Gunakan setTimeout 200ms setelah DOM siap untuk mencegah kotak abu-abu
             const applyMapFix = () => {
@@ -436,6 +543,10 @@
             }
 
             mapCenterButton?.addEventListener('click', fitMapToBounds);
+            cellLayerToggle?.addEventListener('click', () => {
+                cellsVisible = ! cellsVisible;
+                renderCells(latestCells);
+            });
             setInterval(refreshBikes, 10000);
         } else if (mapElement) {
             mapElement.innerHTML = '<div class="map-empty">Peta belum bisa dimuat. Periksa koneksi internet untuk membuka peta.</div>';
