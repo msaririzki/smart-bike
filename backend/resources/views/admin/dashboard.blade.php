@@ -30,11 +30,13 @@
         .dash-map-title svg { stroke: #0f766e; background: #ccfbf1; border-radius: 0.5rem; padding: 0.25rem; width: 2rem; height: 2rem; }
         .dash-map-subtitle { margin: 0.5rem 0 0 0; color: #64748b; font-size: 0.95rem; }
         .dash-map-canvas { height: 70vh; min-height: 550px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
-        .map-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-        .cell-filter-form { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-        .cell-filter-form .premium-select-field { min-width: 260px; }
-        .cell-clear-button { padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #fecaca; color: #b91c1c; font-weight: 700; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); cursor: pointer; }
+        .map-actions { width: 100%; display: grid; grid-template-columns: minmax(13rem, auto) minmax(24rem, 1fr) auto; align-items: center; gap: 0.85rem; }
+        .map-actions-primary { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end; }
+        .cell-map-count { font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.7rem 1rem; border-radius: 8px; font-weight: 800; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .08); }
+        .cell-filter-form { display: grid; grid-template-columns: repeat(2, minmax(15rem, 1fr)); gap: 0.75rem; }
+        .cell-clear-button { padding: 0.7rem 1rem; border-radius: 8px; background: white; border: 1px solid #fecaca; color: #b91c1c; font-weight: 800; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); cursor: pointer; min-height: 44px; white-space: nowrap; }
         .cell-clear-button:disabled { color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; }
+        .dash-map-action-button { padding: 0.7rem 1rem !important; border-radius: 8px !important; background: white !important; border: 1px solid #cbd5e1 !important; color: #334155 !important; font-weight: 800 !important; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05) !important; transition: all 0.2s !important; min-height: 44px; white-space: nowrap; }
         .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
         .leaflet-popup-content { margin: 0; width: 320px !important; }
         .map-popup { padding: 0; font-family: inherit; }
@@ -64,6 +66,10 @@
 
         @media (max-width: 768px) {
             .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+            .map-actions { grid-template-columns: 1fr; }
+            .map-actions-primary { justify-content: flex-start; }
+            .cell-filter-form { grid-template-columns: 1fr; width: 100%; }
+            .cell-map-count, .dash-map-action-button, .cell-clear-button, #cell-clear-form { width: 100%; }
             .dash-card { padding: 0.75rem; }
             .dash-card-icon { width: 1.75rem; height: 1.75rem; border-radius: 0.375rem; }
             .dash-card-icon svg { width: 1rem; height: 1rem; }
@@ -209,7 +215,7 @@
                 <p class="dash-map-subtitle">Peta otomatis diperbarui. Klik penanda untuk melihat ringkasan sepeda dan membuka halaman detail.</p>
             </div>
             <div class="map-actions">
-                <span style="font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600;" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
+                <span class="cell-map-count" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
                 @php
                     $cellDeviceSelectOptions = $cellDeviceOptions
                         ->map(fn ($device) => [
@@ -248,14 +254,16 @@
                         :disabled="$selectedCellDeviceId === null"
                     />
                 </form>
-                <button class="button secondary cell-layer-button" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="cell-layer-toggle">BTS Terdeteksi ({{ $mapCells->count() }})</button>
-                <form method="post" action="{{ route('admin.dashboard.cell-survey.clear') }}" class="cell-filter-form" id="cell-clear-form">
-                    @csrf
-                    <input type="hidden" name="device_user_id" value="{{ $selectedCellDeviceId }}">
-                    <input type="hidden" name="cell_rental_id" value="{{ $selectedCellRentalId }}">
-                    <button class="cell-clear-button" type="submit" @disabled($selectedCellDeviceId === null)>Bersihkan Rekaman</button>
-                </form>
-                <button class="button secondary" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="bike-map-center" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">Pusatkan Peta</button>
+                <div class="map-actions-primary">
+                    <button class="button secondary cell-layer-button dash-map-action-button" type="button" id="cell-layer-toggle">BTS Terdeteksi ({{ $mapCells->count() }})</button>
+                    <form method="post" action="{{ route('admin.dashboard.cell-survey.clear') }}" id="cell-clear-form">
+                        @csrf
+                        <input type="hidden" name="device_user_id" value="{{ $selectedCellDeviceId }}">
+                        <input type="hidden" name="cell_rental_id" value="{{ $selectedCellRentalId }}">
+                        <button class="cell-clear-button" type="submit" @disabled($selectedCellDeviceId === null)>Bersihkan Rekaman</button>
+                    </form>
+                    <button class="button secondary dash-map-action-button" type="button" id="bike-map-center">Pusatkan Peta</button>
+                </div>
             </div>
         </div>
 

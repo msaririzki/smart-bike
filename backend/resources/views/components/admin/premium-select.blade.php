@@ -25,28 +25,30 @@
     <span class="premium-select-icon" aria-hidden="true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{!! $icons[$icon] ?? $icons['filter'] !!}</svg>
     </span>
-    <span class="premium-select-copy">
+    <span class="premium-select-main">
         <span class="premium-select-label">{{ $label }}</span>
         @if($hint)
             <span class="premium-select-hint">{{ $hint }}</span>
         @endif
-    </span>
-    <select id="{{ $fieldId }}" name="{{ $name }}" @disabled($disabled)>
-        @if($placeholder !== null)
-            <option value="">{{ $placeholder }}</option>
-        @endif
-        @foreach($options as $option)
-            @php
-                $value = (string) ($option['value'] ?? '');
-                $optionLabel = $option['label'] ?? $value;
-                $meta = $option['meta'] ?? null;
-            @endphp
-            <option value="{{ $value }}" @selected($selectedValue === $value)>
-                {{ $optionLabel }}@if($meta) - {{ $meta }}@endif
-            </option>
-        @endforeach
-    </select>
-    <span class="premium-select-chevron" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        <span class="premium-select-control">
+            <select id="{{ $fieldId }}" name="{{ $name }}" @disabled($disabled)>
+                @if($placeholder !== null)
+                    <option value="">{{ $placeholder }}</option>
+                @endif
+                @foreach($options as $option)
+                    @php
+                        $value = (string) ($option['value'] ?? '');
+                        $optionLabel = $option['label'] ?? $value;
+                        $meta = $option['meta'] ?? null;
+                    @endphp
+                    <option value="{{ $value }}" @selected($selectedValue === $value)>
+                        {{ $optionLabel }}@if($meta) - {{ $meta }}@endif
+                    </option>
+                @endforeach
+            </select>
+            <span class="premium-select-chevron" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </span>
+        </span>
     </span>
 </label>
