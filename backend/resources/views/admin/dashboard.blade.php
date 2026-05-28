@@ -30,7 +30,11 @@
         .dash-map-title svg { stroke: #0f766e; background: #ccfbf1; border-radius: 0.5rem; padding: 0.25rem; width: 2rem; height: 2rem; }
         .dash-map-subtitle { margin: 0.5rem 0 0 0; color: #64748b; font-size: 0.95rem; }
         .dash-map-canvas { height: 70vh; min-height: 550px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
-        .map-actions { display: flex; align-items: center; gap: 1.25rem; }
+        .map-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .cell-filter-form { display: flex; align-items: center; gap: 0.5rem; }
+        .cell-filter-select { width: min(18rem, 100%); border: 1px solid #cbd5e1; border-radius: 0.5rem; background: white; color: #334155; font-weight: 600; padding: 0.5rem 0.75rem; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
+        .cell-clear-button { padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #fecaca; color: #b91c1c; font-weight: 700; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); cursor: pointer; }
+        .cell-clear-button:disabled { color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; }
         .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
         .leaflet-popup-content { margin: 0; width: 320px !important; }
         .map-popup { padding: 0; font-family: inherit; }
@@ -206,13 +210,28 @@
             </div>
             <div class="map-actions">
                 <span style="font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600;" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
+                <form method="get" action="{{ route('admin.dashboard') }}" class="cell-filter-form">
+                    <select name="cell_device_id" class="cell-filter-select" id="cell-device-filter" aria-label="Akun perekam BTS">
+                        <option value="">Pilih akun perekam BTS</option>
+                        @foreach($cellDeviceOptions as $device)
+                            <option value="{{ $device->id }}" @selected($selectedCellDeviceId === $device->id)>
+                                {{ $device->name }} - {{ $device->email }}
+                            </option>
+                        @endforeach
+                    </select>
+                </form>
                 <button class="button secondary cell-layer-button" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="cell-layer-toggle">BTS Terdeteksi ({{ $mapCells->count() }})</button>
+                <form method="post" action="{{ route('admin.dashboard.cell-survey.clear') }}" class="cell-filter-form" id="cell-clear-form">
+                    @csrf
+                    <input type="hidden" name="device_user_id" value="{{ $selectedCellDeviceId }}">
+                    <button class="cell-clear-button" type="submit" @disabled($selectedCellDeviceId === null)>Bersihkan Rekaman</button>
+                </form>
                 <button class="button secondary" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="bike-map-center" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">Pusatkan Peta</button>
             </div>
         </div>
 
         <div id="bike-map-empty" class="map-empty" @if($mapBikes->isNotEmpty() || $mapCells->isNotEmpty()) hidden @endif>
-            Belum ada sepeda yang memiliki data lokasi.
+            Belum ada sepeda atau rekaman BTS untuk filter yang dipilih.
         </div>
         <div id="bike-map" class="dash-map-canvas" @if($mapBikes->isEmpty() && $mapCells->isEmpty()) hidden @endif></div>
     </div>
@@ -250,7 +269,18 @@
         const mapCountElement = document.getElementById('bike-map-count');
         const mapCenterButton = document.getElementById('bike-map-center');
         const cellLayerToggle = document.getElementById('cell-layer-toggle');
+        const cellDeviceFilter = document.getElementById('cell-device-filter');
+        const cellClearForm = document.getElementById('cell-clear-form');
+        const selectedCellDeviceId = @json($selectedCellDeviceId);
         const mapDataUrl = @json(route('admin.dashboard.map-data'));
+        const mapDataRequestUrl = () => {
+            const url = new URL(mapDataUrl, window.location.origin);
+            if (selectedCellDeviceId) {
+                url.searchParams.set('cell_device_id', selectedCellDeviceId);
+            }
+
+            return url.toString();
+        };
         const escapeHtml = (value) => String(value ?? '-')
             .replaceAll('&', '&amp;')
             .replaceAll('<', '&lt;')
@@ -394,9 +424,13 @@
                                 <span class="map-popup-label">Observasi</span>
                                 <span class="map-popup-value">${escapeHtml(cell.observation_count)} data</span>
                             </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Sepeda</span>
+                                <span class="map-popup-value">${escapeHtml(cell.bike ?? '-')}</span>
+                            </div>
                         </div>
                         <div class="map-popup-details">
-                            <p><strong>Catatan:</strong> Marker ini adalah estimasi dari observasi perangkat, bukan koordinat tower resmi operator. Jika Android mengizinkan, pembacaan mengikuti SIM data aktif.</p>
+                            <p><strong>Catatan:</strong> Marker ini hanya dari akun perekam yang dipilih dan merupakan estimasi observasi perangkat, bukan koordinat tower resmi operator.</p>
                             <p><strong>Terakhir terlihat:</strong> ${escapeHtml(cell.last_seen_at ?? '-')}</p>
                         </div>
                     </div>
@@ -436,7 +470,8 @@
                 });
 
                 cellLayerToggle.textContent = `BTS Terdeteksi (${nextCells.length})`;
-                cellLayerToggle.classList.toggle('active', cellsVisible);
+                cellLayerToggle.classList.toggle('active', Boolean(selectedCellDeviceId) && cellsVisible);
+                cellLayerToggle.disabled = ! selectedCellDeviceId;
             };
 
             const renderMapData = (nextBikes, nextCells, fitMap = false) => {
@@ -492,7 +527,9 @@
                 mapEmptyElement.hidden = hasMapData;
                 mapElement.hidden = ! hasMapData;
                 mapCenterButton.disabled = ! hasMapData;
-                mapCountElement.textContent = `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS terdeteksi`;
+                mapCountElement.textContent = selectedCellDeviceId
+                    ? `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS akun terpilih`
+                    : `${nextBikes.length} sepeda lokasi, pilih akun untuk BTS`;
                 currentBounds = bounds;
 
                 if (bounds.length === 0) {
@@ -526,7 +563,7 @@
 
             const refreshBikes = async () => {
                 try {
-                    const response = await fetch(mapDataUrl, { headers: { Accept: 'application/json' } });
+                    const response = await fetch(mapDataRequestUrl(), { headers: { Accept: 'application/json' } });
                     const payload = await response.json();
                     renderMapData(payload.data ?? [], payload.cells ?? []);
                 } catch (_error) {
@@ -556,6 +593,14 @@
             cellLayerToggle?.addEventListener('click', () => {
                 cellsVisible = ! cellsVisible;
                 renderCells(latestCells);
+            });
+            cellDeviceFilter?.addEventListener('change', () => {
+                cellDeviceFilter.form?.submit();
+            });
+            cellClearForm?.addEventListener('submit', (event) => {
+                if (! confirm('Bersihkan semua rekaman BTS untuk akun device yang dipilih? Data akun lain tidak ikut dihapus.')) {
+                    event.preventDefault();
+                }
             });
             setInterval(refreshBikes, 10000);
         } else if (mapElement) {

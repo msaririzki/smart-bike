@@ -27,6 +27,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::get('search', [SearchController::class, 'index'])->name('search');
         Route::get('dashboard/map-data', [DashboardController::class, 'mapData'])->name('dashboard.map-data');
+        Route::post('dashboard/cell-survey/clear', [DashboardController::class, 'clearCellSurvey'])->name('dashboard.cell-survey.clear');
         Route::get('monitoring-bikes', [MonitoringController::class, 'index'])->name('monitoring.index');
         Route::get('monitoring-bikes/{bike}', [MonitoringController::class, 'show'])->name('monitoring.show');
         Route::resource('bikes', BikeController::class)->except(['show', 'destroy']);

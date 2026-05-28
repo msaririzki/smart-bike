@@ -44,4 +44,14 @@ class CellObservation extends Model
     {
         return $this->belongsTo(CellTower::class);
     }
+
+    public function bike(): BelongsTo
+    {
+        return $this->belongsTo(Bike::class);
+    }
+
+    public function deviceUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'device_user_id');
+    }
 }
