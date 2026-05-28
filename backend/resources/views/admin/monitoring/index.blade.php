@@ -4,16 +4,22 @@
     <h2 style="margin: 0; color: var(--teal-800); margin-bottom: 24px;">Monitoring Sepeda</h2>
 
     <form class="card toolbar" method="get" action="{{ route('admin.monitoring.index') }}">
-        <label>
-            Filter Status
-            <select name="status">
-                @foreach($filters as $option)
-                    <option value="{{ $option }}" @selected($filter === $option)>
-                        {{ $option === 'all' ? 'semua' : ($adminStatusLabels[$option] ?? $option) }}
-                    </option>
-                @endforeach
-            </select>
-        </label>
+        @php
+            $statusOptions = collect($filters)
+                ->map(fn ($option) => [
+                    'value' => $option,
+                    'label' => $option === 'all' ? 'semua' : ($adminStatusLabels[$option] ?? $option),
+                ])
+                ->values();
+        @endphp
+        <x-admin.premium-select
+            name="status"
+            label="Filter Status"
+            icon="status"
+            hint="Monitoring unit"
+            :options="$statusOptions"
+            :selected="$filter"
+        />
         <label>
             Cari Kode/Nama
             <input type="search" name="search" value="{{ $search }}" placeholder="Contoh: BK-001">

@@ -4,22 +4,26 @@
     <h2 style="margin: 0; color: var(--teal-800); margin-bottom: 24px;">Rental</h2>
 
     <form class="card toolbar" method="get" action="{{ route('admin.rentals.index') }}">
-        <label>
-            Filter Status
-            <select name="status">
-                @foreach($filters as $option)
-                    <option value="{{ $option }}" @selected($filter === $option)>
-                        @if($option === 'all')
-                            semua
-                        @elseif($option === 'running')
-                            rental berjalan
-                        @else
-                            {{ $adminStatusLabels[$option] ?? $option }}
-                        @endif
-                    </option>
-                @endforeach
-            </select>
-        </label>
+        @php
+            $statusOptions = collect($filters)
+                ->map(fn ($option) => [
+                    'value' => $option,
+                    'label' => $option === 'all'
+                        ? 'semua'
+                        : ($option === 'running'
+                            ? 'rental berjalan'
+                            : ($adminStatusLabels[$option] ?? $option)),
+                ])
+                ->values();
+        @endphp
+        <x-admin.premium-select
+            name="status"
+            label="Filter Status"
+            icon="status"
+            hint="Riwayat rental"
+            :options="$statusOptions"
+            :selected="$filter"
+        />
         <div>
             <div class="actions">
                 <button class="button" type="submit">Filter</button>

@@ -31,8 +31,8 @@
         .dash-map-subtitle { margin: 0.5rem 0 0 0; color: #64748b; font-size: 0.95rem; }
         .dash-map-canvas { height: 70vh; min-height: 550px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
         .map-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-        .cell-filter-form { display: flex; align-items: center; gap: 0.5rem; }
-        .cell-filter-select { width: min(18rem, 100%); border: 1px solid #cbd5e1; border-radius: 0.5rem; background: white; color: #334155; font-weight: 600; padding: 0.5rem 0.75rem; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
+        .cell-filter-form { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+        .cell-filter-form .premium-select-field { min-width: 260px; }
         .cell-clear-button { padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #fecaca; color: #b91c1c; font-weight: 700; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); cursor: pointer; }
         .cell-clear-button:disabled { color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; }
         .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
@@ -210,23 +210,43 @@
             </div>
             <div class="map-actions">
                 <span style="font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600;" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
+                @php
+                    $cellDeviceSelectOptions = $cellDeviceOptions
+                        ->map(fn ($device) => [
+                            'value' => $device->id,
+                            'label' => "{$device->name} - {$device->email}",
+                        ])
+                        ->values();
+                    $cellRentalSelectOptions = collect($cellRentalOptions)
+                        ->map(fn ($rentalOption) => [
+                            'value' => $rentalOption['id'],
+                            'label' => $rentalOption['label'],
+                            'meta' => "{$rentalOption['observation_count']} data",
+                        ])
+                        ->values();
+                @endphp
                 <form method="get" action="{{ route('admin.dashboard') }}" class="cell-filter-form">
-                    <select name="cell_device_id" class="cell-filter-select" id="cell-device-filter" aria-label="Akun perekam BTS">
-                        <option value="">Pilih akun perekam BTS</option>
-                        @foreach($cellDeviceOptions as $device)
-                            <option value="{{ $device->id }}" @selected($selectedCellDeviceId === $device->id)>
-                                {{ $device->name }} - {{ $device->email }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <select name="cell_rental_id" class="cell-filter-select" id="cell-rental-filter" aria-label="Perjalanan BTS" @disabled($selectedCellDeviceId === null)>
-                        <option value="">Semua perjalanan akun</option>
-                        @foreach($cellRentalOptions as $rentalOption)
-                            <option value="{{ $rentalOption['id'] }}" @selected($selectedCellRentalId === $rentalOption['id'])>
-                                {{ $rentalOption['label'] }} - {{ $rentalOption['observation_count'] }} data
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-admin.premium-select
+                        name="cell_device_id"
+                        id="cell-device-filter"
+                        label="Akun Perekam"
+                        icon="bike"
+                        placeholder="Pilih akun device"
+                        hint="Sumber rekaman BTS"
+                        :options="$cellDeviceSelectOptions"
+                        :selected="$selectedCellDeviceId"
+                    />
+                    <x-admin.premium-select
+                        name="cell_rental_id"
+                        id="cell-rental-filter"
+                        label="Perjalanan"
+                        icon="route"
+                        placeholder="Semua perjalanan akun"
+                        hint="Sesi pengujian"
+                        :options="$cellRentalSelectOptions"
+                        :selected="$selectedCellRentalId"
+                        :disabled="$selectedCellDeviceId === null"
+                    />
                 </form>
                 <button class="button secondary cell-layer-button" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="cell-layer-toggle">BTS Terdeteksi ({{ $mapCells->count() }})</button>
                 <form method="post" action="{{ route('admin.dashboard.cell-survey.clear') }}" class="cell-filter-form" id="cell-clear-form">
