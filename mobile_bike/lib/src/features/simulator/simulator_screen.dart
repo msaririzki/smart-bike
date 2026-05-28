@@ -86,7 +86,8 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   String _lastServerMsg = 'Belum ada pengiriman';
   CellInfoSnapshot? _currentCell;
   String? _lastCellKey;
-  String _lastCellEvent = 'Belum ada data BTS';
+  bool _recordCellSurvey = false;
+  String _lastCellEvent = 'Perekaman BTS nonaktif';
 
   String _locationMode = 'Belum aktif';
   bool _checkingLocationAccess = true;
@@ -949,7 +950,9 @@ class _SimulatorScreenState extends State<SimulatorScreen>
 
     setState(() => _sending = true);
     try {
-      final cell = _streaming ? await _cellInfo.currentServingCell() : null;
+      final cell = _streaming && _recordCellSurvey
+          ? await _cellInfo.currentServingCell()
+          : null;
       _updateCellStatus(cell);
       final res = await widget.api.sendLocationUpdate(
         latitude: pos.latitude,
@@ -1005,6 +1008,19 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     if (previousKey != null && nextKey != null && previousKey != nextKey) {
       _showMessage('Pindah BTS/Cell: ${cell.shortLabel}');
     }
+  }
+
+  void _setCellSurveyRecording(bool value) {
+    setState(() {
+      _recordCellSurvey = value;
+      if (value) {
+        _lastCellEvent = 'Menunggu data BTS';
+      } else {
+        _currentCell = null;
+        _lastCellKey = null;
+        _lastCellEvent = 'Perekaman BTS nonaktif';
+      }
+    });
   }
 
   void _addRoutePoint({
@@ -1784,6 +1800,11 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                         lastSentAt: _lastSentAt,
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _CellSurveyRecordingControl(
+                      enabled: _recordCellSurvey,
+                      onChanged: _setCellSurveyRecording,
+                    ),
                     const SizedBox(height: 24),
                     _sectionHeader('Informasi Sepeda & Perangkat',
                         'Identitas unit, status daya baterai, dan stabilitas transmisi data'),
@@ -1792,6 +1813,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                         bike: bike,
                         batteryPercent: _batteryPercent,
                         networkType: _networkType,
+                        recordCellSurvey: _recordCellSurvey,
                         cellInfo: _currentCell,
                         cellEvent: _lastCellEvent,
                         pointsSent: _routePoints.length,
@@ -1844,6 +1866,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                       accuracyMeters: _accuracyMeters ??
                           rental?.latestLocationPoint?.accuracyMeters,
                       rentalActive: rental != null,
+                      recordCellSurvey: _recordCellSurvey,
                     ),
                     const SizedBox(
                         height:
@@ -1889,6 +1912,53 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   }
 }
 
+class _CellSurveyRecordingControl extends StatelessWidget {
+  const _CellSurveyRecordingControl({
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      borderColor: enabled ? const Color(0xFFF97316) : const Color(0xFFE2E8F0),
+      backgroundColor:
+          enabled ? const Color(0xFFFFF7ED) : const Color(0xFFFFFFFF),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: SwitchListTile.adaptive(
+        value: enabled,
+        onChanged: onChanged,
+        activeThumbColor: const Color(0xFFF97316),
+        contentPadding: EdgeInsets.zero,
+        secondary: Icon(
+          Icons.cell_tower_rounded,
+          color: enabled ? const Color(0xFFF97316) : const Color(0xFF64748B),
+        ),
+        title: const Text(
+          'Rekam BTS/Cell',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        subtitle: Text(
+          enabled
+              ? 'Aktif. Data cell akan dikirim bersama GPS.'
+              : 'Nonaktif. GPS tetap dikirim tanpa data BTS.',
+          style: const TextStyle(
+            color: Color(0xFF64748B),
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FieldTestChecklist extends StatelessWidget {
   const _FieldTestChecklist({
     required this.locationAccess,
@@ -1899,6 +1969,7 @@ class _FieldTestChecklist extends StatelessWidget {
     required this.lastServerAt,
     required this.accuracyMeters,
     required this.rentalActive,
+    required this.recordCellSurvey,
   });
 
   final bool locationAccess;
@@ -1909,6 +1980,7 @@ class _FieldTestChecklist extends StatelessWidget {
   final DateTime? lastServerAt;
   final double? accuracyMeters;
   final bool rentalActive;
+  final bool recordCellSurvey;
 
   @override
   Widget build(BuildContext context) {
@@ -1965,6 +2037,12 @@ class _FieldTestChecklist extends StatelessWidget {
             label: 'Rental aktif',
             detail: rentalActive ? 'Ada rental berjalan' : 'Monitoring saja',
             isWarning: !rentalActive,
+          ),
+          _CheckRow(
+            ok: recordCellSurvey,
+            label: 'Rekam BTS',
+            detail: recordCellSurvey ? 'Aktif' : 'Nonaktif',
+            isWarning: !recordCellSurvey,
           ),
         ],
       ),
@@ -3231,6 +3309,7 @@ class _DeviceSummary extends StatelessWidget {
     required this.bike,
     required this.batteryPercent,
     required this.networkType,
+    required this.recordCellSurvey,
     required this.cellInfo,
     required this.cellEvent,
     required this.pointsSent,
@@ -3240,6 +3319,7 @@ class _DeviceSummary extends StatelessWidget {
   final Bike bike;
   final int batteryPercent;
   final String networkType;
+  final bool recordCellSurvey;
   final CellInfoSnapshot? cellInfo;
   final String cellEvent;
   final int pointsSent;
@@ -3330,9 +3410,12 @@ class _DeviceSummary extends StatelessWidget {
             const SizedBox(height: 16),
             _MetricItemSmall(
               label: 'BTS/CELL',
-              value: cellInfo?.shortLabel ?? cellEvent,
+              value:
+                  recordCellSurvey ? cellInfo?.shortLabel ?? cellEvent : 'NONAKTIF',
               icon: Icons.cell_tower_rounded,
-              color: const Color(0xFFF97316),
+              color: recordCellSurvey
+                  ? const Color(0xFFF97316)
+                  : const Color(0xFF94A3B8),
             ),
           ],
         ),

@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -26,6 +27,7 @@ class DashboardController extends Controller
     {
         $activeRentalStatuses = [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING];
         $selectedCellDeviceId = $this->selectedCellDeviceId($request);
+        $selectedCellRentalId = $this->selectedCellRentalId($request, $selectedCellDeviceId);
 
         return view('admin.dashboard', [
             'totalBikes' => Bike::query()->count(),
@@ -41,19 +43,22 @@ class DashboardController extends Controller
             'totalDistanceMeters' => Rental::query()->sum('total_distance_meters'),
             'users' => User::query()->where('role', 'user')->count(),
             'mapBikes' => $this->bikeMapData(),
-            'mapCells' => $this->cellMapData($selectedCellDeviceId),
+            'mapCells' => $this->cellMapData($selectedCellDeviceId, $selectedCellRentalId),
             'cellDeviceOptions' => $this->cellDeviceOptions(),
+            'cellRentalOptions' => $this->cellRentalOptions($selectedCellDeviceId),
             'selectedCellDeviceId' => $selectedCellDeviceId,
+            'selectedCellRentalId' => $selectedCellRentalId,
         ]);
     }
 
     public function mapData(Request $request): JsonResponse
     {
         $selectedCellDeviceId = $this->selectedCellDeviceId($request);
+        $selectedCellRentalId = $this->selectedCellRentalId($request, $selectedCellDeviceId);
 
         return response()->json([
             'data' => $this->bikeMapData(),
-            'cells' => $this->cellMapData($selectedCellDeviceId),
+            'cells' => $this->cellMapData($selectedCellDeviceId, $selectedCellRentalId),
             'updated_at' => now()->format('Y-m-d H:i:s'),
         ]);
     }
@@ -69,13 +74,31 @@ class DashboardController extends Controller
         ]);
 
         $deviceUserId = (int) $data['device_user_id'];
-        CellHandoverEvent::query()->where('device_user_id', $deviceUserId)->delete();
-        $deleted = CellObservation::query()->where('device_user_id', $deviceUserId)->delete();
+        $rentalId = $request->integer('cell_rental_id');
+        if ($rentalId > 0 && ! CellObservation::query()
+            ->where('device_user_id', $deviceUserId)
+            ->where('rental_id', $rentalId)
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'cell_rental_id' => 'Perjalanan tidak valid untuk akun device yang dipilih.',
+            ]);
+        }
+
+        $query = CellObservation::query()->where('device_user_id', $deviceUserId);
+        if ($rentalId > 0) {
+            $query->where('rental_id', $rentalId);
+        } else {
+            CellHandoverEvent::query()->where('device_user_id', $deviceUserId)->delete();
+        }
+
+        $deleted = $query->delete();
         CellTower::query()->doesntHave('observations')->delete();
+
+        $scopeLabel = $rentalId > 0 ? 'perjalanan terpilih' : 'akun device';
 
         return redirect()
             ->route('admin.dashboard', ['cell_device_id' => $deviceUserId])
-            ->with('status', "{$deleted} rekaman BTS akun device berhasil dibersihkan.");
+            ->with('status', "{$deleted} rekaman BTS {$scopeLabel} berhasil dibersihkan.");
     }
 
     private function bikeMapData(): Collection
@@ -109,7 +132,7 @@ class DashboardController extends Controller
             ->values();
     }
 
-    private function cellMapData(?int $deviceUserId): Collection
+    private function cellMapData(?int $deviceUserId, ?int $rentalId): Collection
     {
         if ($deviceUserId === null) {
             return collect();
@@ -118,6 +141,7 @@ class DashboardController extends Controller
         return CellObservation::query()
             ->with(['cellTower', 'bike:id,code,name'])
             ->where('device_user_id', $deviceUserId)
+            ->when($rentalId !== null, fn ($query) => $query->where('rental_id', $rentalId))
             ->whereBetween('latitude', self::LOMBOK_LATITUDE_RANGE)
             ->whereBetween('longitude', self::LOMBOK_LONGITUDE_RANGE)
             ->latest('observed_at')
@@ -187,12 +211,77 @@ class DashboardController extends Controller
                 : null;
     }
 
+    private function selectedCellRentalId(Request $request, ?int $deviceUserId): ?int
+    {
+        if ($deviceUserId === null) {
+            return null;
+        }
+
+        $rentalId = $request->integer('cell_rental_id');
+        if ($rentalId <= 0) {
+            return null;
+        }
+
+        return CellObservation::query()
+            ->where('device_user_id', $deviceUserId)
+            ->where('rental_id', $rentalId)
+            ->exists()
+                ? $rentalId
+                : null;
+    }
+
     private function cellDeviceOptions(): Collection
     {
         return User::query()
             ->where('role', 'device')
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
+    }
+
+    private function cellRentalOptions(?int $deviceUserId): Collection
+    {
+        if ($deviceUserId === null) {
+            return collect();
+        }
+
+        $groups = CellObservation::query()
+            ->where('device_user_id', $deviceUserId)
+            ->whereNotNull('rental_id')
+            ->selectRaw('rental_id, COUNT(*) as observation_count, MIN(observed_at) as first_observed_at, MAX(observed_at) as last_observed_at')
+            ->groupBy('rental_id')
+            ->orderByDesc('last_observed_at')
+            ->limit(100)
+            ->get();
+
+        $rentals = Rental::query()
+            ->with(['bike:id,code,name', 'user:id,name,email'])
+            ->whereKey($groups->pluck('rental_id')->filter())
+            ->get()
+            ->keyBy('id');
+
+        return $groups
+            ->map(function (CellObservation $group) use ($rentals): ?array {
+                $rentalId = (int) $group->rental_id;
+                $rental = $rentals->get($rentalId);
+                if (! $rental) {
+                    return null;
+                }
+
+                return [
+                    'id' => $rentalId,
+                    'label' => sprintf(
+                        '#%d - %s - %s',
+                        $rentalId,
+                        $rental->bike?->code ?? 'Sepeda',
+                        $rental->started_at?->format('d/m H:i') ?? 'tanpa waktu',
+                    ),
+                    'observation_count' => (int) $group->observation_count,
+                    'last_observed_at' => $group->last_observed_at,
+                    'user_name' => $rental->user?->name,
+                ];
+            })
+            ->filter()
+            ->values();
     }
 
     private function average(Collection $observations, string $field): ?float

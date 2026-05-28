@@ -54,4 +54,9 @@ class CellObservation extends Model
     {
         return $this->belongsTo(User::class, 'device_user_id');
     }
+
+    public function rental(): BelongsTo
+    {
+        return $this->belongsTo(Rental::class);
+    }
 }

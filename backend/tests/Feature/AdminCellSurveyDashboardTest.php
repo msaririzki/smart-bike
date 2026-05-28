@@ -6,6 +6,7 @@ use App\Models\Bike;
 use App\Models\CellHandoverEvent;
 use App\Models\CellObservation;
 use App\Models\CellTower;
+use App\Models\Rental;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -64,6 +65,54 @@ class AdminCellSurveyDashboardTest extends TestCase
         $this->assertDatabaseMissing('cell_observations', ['device_user_id' => $deviceA->id]);
         $this->assertDatabaseHas('cell_observations', ['device_user_id' => $deviceB->id]);
         $this->assertDatabaseMissing('cell_handover_events', ['device_user_id' => $deviceA->id]);
+        $this->assertDatabaseMissing('cell_towers', ['id' => $towerA->id]);
+        $this->assertDatabaseHas('cell_towers', ['id' => $towerB->id]);
+    }
+
+    public function test_admin_can_filter_cell_map_by_selected_rental_trip(): void
+    {
+        [$admin, $device] = $this->users();
+        [$towerA, $towerB] = $this->towers();
+        $bike = $this->bike('BIKE-A', $device);
+        $rentalA = $this->rental($bike);
+        $rentalB = $this->rental($bike);
+
+        $this->observation($towerA, $bike, $device, -8.583000, 116.116000, $rentalA);
+        $this->observation($towerB, $bike, $device, -8.584000, 116.117000, $rentalB);
+
+        $this->actingAs($admin)
+            ->get("/admin/dashboard/map-data?cell_device_id={$device->id}")
+            ->assertOk()
+            ->assertJsonCount(2, 'cells');
+
+        $this->actingAs($admin)
+            ->get("/admin/dashboard/map-data?cell_device_id={$device->id}&cell_rental_id={$rentalA->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'cells')
+            ->assertJsonPath('cells.0.cell_id', '111');
+    }
+
+    public function test_admin_can_clear_cell_survey_for_selected_rental_only(): void
+    {
+        [$admin, $device] = $this->users();
+        [$towerA, $towerB] = $this->towers();
+        $bike = $this->bike('BIKE-A', $device);
+        $rentalA = $this->rental($bike);
+        $rentalB = $this->rental($bike);
+
+        $this->observation($towerA, $bike, $device, -8.583000, 116.116000, $rentalA);
+        $this->observation($towerB, $bike, $device, -8.584000, 116.117000, $rentalB);
+
+        $this->actingAs($admin)
+            ->post('/admin/dashboard/cell-survey/clear', [
+                'device_user_id' => $device->id,
+                'cell_rental_id' => $rentalA->id,
+            ])
+            ->assertRedirect("/admin?cell_device_id={$device->id}")
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseMissing('cell_observations', ['rental_id' => $rentalA->id]);
+        $this->assertDatabaseHas('cell_observations', ['rental_id' => $rentalB->id]);
         $this->assertDatabaseMissing('cell_towers', ['id' => $towerA->id]);
         $this->assertDatabaseHas('cell_towers', ['id' => $towerB->id]);
     }
@@ -136,12 +185,38 @@ class AdminCellSurveyDashboardTest extends TestCase
         ]);
     }
 
-    private function observation(CellTower $tower, Bike $bike, User $device, float $latitude, float $longitude): CellObservation
+    private function rental(Bike $bike): Rental
+    {
+        $user = User::query()->create([
+            'name' => 'Renter '.uniqid(),
+            'email' => uniqid('renter-', true).'@example.test',
+            'password' => 'password',
+            'role' => 'user',
+        ]);
+
+        return Rental::query()->create([
+            'user_id' => $user->id,
+            'bike_id' => $bike->id,
+            'status' => Rental::STATUS_COMPLETED,
+            'started_at' => now()->subMinutes(30),
+            'ended_at' => now(),
+        ]);
+    }
+
+    private function observation(
+        CellTower $tower,
+        Bike $bike,
+        User $device,
+        float $latitude,
+        float $longitude,
+        ?Rental $rental = null,
+    ): CellObservation
     {
         return CellObservation::query()->create([
             'cell_tower_id' => $tower->id,
             'bike_id' => $bike->id,
             'device_user_id' => $device->id,
+            'rental_id' => $rental?->id,
             'latitude' => $latitude,
             'longitude' => $longitude,
             'accuracy_meters' => 10,

@@ -219,11 +219,20 @@
                             </option>
                         @endforeach
                     </select>
+                    <select name="cell_rental_id" class="cell-filter-select" id="cell-rental-filter" aria-label="Perjalanan BTS" @disabled($selectedCellDeviceId === null)>
+                        <option value="">Semua perjalanan akun</option>
+                        @foreach($cellRentalOptions as $rentalOption)
+                            <option value="{{ $rentalOption['id'] }}" @selected($selectedCellRentalId === $rentalOption['id'])>
+                                {{ $rentalOption['label'] }} - {{ $rentalOption['observation_count'] }} data
+                            </option>
+                        @endforeach
+                    </select>
                 </form>
                 <button class="button secondary cell-layer-button" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="cell-layer-toggle">BTS Terdeteksi ({{ $mapCells->count() }})</button>
                 <form method="post" action="{{ route('admin.dashboard.cell-survey.clear') }}" class="cell-filter-form" id="cell-clear-form">
                     @csrf
                     <input type="hidden" name="device_user_id" value="{{ $selectedCellDeviceId }}">
+                    <input type="hidden" name="cell_rental_id" value="{{ $selectedCellRentalId }}">
                     <button class="cell-clear-button" type="submit" @disabled($selectedCellDeviceId === null)>Bersihkan Rekaman</button>
                 </form>
                 <button class="button secondary" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="bike-map-center" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">Pusatkan Peta</button>
@@ -270,13 +279,18 @@
         const mapCenterButton = document.getElementById('bike-map-center');
         const cellLayerToggle = document.getElementById('cell-layer-toggle');
         const cellDeviceFilter = document.getElementById('cell-device-filter');
+        const cellRentalFilter = document.getElementById('cell-rental-filter');
         const cellClearForm = document.getElementById('cell-clear-form');
         const selectedCellDeviceId = @json($selectedCellDeviceId);
+        const selectedCellRentalId = @json($selectedCellRentalId);
         const mapDataUrl = @json(route('admin.dashboard.map-data'));
         const mapDataRequestUrl = () => {
             const url = new URL(mapDataUrl, window.location.origin);
             if (selectedCellDeviceId) {
                 url.searchParams.set('cell_device_id', selectedCellDeviceId);
+            }
+            if (selectedCellRentalId) {
+                url.searchParams.set('cell_rental_id', selectedCellRentalId);
             }
 
             return url.toString();
@@ -528,7 +542,9 @@
                 mapElement.hidden = ! hasMapData;
                 mapCenterButton.disabled = ! hasMapData;
                 mapCountElement.textContent = selectedCellDeviceId
-                    ? `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS akun terpilih`
+                    ? selectedCellRentalId
+                        ? `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS perjalanan terpilih`
+                        : `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS akun terpilih`
                     : `${nextBikes.length} sepeda lokasi, pilih akun untuk BTS`;
                 currentBounds = bounds;
 
@@ -595,10 +611,17 @@
                 renderCells(latestCells);
             });
             cellDeviceFilter?.addEventListener('change', () => {
+                if (cellRentalFilter) {
+                    cellRentalFilter.value = '';
+                }
                 cellDeviceFilter.form?.submit();
             });
+            cellRentalFilter?.addEventListener('change', () => {
+                cellRentalFilter.form?.submit();
+            });
             cellClearForm?.addEventListener('submit', (event) => {
-                if (! confirm('Bersihkan semua rekaman BTS untuk akun device yang dipilih? Data akun lain tidak ikut dihapus.')) {
+                const scope = selectedCellRentalId ? 'perjalanan yang dipilih' : 'akun device yang dipilih';
+                if (! confirm(`Bersihkan rekaman BTS untuk ${scope}? Data lain tidak ikut dihapus.`)) {
                     event.preventDefault();
                 }
             });
