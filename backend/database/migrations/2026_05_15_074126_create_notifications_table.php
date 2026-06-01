@@ -15,6 +15,7 @@ return new class extends Migration
         Schema::create('notifications', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('rental_id')->nullable()->constrained()->nullOnDelete();
             $table->string('title');
             $table->text('message');
             $table->enum('type', ['sewa', 'pengumuman'])->default('pengumuman');

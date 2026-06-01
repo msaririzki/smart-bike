@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BikeController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RentalController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,8 +18,6 @@ Route::prefix('auth')->group(function (): void {
         Route::patch('/me', [AuthController::class, 'updateMe']);
     });
 });
-
-use App\Http\Controllers\Api\NotificationController;
 
 Route::middleware(['auth:sanctum', 'role:user,admin,superadmin'])->group(function (): void {
     Route::get('/bikes', [BikeController::class, 'index']);

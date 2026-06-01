@@ -30,7 +30,13 @@
         .dash-map-title svg { stroke: #0f766e; background: #ccfbf1; border-radius: 0.5rem; padding: 0.25rem; width: 2rem; height: 2rem; }
         .dash-map-subtitle { margin: 0.5rem 0 0 0; color: #64748b; font-size: 0.95rem; }
         .dash-map-canvas { height: 70vh; min-height: 550px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
-        .map-actions { display: flex; align-items: center; gap: 1.25rem; }
+        .map-actions { width: 100%; display: grid; grid-template-columns: minmax(13rem, auto) minmax(24rem, 1fr) auto; align-items: center; gap: 0.85rem; }
+        .map-actions-primary { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end; }
+        .cell-map-count { font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.7rem 1rem; border-radius: 8px; font-weight: 800; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .08); }
+        .cell-filter-form { display: grid; grid-template-columns: repeat(2, minmax(15rem, 1fr)); gap: 0.75rem; }
+        .cell-clear-button { padding: 0.7rem 1rem; border-radius: 8px; background: white; border: 1px solid #fecaca; color: #b91c1c; font-weight: 800; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); cursor: pointer; min-height: 44px; white-space: nowrap; }
+        .cell-clear-button:disabled { color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; }
+        .dash-map-action-button { padding: 0.7rem 1rem !important; border-radius: 8px !important; background: white !important; border: 1px solid #cbd5e1 !important; color: #334155 !important; font-weight: 800 !important; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05) !important; transition: all 0.2s !important; min-height: 44px; white-space: nowrap; }
         .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
         .leaflet-popup-content { margin: 0; width: 320px !important; }
         .map-popup { padding: 0; font-family: inherit; }
@@ -54,10 +60,16 @@
         .map-popup-footer { display: flex; justify-content: space-between; padding: 1rem 1.25rem; background: white; border-top: 1px solid #f1f5f9; }
         .map-popup-footer a { color: #0f766e; font-weight: 600; font-size: 0.875rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s; }
         .map-popup-footer a:hover { color: #0f172a; text-decoration: underline; }
+        .cell-map-marker { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: #7c2d12; background: #fed7aa; border: 3px solid #fff7ed; box-shadow: 0 8px 18px rgba(124, 45, 18, .26); font-size: 16px; }
+        .cell-layer-button.active { background: #0f766e !important; border-color: #0f766e !important; color: white !important; }
 
 
         @media (max-width: 768px) {
             .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+            .map-actions { grid-template-columns: 1fr; }
+            .map-actions-primary { justify-content: flex-start; }
+            .cell-filter-form { grid-template-columns: 1fr; width: 100%; }
+            .cell-map-count, .dash-map-action-button, .cell-clear-button, #cell-clear-form { width: 100%; }
             .dash-card { padding: 0.75rem; }
             .dash-card-icon { width: 1.75rem; height: 1.75rem; border-radius: 0.375rem; }
             .dash-card-icon svg { width: 1rem; height: 1rem; }
@@ -203,15 +215,62 @@
                 <p class="dash-map-subtitle">Peta otomatis diperbarui. Klik penanda untuk melihat ringkasan sepeda dan membuka halaman detail.</p>
             </div>
             <div class="map-actions">
-                <span style="font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600;" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
-                <button class="button secondary" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: white; border: 1px solid #cbd5e1; color: #334155; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); transition: all 0.2s;" type="button" id="bike-map-center" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">Pusatkan Peta</button>
+                <span class="cell-map-count" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
+                @php
+                    $cellDeviceSelectOptions = $cellDeviceOptions
+                        ->map(fn ($device) => [
+                            'value' => $device->id,
+                            'label' => "{$device->name} - {$device->email}",
+                        ])
+                        ->values();
+                    $cellRentalSelectOptions = collect($cellRentalOptions)
+                        ->map(fn ($rentalOption) => [
+                            'value' => $rentalOption['id'],
+                            'label' => $rentalOption['label'],
+                            'meta' => "{$rentalOption['observation_count']} data",
+                        ])
+                        ->values();
+                @endphp
+                <form method="get" action="{{ route('admin.dashboard') }}" class="cell-filter-form">
+                    <x-admin.premium-select
+                        name="cell_device_id"
+                        id="cell-device-filter"
+                        label="Akun Perekam"
+                        icon="bike"
+                        placeholder="Pilih akun device"
+                        hint="Sumber rekaman BTS"
+                        :options="$cellDeviceSelectOptions"
+                        :selected="$selectedCellDeviceId"
+                    />
+                    <x-admin.premium-select
+                        name="cell_rental_id"
+                        id="cell-rental-filter"
+                        label="Perjalanan"
+                        icon="route"
+                        placeholder="Semua perjalanan akun"
+                        hint="Sesi pengujian"
+                        :options="$cellRentalSelectOptions"
+                        :selected="$selectedCellRentalId"
+                        :disabled="$selectedCellDeviceId === null"
+                    />
+                </form>
+                <div class="map-actions-primary">
+                    <button class="button secondary cell-layer-button dash-map-action-button" type="button" id="cell-layer-toggle">BTS Terdeteksi ({{ $mapCells->count() }})</button>
+                    <form method="post" action="{{ route('admin.dashboard.cell-survey.clear') }}" id="cell-clear-form">
+                        @csrf
+                        <input type="hidden" name="device_user_id" value="{{ $selectedCellDeviceId }}">
+                        <input type="hidden" name="cell_rental_id" value="{{ $selectedCellRentalId }}">
+                        <button class="cell-clear-button" type="submit" @disabled($selectedCellDeviceId === null)>Bersihkan Rekaman</button>
+                    </form>
+                    <button class="button secondary dash-map-action-button" type="button" id="bike-map-center">Pusatkan Peta</button>
+                </div>
             </div>
         </div>
 
-        <div id="bike-map-empty" class="map-empty" @if($mapBikes->isNotEmpty()) hidden @endif>
-            Belum ada sepeda yang memiliki data lokasi.
+        <div id="bike-map-empty" class="map-empty" @if($mapBikes->isNotEmpty() || $mapCells->isNotEmpty()) hidden @endif>
+            Belum ada sepeda atau rekaman BTS untuk filter yang dipilih.
         </div>
-        <div id="bike-map" class="dash-map-canvas" @if($mapBikes->isEmpty()) hidden @endif></div>
+        <div id="bike-map" class="dash-map-canvas" @if($mapBikes->isEmpty() && $mapCells->isEmpty()) hidden @endif></div>
     </div>
 
     <div class="main-content-grid">
@@ -240,12 +299,30 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const bikes = @json($mapBikes);
+        const cells = @json($mapCells);
         const statusLabels = @json($adminStatusLabels);
         const mapElement = document.getElementById('bike-map');
         const mapEmptyElement = document.getElementById('bike-map-empty');
         const mapCountElement = document.getElementById('bike-map-count');
         const mapCenterButton = document.getElementById('bike-map-center');
+        const cellLayerToggle = document.getElementById('cell-layer-toggle');
+        const cellDeviceFilter = document.getElementById('cell-device-filter');
+        const cellRentalFilter = document.getElementById('cell-rental-filter');
+        const cellClearForm = document.getElementById('cell-clear-form');
+        const selectedCellDeviceId = @json($selectedCellDeviceId);
+        const selectedCellRentalId = @json($selectedCellRentalId);
         const mapDataUrl = @json(route('admin.dashboard.map-data'));
+        const mapDataRequestUrl = () => {
+            const url = new URL(mapDataUrl, window.location.origin);
+            if (selectedCellDeviceId) {
+                url.searchParams.set('cell_device_id', selectedCellDeviceId);
+            }
+            if (selectedCellRentalId) {
+                url.searchParams.set('cell_rental_id', selectedCellRentalId);
+            }
+
+            return url.toString();
+        };
         const escapeHtml = (value) => String(value ?? '-')
             .replaceAll('&', '&amp;')
             .replaceAll('<', '&lt;')
@@ -256,8 +333,11 @@
         if (mapElement && window.L) {
             const map = L.map(mapElement).setView([-8.5830, 116.1160], 14);
             const markers = new Map();
+            const cellMarkers = new Map();
+            let cellsVisible = true;
             let hasFittedMap = false;
             let currentBounds = [];
+            let latestCells = cells;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
@@ -330,7 +410,113 @@
                 `;
             };
 
-            const renderBikes = (nextBikes, fitMap = false) => {
+            const cellIcon = () => L.divIcon({
+                className: 'cell-map-marker',
+                html: '&#128246;',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15],
+                popupAnchor: [0, -15],
+            });
+
+            const cellPopupHtml = (cell) => {
+                const signal = cell.average_signal_dbm === null ? '-' : `${cell.average_signal_dbm} dBm`;
+                const rsrp = cell.average_rsrp_dbm === null ? '-' : `${cell.average_rsrp_dbm} dBm`;
+
+                const operatorLabel = cell.operator_label ?? cell.operator_name ?? 'Cell Terdeteksi';
+
+                return `
+                    <div class="map-popup">
+                        <div class="map-popup-header" style="background: linear-gradient(135deg, #c2410c, #f97316);">
+                            <div>
+                                <h3 class="map-popup-title">${escapeHtml(operatorLabel)}</h3>
+                                <div class="map-popup-subtitle">${escapeHtml(cell.radio_type)} - Cell ${escapeHtml(cell.cell_id)}</div>
+                            </div>
+                            <span class="badge">Estimasi</span>
+                        </div>
+                        <div class="map-popup-grid">
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">MCC/MNC</span>
+                                <span class="map-popup-value">${escapeHtml(cell.mcc ?? '-')}/${escapeHtml(cell.mnc ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">SIM Data Aktif</span>
+                                <span class="map-popup-value">${escapeHtml(cell.active_data_subscription_id ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Kode Operator</span>
+                                <span class="map-popup-value">${escapeHtml(cell.network_operator_code ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">TAC/LAC</span>
+                                <span class="map-popup-value">${escapeHtml(cell.tac_or_lac ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">PCI/PSC</span>
+                                <span class="map-popup-value">${escapeHtml(cell.pci_or_psc ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Sinyal Rata-rata</span>
+                                <span class="map-popup-value">${escapeHtml(signal)}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">RSRP Rata-rata</span>
+                                <span class="map-popup-value">${escapeHtml(rsrp)}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Observasi</span>
+                                <span class="map-popup-value">${escapeHtml(cell.observation_count)} data</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Sepeda</span>
+                                <span class="map-popup-value">${escapeHtml(cell.bike ?? '-')}</span>
+                            </div>
+                        </div>
+                        <div class="map-popup-details">
+                            <p><strong>Catatan:</strong> Marker ini hanya dari akun perekam yang dipilih dan merupakan estimasi observasi perangkat, bukan koordinat tower resmi operator.</p>
+                            <p><strong>Terakhir terlihat:</strong> ${escapeHtml(cell.last_seen_at ?? '-')}</p>
+                        </div>
+                    </div>
+                `;
+            };
+
+            const renderCells = (nextCells) => {
+                const visibleIds = new Set();
+
+                nextCells.forEach((cell) => {
+                    const id = String(cell.id);
+                    const position = [cell.latitude, cell.longitude];
+                    visibleIds.add(id);
+
+                    if (cellMarkers.has(id)) {
+                        cellMarkers.get(id)
+                            .setLatLng(position)
+                            .setPopupContent(cellPopupHtml(cell));
+                    } else {
+                        const marker = L.marker(position, { icon: cellIcon() }).bindPopup(cellPopupHtml(cell), { autoPan: false, className: 'animated-popup' });
+                        cellMarkers.set(id, marker);
+                    }
+
+                    if (cellsVisible && ! map.hasLayer(cellMarkers.get(id))) {
+                        cellMarkers.get(id).addTo(map);
+                    }
+                    if (! cellsVisible && map.hasLayer(cellMarkers.get(id))) {
+                        map.removeLayer(cellMarkers.get(id));
+                    }
+                });
+
+                cellMarkers.forEach((marker, id) => {
+                    if (! visibleIds.has(id)) {
+                        map.removeLayer(marker);
+                        cellMarkers.delete(id);
+                    }
+                });
+
+                cellLayerToggle.textContent = `BTS Terdeteksi (${nextCells.length})`;
+                cellLayerToggle.classList.toggle('active', Boolean(selectedCellDeviceId) && cellsVisible);
+                cellLayerToggle.disabled = ! selectedCellDeviceId;
+            };
+
+            const renderMapData = (nextBikes, nextCells, fitMap = false) => {
                 const visibleCodes = new Set();
                 const bounds = [];
 
@@ -372,10 +558,22 @@
                     }
                 });
 
-                mapEmptyElement.hidden = nextBikes.length > 0;
-                mapElement.hidden = nextBikes.length === 0;
-                mapCenterButton.disabled = nextBikes.length === 0;
-                mapCountElement.textContent = `${nextBikes.length} sepeda memiliki data lokasi`;
+                latestCells = nextCells;
+                renderCells(nextCells);
+
+                if (nextBikes.length === 0 && nextCells.length > 0) {
+                    nextCells.forEach((cell) => bounds.push([cell.latitude, cell.longitude]));
+                }
+
+                const hasMapData = nextBikes.length > 0 || nextCells.length > 0;
+                mapEmptyElement.hidden = hasMapData;
+                mapElement.hidden = ! hasMapData;
+                mapCenterButton.disabled = ! hasMapData;
+                mapCountElement.textContent = selectedCellDeviceId
+                    ? selectedCellRentalId
+                        ? `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS perjalanan terpilih`
+                        : `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS akun terpilih`
+                    : `${nextBikes.length} sepeda lokasi, pilih akun untuk BTS`;
                 currentBounds = bounds;
 
                 if (bounds.length === 0) {
@@ -409,15 +607,15 @@
 
             const refreshBikes = async () => {
                 try {
-                    const response = await fetch(mapDataUrl, { headers: { Accept: 'application/json' } });
+                    const response = await fetch(mapDataRequestUrl(), { headers: { Accept: 'application/json' } });
                     const payload = await response.json();
-                    renderBikes(payload.data ?? []);
+                    renderMapData(payload.data ?? [], payload.cells ?? []);
                 } catch (_error) {
                     mapCountElement.textContent = 'Peta belum bisa diperbarui otomatis';
                 }
             };
 
-            renderBikes(bikes);
+            renderMapData(bikes, cells);
 
             // Fix: Gunakan setTimeout 200ms setelah DOM siap untuk mencegah kotak abu-abu
             const applyMapFix = () => {
@@ -436,6 +634,25 @@
             }
 
             mapCenterButton?.addEventListener('click', fitMapToBounds);
+            cellLayerToggle?.addEventListener('click', () => {
+                cellsVisible = ! cellsVisible;
+                renderCells(latestCells);
+            });
+            cellDeviceFilter?.addEventListener('change', () => {
+                if (cellRentalFilter) {
+                    cellRentalFilter.value = '';
+                }
+                cellDeviceFilter.form?.submit();
+            });
+            cellRentalFilter?.addEventListener('change', () => {
+                cellRentalFilter.form?.submit();
+            });
+            cellClearForm?.addEventListener('submit', (event) => {
+                const scope = selectedCellRentalId ? 'perjalanan yang dipilih' : 'akun device yang dipilih';
+                if (! confirm(`Bersihkan rekaman BTS untuk ${scope}? Data lain tidak ikut dihapus.`)) {
+                    event.preventDefault();
+                }
+            });
             setInterval(refreshBikes, 10000);
         } else if (mapElement) {
             mapElement.innerHTML = '<div class="map-empty">Peta belum bisa dimuat. Periksa koneksi internet untuk membuka peta.</div>';

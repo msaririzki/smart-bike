@@ -114,6 +114,23 @@ class DeviceController extends Controller
             'accuracy_meters' => ['nullable', 'numeric', 'min:0'],
             'network_type' => ['nullable', 'string', 'max:50'],
             'recorded_at' => ['nullable', 'date'],
+            'cell' => ['nullable', 'array'],
+            'cell.radio_type' => ['nullable', 'string', 'in:LTE,NR,WCDMA,GSM,UNKNOWN'],
+            'cell.operator_name' => ['nullable', 'string', 'max:100'],
+            'cell.network_operator_name' => ['nullable', 'string', 'max:100'],
+            'cell.operator_label' => ['nullable', 'string', 'max:100'],
+            'cell.network_operator_code' => ['nullable', 'string', 'max:20'],
+            'cell.active_data_subscription_id' => ['nullable', 'integer'],
+            'cell.mcc' => ['nullable', 'string', 'max:10'],
+            'cell.mnc' => ['nullable', 'string', 'max:10'],
+            'cell.cell_id' => ['nullable', 'string', 'max:64'],
+            'cell.tac_or_lac' => ['nullable', 'string', 'max:64'],
+            'cell.pci_or_psc' => ['nullable', 'string', 'max:64'],
+            'cell.signal_dbm' => ['nullable', 'integer'],
+            'cell.rsrp_dbm' => ['nullable', 'integer'],
+            'cell.rsrq_db' => ['nullable', 'numeric'],
+            'cell.sinr_db' => ['nullable', 'numeric'],
+            'cell.is_registered' => ['nullable', 'boolean'],
         ]);
 
         return response()->json($this->locations->process($request->user(), $data));

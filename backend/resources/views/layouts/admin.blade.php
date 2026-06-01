@@ -128,6 +128,23 @@
         .toolbar { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-bottom: 16px; }
         .toolbar label { margin-top: 0; min-width: 180px; }
         .toolbar .actions { display: flex; gap: 8px; margin-top: 5px; }
+        .premium-filter-group { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+        .premium-select-field { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; min-width: 250px; min-height: 68px; margin: 0; padding: 10px 12px; border: 1px solid #dbe3ea; border-radius: 8px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 0 8px 18px rgba(15, 23, 42, .06), inset 0 1px 0 rgba(255,255,255,.8); transition: border-color .2s, box-shadow .2s, transform .2s; }
+        .toolbar .premium-select-field { min-width: 230px; }
+        .premium-select-field:focus-within { border-color: var(--teal-700); box-shadow: 0 0 0 3px rgba(15,118,110,.12), 0 10px 22px rgba(15,23,42,.08); transform: translateY(-1px); }
+        .premium-select-field.is-disabled { opacity: .62; background: #f8fafc; transform: none; box-shadow: none; }
+        .premium-select-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; color: var(--teal-700); background: #ccfbf1; flex-shrink: 0; }
+        .premium-select-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .premium-select-label { color: #64748b; font-size: 10px; font-weight: 800; line-height: 1.1; text-transform: uppercase; letter-spacing: .05em; }
+        .premium-select-hint { color: #0f172a; font-size: 12px; font-weight: 700; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .premium-select-control { position: relative; display: block; min-width: 0; }
+        .premium-select-field select { width: 100%; min-height: 24px; margin: 0; padding: 0 28px 0 0; border: 0; background: transparent; color: #0f172a; font-size: 14px; font-weight: 800; line-height: 1.25; appearance: none; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .premium-select-field select:focus { box-shadow: none; }
+        .premium-select-field select:disabled { cursor: not-allowed; }
+        .premium-select-chevron { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: #64748b; pointer-events: none; display: grid; place-items: center; }
+        @media (max-width: 640px) {
+            .premium-filter-group, .premium-select-field { width: 100%; }
+        }
         
         .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1; }
         .badge.available { color: #047857; background: #d1fae5; }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/bike.dart';
+import '../models/cell_info_snapshot.dart';
 import '../models/device_rental_summary.dart';
 import '../models/rental_qr_session.dart';
 import 'session_store.dart';
@@ -88,6 +89,7 @@ class ApiClient {
     double? accuracyMeters,
     required String networkType,
     DateTime? recordedAt,
+    CellInfoSnapshot? cell,
   }) async {
     return _post('/device/location-update', body: {
       'latitude': latitude,
@@ -96,6 +98,7 @@ class ApiClient {
       if (accuracyMeters != null) 'accuracy_meters': accuracyMeters,
       'network_type': networkType,
       'recorded_at': (recordedAt ?? DateTime.now()).toUtc().toIso8601String(),
+      if (cell != null) 'cell': cell.toJson(),
     });
   }
 

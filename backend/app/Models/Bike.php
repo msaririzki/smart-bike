@@ -72,6 +72,11 @@ class Bike extends Model
         return $this->hasMany(DeviceHeartbeat::class);
     }
 
+    public function cellObservations(): HasMany
+    {
+        return $this->hasMany(CellObservation::class);
+    }
+
     public function latestHeartbeat(): HasOne
     {
         return $this->hasOne(DeviceHeartbeat::class)->latestOfMany('last_seen_at');

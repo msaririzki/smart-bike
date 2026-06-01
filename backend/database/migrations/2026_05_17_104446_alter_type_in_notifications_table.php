@@ -16,6 +16,7 @@ return new class extends Migration
         Schema::create('notifications', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('rental_id')->nullable()->constrained()->nullOnDelete();
             $table->string('title');
             $table->text('message');
             $table->string('type')->default('pengumuman');
@@ -23,7 +24,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        \Illuminate\Support\Facades\DB::statement('INSERT INTO notifications (id, user_id, title, message, type, is_read, created_at, updated_at) SELECT id, user_id, title, message, type, is_read, created_at, updated_at FROM notifications_old');
+        \Illuminate\Support\Facades\DB::statement('INSERT INTO notifications (id, user_id, rental_id, title, message, type, is_read, created_at, updated_at) SELECT id, user_id, rental_id, title, message, type, is_read, created_at, updated_at FROM notifications_old');
         
         Schema::drop('notifications_old');
     }
