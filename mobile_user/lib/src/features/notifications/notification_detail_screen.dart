@@ -205,7 +205,9 @@ class NotificationDetailScreen extends StatelessWidget {
         const SizedBox(height: 40),
         OutlinedButton.icon(
           onPressed: () {
-            Share.share('${notification.title}\n\n${notification.message}');
+            SharePlus.instance.share(ShareParams(
+              text: '${notification.title}\n\n${notification.message}',
+            ));
           },
           icon: const Icon(Icons.share_rounded, size: 18),
           label: const Text('Bagikan'),

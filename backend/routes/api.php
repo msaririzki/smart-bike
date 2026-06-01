@@ -18,9 +18,17 @@ Route::prefix('auth')->group(function (): void {
     });
 });
 
+use App\Http\Controllers\Api\NotificationController;
+
 Route::middleware(['auth:sanctum', 'role:user,admin,superadmin'])->group(function (): void {
     Route::get('/bikes', [BikeController::class, 'index']);
     Route::get('/bikes/{bike}', [BikeController::class, 'show']);
+    
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/{id}/unread', [NotificationController::class, 'markAsUnread']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 });
 
 Route::middleware(['auth:sanctum', 'role:user'])->group(function (): void {
