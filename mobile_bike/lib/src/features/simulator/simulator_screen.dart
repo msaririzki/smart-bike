@@ -50,6 +50,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   static const double _speedRiseLimitKmhPerSecond = 5;
   static const double _speedFallLimitKmhPerSecond = 8;
   static const Duration _stationaryServerPingInterval = Duration(seconds: 15);
+  static const Duration _autoFollowReturnDelay = Duration(seconds: 10);
   static const int _maxRoutePoints = 120;
 
   final _gps = GpsService();
@@ -113,6 +114,10 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   _BikeMapType _mapType = _BikeMapType.standard;
   _MapFollowMode _followMode = _MapFollowMode.auto;
   bool _mapControlsExpanded = false;
+  DateTime? _autoFollowReturnAt;
+  int? _autoFollowReturnSeconds;
+  Timer? _autoFollowReturnTimer;
+  Timer? _autoFollowCountdownTimer;
   final MapController _mapController = MapController();
   final ValueNotifier<int> _monitoringPanelRevision = ValueNotifier<int>(0);
 
@@ -155,6 +160,8 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     _batteryTimer?.cancel();
     _summaryTimer?.cancel();
     _clockTimer?.cancel();
+    _autoFollowReturnTimer?.cancel();
+    _autoFollowCountdownTimer?.cancel();
     _refreshController.dispose();
     _mapController.dispose();
     _monitoringPanelRevision.dispose();
@@ -1168,6 +1175,10 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     return normalized < 0 ? normalized + 360 : normalized;
   }
 
+  double _mapRotationForHeading(double? headingDegrees) {
+    return _navigationMapRotation(headingDegrees);
+  }
+
   double _bearingDegrees(
     double lat1,
     double lon1,
@@ -1189,8 +1200,9 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     final latest = _routePoints.last;
     final target = latlong.LatLng(latest.latitude, latest.longitude);
     final isAuto = _followMode == _MapFollowMode.auto;
-    final rotation =
-        isAuto ? (_headingDegrees ?? latest.headingDegrees ?? 0) : 0.0;
+    final rotation = isAuto
+        ? _mapRotationForHeading(_headingDegrees ?? latest.headingDegrees)
+        : 0.0;
     final zoom = _currentMapZoom ?? 17.0;
 
     if (!isAuto && !force) return;
@@ -1209,7 +1221,106 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   void _rotateMapToHeading() {
     if (_routePoints.isEmpty || _followMode != _MapFollowMode.auto) return;
     final latest = _routePoints.last;
-    _mapController.rotate(_headingDegrees ?? latest.headingDegrees ?? 0);
+    _mapController.rotate(
+      _mapRotationForHeading(_headingDegrees ?? latest.headingDegrees),
+    );
+  }
+
+  void _handleMapUserGesture() {
+    if (!mounted) return;
+    if (_followMode == _MapFollowMode.manual && _autoFollowReturnAt == null) {
+      return;
+    }
+
+    _beginAutoFollowReturnCountdown();
+    setState(() {
+      _followMode = _MapFollowMode.manual;
+      _mapControlsExpanded = false;
+    });
+  }
+
+  void _zoomMapBy(double delta) {
+    _handleMapUserGesture();
+
+    latlong.LatLng? center;
+    double? zoom;
+    double? rotation;
+
+    try {
+      final camera = _mapController.camera;
+      center = camera.center;
+      zoom = camera.zoom;
+      rotation = camera.rotation;
+    } catch (_) {}
+
+    if (center == null && _routePoints.isNotEmpty) {
+      final latest = _routePoints.last;
+      center = latlong.LatLng(latest.latitude, latest.longitude);
+    }
+
+    if (center == null) return;
+
+    final nextZoom = ((zoom ?? 17.0) + delta).clamp(5.0, 19.0).toDouble();
+    final latestHeading =
+        _routePoints.isEmpty ? null : _routePoints.last.headingDegrees;
+    final nextRotation = _followMode == _MapFollowMode.auto
+        ? _mapRotationForHeading(_headingDegrees ?? latestHeading)
+        : (rotation ?? 0.0);
+
+    _mapController.moveAndRotate(center, nextZoom, nextRotation);
+  }
+
+  void _beginAutoFollowReturnCountdown() {
+    _autoFollowReturnTimer?.cancel();
+    _autoFollowCountdownTimer?.cancel();
+
+    _autoFollowReturnAt = DateTime.now().add(_autoFollowReturnDelay);
+    _autoFollowReturnSeconds = _autoFollowReturnDelay.inSeconds;
+
+    _autoFollowCountdownTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _syncAutoFollowReturnCountdown(),
+    );
+    _autoFollowReturnTimer = Timer(
+      _autoFollowReturnDelay,
+      _returnToAutoFollowIfScheduled,
+    );
+  }
+
+  void _syncAutoFollowReturnCountdown() {
+    final returnAt = _autoFollowReturnAt;
+    if (returnAt == null) {
+      _autoFollowCountdownTimer?.cancel();
+      _autoFollowCountdownTimer = null;
+      return;
+    }
+
+    final remainingMs = returnAt.difference(DateTime.now()).inMilliseconds;
+    final nextSeconds =
+        (remainingMs / 1000).ceil().clamp(0, _autoFollowReturnDelay.inSeconds);
+    if (_autoFollowReturnSeconds == nextSeconds || !mounted) return;
+
+    setState(() => _autoFollowReturnSeconds = nextSeconds.toInt());
+  }
+
+  void _returnToAutoFollowIfScheduled() {
+    if (!mounted || _autoFollowReturnAt == null) return;
+
+    setState(() {
+      _followMode = _MapFollowMode.auto;
+      _mapControlsExpanded = false;
+      _clearAutoFollowReturnCountdown();
+    });
+    _updateMapCamera(force: true);
+  }
+
+  void _clearAutoFollowReturnCountdown() {
+    _autoFollowReturnTimer?.cancel();
+    _autoFollowCountdownTimer?.cancel();
+    _autoFollowReturnTimer = null;
+    _autoFollowCountdownTimer = null;
+    _autoFollowReturnAt = null;
+    _autoFollowReturnSeconds = null;
   }
 
   Future<void> _sendHeartbeat() async {
@@ -1400,6 +1511,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
               setState(() {
                 _followMode = value;
                 _mapControlsExpanded = false;
+                _clearAutoFollowReturnCountdown();
               });
               _updateMapCamera(force: true);
             },
@@ -1407,6 +1519,10 @@ class _SimulatorScreenState extends State<SimulatorScreen>
             onControlsToggle: () => setState(
               () => _mapControlsExpanded = !_mapControlsExpanded,
             ),
+            onUserGesture: _handleMapUserGesture,
+            onZoomIn: () => _zoomMapBy(1),
+            onZoomOut: () => _zoomMapBy(-1),
+            autoReturnSeconds: _autoFollowReturnSeconds,
             mapController: _mapController,
           ),
         ),
@@ -1563,6 +1679,12 @@ class _SimulatorScreenState extends State<SimulatorScreen>
               icon: const Icon(Icons.my_location),
               color: const Color(0xff1f2937),
               onPressed: () {
+                setState(() {
+                  _followMode = _MapFollowMode.auto;
+                  _mapControlsExpanded = false;
+                  _clearAutoFollowReturnCountdown();
+                });
+
                 if (_routePoints.isNotEmpty) {
                   _updateMapCamera(force: true);
                 } else if (rental.latestLocationPoint?.latitude != null) {
@@ -1684,15 +1806,6 @@ class _SimulatorScreenState extends State<SimulatorScreen>
                       ),
                     ),
                   ],
-                ),
-                Text(
-                  'Sewa Pintar. Lacak Akurat.',
-                  style: TextStyle(
-                      color: isRented
-                          ? const Color(0xff4b5563)
-                          : const Color(0xFF94A3B8),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -2547,6 +2660,27 @@ enum _MapFollowMode {
   final IconData icon;
 }
 
+double _navigationMapRotation(double? headingDegrees) {
+  if (headingDegrees == null || !headingDegrees.isFinite) return 0;
+  final heading = headingDegrees % 360;
+  final normalizedHeading = heading < 0 ? heading + 360 : heading;
+  return (360 - normalizedHeading) % 360;
+}
+
+bool _isUserMapGesture(MapEventSource source) {
+  return switch (source) {
+    MapEventSource.dragStart ||
+    MapEventSource.dragEnd ||
+    MapEventSource.multiFingerGestureStart ||
+    MapEventSource.multiFingerEnd ||
+    MapEventSource.doubleTap ||
+    MapEventSource.doubleTapHold ||
+    MapEventSource.scrollWheel =>
+      true,
+    _ => false,
+  };
+}
+
 class _MiniRouteMap extends StatelessWidget {
   const _MiniRouteMap({
     this.height = 170,
@@ -2559,6 +2693,10 @@ class _MiniRouteMap extends StatelessWidget {
     required this.onFollowModeChanged,
     required this.controlsExpanded,
     required this.onControlsToggle,
+    required this.onUserGesture,
+    required this.onZoomIn,
+    required this.onZoomOut,
+    required this.autoReturnSeconds,
     this.mapController,
   });
 
@@ -2572,6 +2710,10 @@ class _MiniRouteMap extends StatelessWidget {
   final ValueChanged<_MapFollowMode> onFollowModeChanged;
   final bool controlsExpanded;
   final VoidCallback onControlsToggle;
+  final VoidCallback onUserGesture;
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final int? autoReturnSeconds;
   final MapController? mapController;
 
   static const _fallbackCenter = latlong.LatLng(-8.583235, 116.116768);
@@ -2587,8 +2729,9 @@ class _MiniRouteMap extends StatelessWidget {
         (points.isEmpty ? null : points.last.headingDegrees);
     final markerRotation =
         followMode == _MapFollowMode.auto ? 0.0 : (latestHeading ?? 0);
-    final initialRotation =
-        followMode == _MapFollowMode.auto ? (latestHeading ?? 0) : 0.0;
+    final initialRotation = followMode == _MapFollowMode.auto
+        ? _navigationMapRotation(latestHeading)
+        : 0.0;
     final isSatellite = mapType == _BikeMapType.satellite;
     final routeColor =
         isSatellite ? const Color(0xFF22D3EE) : const Color(0xFF0EA5E9);
@@ -2613,6 +2756,9 @@ class _MiniRouteMap extends StatelessWidget {
                 initialRotation: initialRotation,
                 minZoom: 5,
                 maxZoom: 19,
+                onMapEvent: (event) {
+                  if (_isUserMapGesture(event.source)) onUserGesture();
+                },
                 interactionOptions: const InteractionOptions(
                   flags: InteractiveFlag.drag |
                       InteractiveFlag.pinchZoom |
@@ -2654,6 +2800,7 @@ class _MiniRouteMap extends StatelessWidget {
                   ),
                 if (mapPoints.isNotEmpty)
                   MarkerLayer(
+                    rotate: true,
                     markers: [
                       if (mapPoints.length > 1)
                         _buildMarker(
@@ -2674,7 +2821,22 @@ class _MiniRouteMap extends StatelessWidget {
               ],
             ),
           ),
-
+          Positioned(
+            left: 12,
+            bottom: 150,
+            child: _MapZoomDock(
+              onZoomIn: onZoomIn,
+              onZoomOut: onZoomOut,
+            ),
+          ),
+          if (autoReturnSeconds != null &&
+              autoReturnSeconds! > 0 &&
+              followMode == _MapFollowMode.manual)
+            Positioned(
+              left: 12,
+              bottom: 246,
+              child: _AutoFollowReturnChip(seconds: autoReturnSeconds!),
+            ),
           Positioned(
             right: 12,
             bottom: 150,
@@ -2688,48 +2850,16 @@ class _MiniRouteMap extends StatelessWidget {
             ),
           ),
           if (pointCount < 2)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  pointCount == 0
-                      ? 'Menunggu titik GPS valid dari perangkat.'
-                      : 'Jalur muncul setelah perangkat benar-benar bergerak.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFFCBD5E1),
-                    fontWeight: FontWeight.w600,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black54,
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                ),
+            Positioned(
+              left: 64,
+              right: 64,
+              bottom: 216,
+              child: _MapHintChip(
+                message: pointCount == 0
+                    ? 'Menunggu GPS valid'
+                    : 'Jalur muncul setelah sepeda bergerak',
               ),
             ),
-          const Positioned(
-            left: 12,
-            bottom: 156,
-            child: Row(
-              children: [
-                _LegendDot(color: Color(0xFF38BDF8)),
-                SizedBox(width: 5),
-                Text(
-                  'Awal',
-                  style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11),
-                ),
-                SizedBox(width: 12),
-                _LegendDot(color: Color(0xFF22C55E)),
-                SizedBox(width: 5),
-                Text(
-                  'Terbaru',
-                  style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -2792,6 +2922,193 @@ class _MiniRouteMap extends StatelessWidget {
         child: Transform.rotate(
           angle: rotationDegrees * math.pi / 180,
           child: Icon(icon, color: color, size: size * .58),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapZoomDock extends StatelessWidget {
+  const _MapZoomDock({
+    required this.onZoomIn,
+    required this.onZoomOut,
+  });
+
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .96),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26000000),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MapZoomButton(
+            icon: Icons.add_rounded,
+            tooltip: 'Perbesar peta',
+            onPressed: onZoomIn,
+          ),
+          const SizedBox(
+            width: 34,
+            child: Divider(height: 1, color: Color(0xFFE5E7EB)),
+          ),
+          _MapZoomButton(
+            icon: Icons.remove_rounded,
+            tooltip: 'Perkecil peta',
+            onPressed: onZoomOut,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapZoomButton extends StatelessWidget {
+  const _MapZoomButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 44,
+            height: 42,
+            child: Icon(
+              icon,
+              size: 22,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AutoFollowReturnChip extends StatelessWidget {
+  const _AutoFollowReturnChip({required this.seconds});
+
+  final int seconds;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: .88),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: .18),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.navigation_rounded,
+              size: 15,
+              color: Color(0xFF5EEAD4),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              'Ikuti lagi ${seconds}dtk',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapHintChip extends StatelessWidget {
+  const _MapHintChip({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 280),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withValues(alpha: .84),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: .16),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x33000000),
+                blurRadius: 16,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.route_rounded,
+                  size: 15,
+                  color: Color(0xFF93C5FD),
+                ),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    message,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -3074,21 +3391,6 @@ class _MapSegmentButton<T> extends StatelessWidget {
 }
 
 
-
-class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 8,
-      height: 8,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    );
-  }
-}
 
 class _Panel extends StatelessWidget {
   const _Panel({
