@@ -129,24 +129,36 @@
         .toolbar label { margin-top: 0; min-width: 180px; }
         .toolbar .actions { display: flex; gap: 8px; margin-top: 5px; }
         .premium-filter-group { display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap; }
-        .premium-select-field { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; min-width: 250px; min-height: 64px; margin: 0; padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .premium-select-field { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; min-width: 250px; min-height: 64px; margin: 0; padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
         .premium-select-field:hover { border-color: #cbd5e1; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.025); transform: translateY(-1px); }
         .toolbar .premium-select-field { min-width: 230px; }
-        .premium-select-field:focus-within { border-color: var(--teal-600); box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.15), 0 10px 15px -3px rgba(0, 0, 0, 0.05); transform: translateY(-1px); }
+        .premium-select-field:focus-within, .premium-select-field.is-open { border-color: var(--teal-600); box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.15), 0 10px 15px -3px rgba(0, 0, 0, 0.05); transform: translateY(-1px); }
         .premium-select-field.is-disabled { opacity: 0.7; background: #f8fafc; transform: none; box-shadow: none; pointer-events: none; cursor: not-allowed; }
         .premium-select-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; color: var(--teal-700); background: #f0fdfa; flex-shrink: 0; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); }
         .premium-select-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; justify-content: center; }
         .premium-select-label { color: #64748b; font-size: 11px; font-weight: 700; line-height: 1; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
         .premium-select-hint { color: #1e293b; font-size: 13px; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .premium-select-control { position: relative; display: block; min-width: 0; }
-        .premium-select-field select { width: 100%; min-height: 24px; margin: 0; padding: 0 28px 0 0; border: 0; background: transparent; color: #0f172a; font-size: 14px; font-weight: 700; line-height: 1.25; appearance: none; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none; }
-        .premium-select-field select option { background: #ffffff; color: #0f172a; font-weight: 500; padding: 12px; font-size: 14px; }
-        .premium-select-field select:focus { box-shadow: none; outline: none; }
-        .premium-select-field select:disabled { cursor: not-allowed; }
-        .premium-select-chevron { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none; display: grid; place-items: center; transition: color 0.2s; }
+        .premium-select-native { position: absolute; width: 1px !important; height: 1px !important; margin: -1px !important; padding: 0 !important; border: 0 !important; opacity: 0; pointer-events: none; clip-path: inset(50%); }
+        .premium-select-trigger { width: 100%; min-height: 28px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 0; padding: 0; border: 0; background: transparent; color: #0f172a; font: inherit; cursor: pointer; text-align: left; }
+        .premium-select-trigger:focus { outline: none; box-shadow: none; }
+        .premium-select-current, .premium-select-option-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .premium-select-current-title, .premium-select-option-title { color: #0f172a; font-size: 14px; font-weight: 800; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .premium-select-current-meta, .premium-select-option-meta { color: #64748b; font-size: 12px; font-weight: 650; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .premium-select-chevron { color: #94a3b8; display: grid; place-items: center; transition: color 0.2s, transform 0.2s; }
         .premium-select-field:hover .premium-select-chevron { color: #64748b; }
+        .premium-select-field.is-open .premium-select-chevron { color: var(--teal-700); transform: rotate(180deg); }
+        .premium-select-menu { position: absolute; z-index: 5000; left: 0; right: 0; top: calc(100% + 8px); display: grid; gap: 4px; max-height: 18rem; overflow-y: auto; padding: 8px; border: 1px solid #dbe5ee; border-radius: 14px; background: rgba(255, 255, 255, 0.98); box-shadow: 0 20px 32px -18px rgba(15, 23, 42, 0.45), 0 8px 14px -12px rgba(15, 118, 110, 0.35); backdrop-filter: blur(10px); }
+        .premium-select-menu[hidden] { display: none; }
+        .premium-select-option { width: 100%; display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center; gap: 10px; min-height: 44px; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: #0f172a; font: inherit; cursor: pointer; text-align: left; }
+        .premium-select-option:hover, .premium-select-option.is-active { background: #f0fdfa; }
+        .premium-select-option[aria-selected="true"] { background: #ecfdf5; }
+        .premium-select-option-check { width: 22px; height: 22px; display: grid; place-items: center; color: transparent; border-radius: 999px; }
+        .premium-select-option[aria-selected="true"] .premium-select-option-check { color: #0f766e; background: #ccfbf1; }
+        .premium-select-option:focus { outline: none; background: #f0fdfa; box-shadow: inset 0 0 0 1px #99f6e4; }
         @media (max-width: 640px) {
             .premium-filter-group, .premium-select-field { width: 100%; }
+            .premium-select-menu { max-height: 15rem; }
         }
         
         .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1; }
@@ -397,6 +409,139 @@
                         td.setAttribute('data-label', headers[i]);
                     }
                 });
+            });
+        });
+
+        const closePremiumSelect = (field) => {
+            const menu = field.querySelector('.premium-select-menu');
+            const trigger = field.querySelector('.premium-select-trigger');
+            field.classList.remove('is-open');
+            if (menu) {
+                menu.hidden = true;
+            }
+            if (trigger) {
+                trigger.setAttribute('aria-expanded', 'false');
+            }
+        };
+
+        const syncPremiumSelect = (field) => {
+            const nativeSelect = field.querySelector('.premium-select-native');
+            const title = field.querySelector('.premium-select-current-title');
+            const current = field.querySelector('.premium-select-current');
+            const optionButtons = Array.from(field.querySelectorAll('.premium-select-option'));
+            const selectedButton = optionButtons.find((option) => option.dataset.value === nativeSelect?.value) ?? optionButtons[0];
+
+            optionButtons.forEach((option) => {
+                option.setAttribute('aria-selected', option === selectedButton ? 'true' : 'false');
+            });
+
+            if (! selectedButton || ! title || ! current) {
+                return;
+            }
+
+            title.textContent = selectedButton.dataset.title || selectedButton.textContent.trim();
+            current.querySelector('.premium-select-current-meta')?.remove();
+
+            if (selectedButton.dataset.meta) {
+                const meta = document.createElement('span');
+                meta.className = 'premium-select-current-meta';
+                meta.textContent = selectedButton.dataset.meta;
+                current.appendChild(meta);
+            }
+        };
+
+        const openPremiumSelect = (field) => {
+            const menu = field.querySelector('.premium-select-menu');
+            const trigger = field.querySelector('.premium-select-trigger');
+            if (! menu || field.classList.contains('is-disabled')) return;
+
+            document.querySelectorAll('[data-premium-select].is-open').forEach((openField) => {
+                if (openField !== field) {
+                    closePremiumSelect(openField);
+                }
+            });
+
+            field.classList.add('is-open');
+            menu.hidden = false;
+            trigger?.setAttribute('aria-expanded', 'true');
+            const selected = menu.querySelector('.premium-select-option[aria-selected="true"]');
+            selected?.scrollIntoView({ block: 'nearest' });
+        };
+
+        document.querySelectorAll('[data-premium-select]').forEach((field) => {
+            const nativeSelect = field.querySelector('.premium-select-native');
+            const trigger = field.querySelector('.premium-select-trigger');
+            const menu = field.querySelector('.premium-select-menu');
+            const options = Array.from(field.querySelectorAll('.premium-select-option'));
+
+            syncPremiumSelect(field);
+
+            field.addEventListener('click', (event) => {
+                if (menu?.contains(event.target)) return;
+                if (field.classList.contains('is-disabled')) return;
+                if (field.classList.contains('is-open')) {
+                    closePremiumSelect(field);
+                } else {
+                    openPremiumSelect(field);
+                }
+            });
+
+            trigger?.addEventListener('keydown', (event) => {
+                const currentIndex = Math.max(0, options.findIndex((option) => option.getAttribute('aria-selected') === 'true'));
+
+                if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+                    event.preventDefault();
+                    openPremiumSelect(field);
+                    const nextIndex = event.key === 'ArrowUp'
+                        ? Math.max(0, currentIndex - 1)
+                        : Math.min(options.length - 1, currentIndex + 1);
+                    options[nextIndex]?.focus();
+                }
+
+                if (event.key === 'Escape') {
+                    closePremiumSelect(field);
+                }
+            });
+
+            options.forEach((option, index) => {
+                option.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    if (! nativeSelect) return;
+
+                    nativeSelect.value = option.dataset.value ?? '';
+                    syncPremiumSelect(field);
+                    closePremiumSelect(field);
+                    nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+
+                option.addEventListener('keydown', (event) => {
+                    if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        options[Math.min(options.length - 1, index + 1)]?.focus();
+                    }
+                    if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        options[Math.max(0, index - 1)]?.focus();
+                    }
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        option.click();
+                    }
+                    if (event.key === 'Escape') {
+                        closePremiumSelect(field);
+                        trigger?.focus();
+                    }
+                });
+            });
+
+            nativeSelect?.addEventListener('change', () => syncPremiumSelect(field));
+        });
+
+        document.addEventListener('click', (event) => {
+            document.querySelectorAll('[data-premium-select].is-open').forEach((field) => {
+                if (! field.contains(event.target)) {
+                    closePremiumSelect(field);
+                }
             });
         });
 
