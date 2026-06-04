@@ -140,7 +140,7 @@ class LocationBillingAndIdleTest extends TestCase
             'accuracy_meters' => 5,
             'recorded_at' => now()->subSeconds(55)->toISOString(),
         ])->assertOk()
-            ->assertJsonPath('message', 'Movement ignored as GPS anomaly.');
+            ->assertJsonPath('message', 'Over-speed movement recorded but not billed.');
 
         $this->rental->refresh();
         $this->assertGreaterThan(100, (float) $this->rental->total_distance_meters);
@@ -150,6 +150,52 @@ class LocationBillingAndIdleTest extends TestCase
             'ignored_reason' => 'speed_anomaly',
             'is_anomaly' => true,
         ]);
+    }
+
+    public function test_tracking_and_billing_resume_from_speed_anomaly_anchor(): void
+    {
+        Sanctum::actingAs($this->device);
+
+        $baseTime = now()->subMinutes(5);
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
+            'accuracy_meters' => 5,
+            'recorded_at' => $baseTime->toISOString(),
+        ])->assertOk();
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.582000,
+            'longitude' => 116.116000,
+            'accuracy_meters' => 5,
+            'recorded_at' => $baseTime->copy()->addMinutes(2)->toISOString(),
+        ])->assertOk()
+            ->assertJsonPath('message', 'Valid movement processed.');
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.580000,
+            'longitude' => 116.116000,
+            'accuracy_meters' => 5,
+            'recorded_at' => $baseTime->copy()->addMinutes(2)->addSeconds(5)->toISOString(),
+        ])->assertOk()
+            ->assertJsonPath('message', 'Over-speed movement recorded but not billed.');
+
+        $distanceBeforeResume = (float) $this->rental->refresh()->total_distance_meters;
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.579000,
+            'longitude' => 116.116000,
+            'accuracy_meters' => 5,
+            'recorded_at' => $baseTime->copy()->addMinutes(2)->addSeconds(30)->toISOString(),
+        ])->assertOk()
+            ->assertJsonPath('message', 'Valid movement processed.');
+
+        $this->rental->refresh();
+
+        $this->assertGreaterThan($distanceBeforeResume + 100, (float) $this->rental->total_distance_meters);
+        $this->assertLessThan($distanceBeforeResume + 130, (float) $this->rental->total_distance_meters);
+        $this->assertSame(1000, $this->rental->distance_cost);
     }
 
     public function test_device_can_read_active_rental_dashboard_summary_for_assigned_bike(): void

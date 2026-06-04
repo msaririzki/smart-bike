@@ -71,8 +71,17 @@ class LocationProcessingService
 
             $previous = RentalLocationPoint::query()
                 ->where('rental_id', $rental->id)
-                ->whereNull('ignored_reason')
-                ->where('is_anomaly', false)
+                ->where(function ($query): void {
+                    $query->where(function ($query): void {
+                        $query
+                            ->whereNull('ignored_reason')
+                            ->where('is_anomaly', false);
+                    })->orWhere(function ($query): void {
+                        $query
+                            ->where('ignored_reason', 'speed_anomaly')
+                            ->where('is_anomaly', true);
+                    });
+                })
                 ->latest('recorded_at')
                 ->first();
 
@@ -118,7 +127,7 @@ class LocationProcessingService
             if ($speedKmh > $maxSpeed) {
                 $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, 'speed_anomaly', $distance, true);
 
-                return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Movement ignored as GPS anomaly.'];
+                return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Over-speed movement recorded but not billed.'];
             }
 
             $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, null, $distance, false, true);

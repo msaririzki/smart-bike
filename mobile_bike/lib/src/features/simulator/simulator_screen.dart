@@ -41,6 +41,7 @@ class SimulatorScreen extends StatefulWidget {
 class _SimulatorScreenState extends State<SimulatorScreen>
     with SingleTickerProviderStateMixin {
   static const double _maxAcceptedGpsAccuracyMeters = 50;
+  static const double _maxBillableSpeedKmh = 40;
   static const double _maxAcceptedJumpSpeedKmh = 80;
   static const double _minRouteDistanceMeters = 1.5;
   static const double _maxDynamicMovementThresholdMeters = 35;
@@ -51,7 +52,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   static const double _speedFallLimitKmhPerSecond = 8;
   static const Duration _stationaryServerPingInterval = Duration(seconds: 15);
   static const Duration _autoFollowReturnDelay = Duration(seconds: 10);
-  static const int _maxRoutePoints = 120;
+  static const int _maxRoutePoints = 3000;
 
   final _gps = GpsService();
   final _battery = Battery();
@@ -710,12 +711,24 @@ class _SimulatorScreenState extends State<SimulatorScreen>
       return;
     }
 
-    if (impliedSpeedKmh > _maxAcceptedJumpSpeedKmh) {
-      _setStateAndRefreshMonitoring(() {
-        _speedKmh = 0;
-        _lastServerMsg =
-            'GPS loncat, titik diabaikan (${impliedSpeedKmh.toStringAsFixed(1)} km/h)';
-      });
+    if (impliedSpeedKmh > _maxBillableSpeedKmh) {
+      final anomalySpeedKmh = math.max(
+        impliedSpeedKmh,
+        pos.speed.isFinite && pos.speed > 0 ? pos.speed * 3.6 : 0.0,
+      );
+      final displayAnomalySpeedKmh =
+          anomalySpeedKmh.clamp(0.0, _maxAcceptedJumpSpeedKmh).toDouble();
+
+      _acceptRealGpsPoint(
+        pos,
+        sampledAt: sampledAt,
+        speedKmh: displayAnomalySpeedKmh,
+        serverSpeedKmh: anomalySpeedKmh,
+        distance: distance,
+        isSpeedAnomaly: true,
+        message:
+            'Melebihi batas ${_maxBillableSpeedKmh.toStringAsFixed(0)} km/h; segmen ditandai merah.',
+      );
       return;
     }
 
@@ -894,6 +907,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     required double serverSpeedKmh,
     required String message,
     double distance = 0,
+    bool isSpeedAnomaly = false,
   }) {
     final previous = _lastAcceptedGpsPoint;
     final headingDegrees = _headingFromPosition(pos, previous);
@@ -903,6 +917,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
       accuracyMeters: pos.accuracy,
       recordedAt: sampledAt,
       headingDegrees: headingDegrees ?? previous?.headingDegrees,
+      isSpeedAnomaly: isSpeedAnomaly,
     );
 
     _lastAcceptedGpsPoint = point;
@@ -923,6 +938,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
         longitude: point.longitude,
         accuracyMeters: point.accuracyMeters,
         headingDegrees: _headingDegrees ?? point.headingDegrees,
+        isSpeedAnomaly: point.isSpeedAnomaly,
       );
     });
     _updateMapCamera();
@@ -1100,6 +1116,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     required double longitude,
     required double accuracyMeters,
     double? headingDegrees,
+    bool isSpeedAnomaly = false,
   }) {
     final next = _RoutePoint(
       latitude: latitude,
@@ -1107,6 +1124,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
       accuracyMeters: accuracyMeters,
       recordedAt: DateTime.now(),
       headingDegrees: headingDegrees,
+      isSpeedAnomaly: isSpeedAnomaly,
     );
 
     if (_routePoints.isNotEmpty) {
@@ -1661,6 +1679,17 @@ class _SimulatorScreenState extends State<SimulatorScreen>
             ),
           ),
         ),
+        if (_locationAccessGranted && _routePoints.length < 2)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 198,
+            left: 24,
+            right: 24,
+            child: _MapHintChip(
+              message: _routePoints.isEmpty
+                  ? 'Menunggu GPS valid'
+                  : 'Jalur muncul setelah sepeda bergerak',
+            ),
+          ),
         AnimatedPositioned(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
@@ -2578,6 +2607,7 @@ class _RoutePoint {
     required this.accuracyMeters,
     required this.recordedAt,
     this.headingDegrees,
+    this.isSpeedAnomaly = false,
   });
 
   final double latitude;
@@ -2585,6 +2615,7 @@ class _RoutePoint {
   final double accuracyMeters;
   final DateTime recordedAt;
   final double? headingDegrees;
+  final bool isSpeedAnomaly;
 }
 
 class _PendingLocationUpdate {
@@ -2770,18 +2801,7 @@ class _MiniRouteMap extends StatelessWidget {
                 if (isSatellite) _buildLabelLayer(),
                 if (mapPoints.length >= 2)
                   PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: mapPoints,
-                        strokeWidth: 7,
-                        color: routeColor.withValues(alpha: .28),
-                      ),
-                      Polyline(
-                        points: mapPoints,
-                        strokeWidth: 4,
-                        color: routeColor,
-                      ),
-                    ],
+                    polylines: _buildRoutePolylines(mapPoints, routeColor),
                   ),
                 if (latestAccuracy != null &&
                     latestAccuracy > 0 &&
@@ -2849,17 +2869,6 @@ class _MiniRouteMap extends StatelessWidget {
               onMapTypeChanged: onMapTypeChanged,
             ),
           ),
-          if (pointCount < 2)
-            Positioned(
-              left: 64,
-              right: 64,
-              bottom: 216,
-              child: _MapHintChip(
-                message: pointCount == 0
-                    ? 'Menunggu GPS valid'
-                    : 'Jalur muncul setelah sepeda bergerak',
-              ),
-            ),
         ],
       ),
     );
@@ -2893,6 +2902,38 @@ class _MiniRouteMap extends StatelessWidget {
       userAgentPackageName: 'com.smartbike.mobile_bike',
       maxNativeZoom: 19,
     );
+  }
+
+  List<Polyline> _buildRoutePolylines(
+    List<latlong.LatLng> mapPoints,
+    Color routeColor,
+  ) {
+    const anomalyColor = Color(0xFFEF4444);
+    final shadows = <Polyline>[];
+    final lines = <Polyline>[];
+
+    for (var i = 1; i < mapPoints.length; i++) {
+      final isAnomalySegment = points[i].isSpeedAnomaly;
+      final color = isAnomalySegment ? anomalyColor : routeColor;
+      final segment = [mapPoints[i - 1], mapPoints[i]];
+
+      shadows.add(
+        Polyline(
+          points: segment,
+          strokeWidth: 7,
+          color: color.withValues(alpha: .26),
+        ),
+      );
+      lines.add(
+        Polyline(
+          points: segment,
+          strokeWidth: 4,
+          color: color,
+        ),
+      );
+    }
+
+    return [...shadows, ...lines];
   }
 
   Marker _buildMarker({
@@ -3067,7 +3108,7 @@ class _MapHintChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 280),
+        constraints: const BoxConstraints(maxWidth: 360),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: const Color(0xFF0F172A).withValues(alpha: .84),
@@ -3097,8 +3138,9 @@ class _MapHintChip extends StatelessWidget {
                 Flexible(
                   child: Text(
                     message,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                    softWrap: true,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
