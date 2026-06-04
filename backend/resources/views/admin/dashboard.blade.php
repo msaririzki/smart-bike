@@ -82,6 +82,8 @@
         .map-popup-footer a { color: #0f766e; font-weight: 600; font-size: 0.875rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s; }
         .map-popup-footer a:hover { color: #0f172a; text-decoration: underline; }
         .cell-map-marker { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: #7c2d12; background: #fed7aa; border: 3px solid #fff7ed; box-shadow: 0 8px 18px rgba(124, 45, 18, .26); font-size: 16px; }
+        .cell-handover-marker { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: #ffffff; background: #2563eb; border: 3px solid #dbeafe; box-shadow: 0 10px 20px rgba(37, 99, 235, .32); font-size: 14px; font-weight: 900; }
+        .cell-route-line { filter: drop-shadow(0 4px 8px rgba(37, 99, 235, .25)); }
         .cell-layer-button.active { background: #0f766e !important; border-color: #0f766e !important; color: white !important; }
 
 
@@ -345,6 +347,8 @@
     <script>
         const bikes = @json($mapBikes);
         const cells = @json($mapCells);
+        const cellRoute = @json($cellRoute);
+        const cellHandovers = @json($cellHandovers);
         const statusLabels = @json($adminStatusLabels);
         const mapElement = document.getElementById('bike-map');
         const mapEmptyElement = document.getElementById('bike-map-empty');
@@ -382,10 +386,14 @@
             const map = L.map(mapElement).setView([-8.5830, 116.1160], 14);
             const markers = new Map();
             const cellMarkers = new Map();
+            const handoverMarkers = new Map();
+            let cellRouteLine = null;
             let cellsVisible = true;
             let hasFittedMap = false;
             let currentBounds = [];
             let latestCells = cells;
+            let latestCellRoute = cellRoute;
+            let latestCellHandovers = cellHandovers;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
@@ -466,6 +474,14 @@
                 popupAnchor: [0, -15],
             });
 
+            const handoverIcon = () => L.divIcon({
+                className: 'cell-handover-marker',
+                html: '&#8644;',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                popupAnchor: [0, -14],
+            });
+
             const cellPopupHtml = (cell) => {
                 const signal = cell.average_signal_dbm === null ? '-' : `${cell.average_signal_dbm} dBm`;
                 const rsrp = cell.average_rsrp_dbm === null ? '-' : `${cell.average_rsrp_dbm} dBm`;
@@ -527,6 +543,107 @@
                 `;
             };
 
+            const handoverPopupHtml = (event) => {
+                const fromOperator = event.from_operator_label ?? 'Cell awal';
+                const toOperator = event.to_operator_label ?? 'Cell baru';
+                const signal = event.signal_dbm === null ? '-' : `${event.signal_dbm} dBm`;
+
+                return `
+                    <div class="map-popup">
+                        <div class="map-popup-header" style="background: linear-gradient(135deg, #1d4ed8, #38bdf8);">
+                            <div>
+                                <h3 class="map-popup-title">Pindah BTS/Cell</h3>
+                                <div class="map-popup-subtitle">${escapeHtml(fromOperator)} &rarr; ${escapeHtml(toOperator)}</div>
+                            </div>
+                            <span class="badge">Handover</span>
+                        </div>
+                        <div class="map-popup-grid">
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Dari Cell</span>
+                                <span class="map-popup-value">${escapeHtml(event.from_radio_type ?? '-')} ${escapeHtml(event.from_cell_id ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Ke Cell</span>
+                                <span class="map-popup-value">${escapeHtml(event.to_radio_type ?? '-')} ${escapeHtml(event.to_cell_id ?? '-')}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Sinyal saat pindah</span>
+                                <span class="map-popup-value">${escapeHtml(signal)}</span>
+                            </div>
+                            <div class="map-popup-item">
+                                <span class="map-popup-label">Waktu</span>
+                                <span class="map-popup-value">${escapeHtml(event.observed_at ?? '-')}</span>
+                            </div>
+                        </div>
+                        <div class="map-popup-details">
+                            <p><strong>Catatan:</strong> Titik ini adalah lokasi GPS saat perangkat terdeteksi berpindah dari satu cell ke cell lain dalam perjalanan yang dipilih.</p>
+                        </div>
+                    </div>
+                `;
+            };
+
+            const renderCellRoute = (routePoints) => {
+                if (cellRouteLine) {
+                    map.removeLayer(cellRouteLine);
+                    cellRouteLine = null;
+                }
+
+                if (routePoints.length < 2) {
+                    return;
+                }
+
+                const positions = routePoints.map((point) => [point.latitude, point.longitude]);
+                cellRouteLine = L.polyline(positions, {
+                    color: '#2563eb',
+                    weight: 4,
+                    opacity: 0.78,
+                    dashArray: '10 8',
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                    className: 'cell-route-line',
+                }).bindPopup(
+                    `<div class="map-popup-details"><p><strong>Jalur observasi BTS:</strong> ${escapeHtml(routePoints.length)} titik GPS pada perjalanan yang dipilih.</p></div>`,
+                    { autoPan: false, className: 'animated-popup' },
+                );
+
+                if (cellsVisible) {
+                    cellRouteLine.addTo(map);
+                }
+            };
+
+            const renderHandovers = (events) => {
+                const visibleIds = new Set();
+
+                events.forEach((event) => {
+                    const id = String(event.id);
+                    const position = [event.latitude, event.longitude];
+                    visibleIds.add(id);
+
+                    if (handoverMarkers.has(id)) {
+                        handoverMarkers.get(id)
+                            .setLatLng(position)
+                            .setPopupContent(handoverPopupHtml(event));
+                    } else {
+                        const marker = L.marker(position, { icon: handoverIcon(), zIndexOffset: 650 }).bindPopup(handoverPopupHtml(event), { autoPan: false, className: 'animated-popup' });
+                        handoverMarkers.set(id, marker);
+                    }
+
+                    if (cellsVisible && ! map.hasLayer(handoverMarkers.get(id))) {
+                        handoverMarkers.get(id).addTo(map);
+                    }
+                    if (! cellsVisible && map.hasLayer(handoverMarkers.get(id))) {
+                        map.removeLayer(handoverMarkers.get(id));
+                    }
+                });
+
+                handoverMarkers.forEach((marker, id) => {
+                    if (! visibleIds.has(id)) {
+                        map.removeLayer(marker);
+                        handoverMarkers.delete(id);
+                    }
+                });
+            };
+
             const renderCells = (nextCells) => {
                 const visibleIds = new Set();
 
@@ -560,13 +677,16 @@
                 });
 
                 if (cellLayerLabel) {
-                    cellLayerLabel.textContent = `BTS (${nextCells.length})`;
+                    const handoverCount = latestCellHandovers.length;
+                    cellLayerLabel.textContent = handoverCount > 0
+                        ? `BTS (${nextCells.length}) / Pindah (${handoverCount})`
+                        : `BTS (${nextCells.length})`;
                 }
                 cellLayerToggle.classList.toggle('active', Boolean(selectedCellDeviceId) && cellsVisible);
                 cellLayerToggle.disabled = ! selectedCellDeviceId;
             };
 
-            const renderMapData = (nextBikes, nextCells, fitMap = false) => {
+            const renderMapData = (nextBikes, nextCells, nextCellRoute = [], nextCellHandovers = [], fitMap = false) => {
                 const visibleCodes = new Set();
                 const bounds = [];
 
@@ -609,13 +729,21 @@
                 });
 
                 latestCells = nextCells;
+                latestCellRoute = nextCellRoute;
+                latestCellHandovers = nextCellHandovers;
+                renderCellRoute(nextCellRoute);
+                renderHandovers(nextCellHandovers);
                 renderCells(nextCells);
 
-                if (nextBikes.length === 0 && nextCells.length > 0) {
+                nextCellRoute.forEach((point) => bounds.push([point.latitude, point.longitude]));
+                nextCells.forEach((cell) => bounds.push([cell.latitude, cell.longitude]));
+                nextCellHandovers.forEach((event) => bounds.push([event.latitude, event.longitude]));
+
+                if (nextBikes.length === 0 && bounds.length === 0 && nextCells.length > 0) {
                     nextCells.forEach((cell) => bounds.push([cell.latitude, cell.longitude]));
                 }
 
-                const hasMapData = nextBikes.length > 0 || nextCells.length > 0;
+                const hasMapData = nextBikes.length > 0 || nextCells.length > 0 || nextCellRoute.length > 0 || nextCellHandovers.length > 0;
                 mapEmptyElement.hidden = hasMapData;
                 mapElement.hidden = ! hasMapData;
                 mapCenterButton.disabled = ! hasMapData;
@@ -788,7 +916,7 @@
                         updateRentalFilterOptions(payload.cell_rental_options ?? []);
                     }
 
-                    renderMapData(payload.data ?? [], payload.cells ?? [], fitMap);
+                    renderMapData(payload.data ?? [], payload.cells ?? [], payload.cell_route ?? [], payload.cell_handovers ?? [], fitMap);
                     updateFilterUrl();
                     updateCellClearState();
                 } catch (_error) {
@@ -800,13 +928,13 @@
                 try {
                     const response = await fetch(mapDataRequestUrl(), { headers: { Accept: 'application/json' } });
                     const payload = await response.json();
-                    renderMapData(payload.data ?? [], payload.cells ?? []);
+                    renderMapData(payload.data ?? [], payload.cells ?? [], payload.cell_route ?? [], payload.cell_handovers ?? []);
                 } catch (_error) {
                     return;
                 }
             };
 
-            renderMapData(bikes, cells);
+            renderMapData(bikes, cells, cellRoute, cellHandovers);
 
             // Fix: Gunakan setTimeout 200ms setelah DOM siap untuk mencegah kotak abu-abu
             const applyMapFix = () => {
@@ -827,6 +955,8 @@
             mapCenterButton?.addEventListener('click', fitMapToBounds);
             cellLayerToggle?.addEventListener('click', () => {
                 cellsVisible = ! cellsVisible;
+                renderCellRoute(latestCellRoute);
+                renderHandovers(latestCellHandovers);
                 renderCells(latestCells);
             });
             cellDeviceFilter?.addEventListener('change', () => {

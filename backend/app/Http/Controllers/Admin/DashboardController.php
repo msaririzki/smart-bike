@@ -47,6 +47,8 @@ class DashboardController extends Controller
             'users' => User::query()->where('role', 'user')->count(),
             'mapBikes' => $this->bikeMapData(),
             'mapCells' => $this->cellMapData($selectedCellDeviceId, $selectedCellRentalId),
+            'cellRoute' => $this->cellRouteData($selectedCellDeviceId, $selectedCellRentalId),
+            'cellHandovers' => $this->cellHandoverData($selectedCellDeviceId, $selectedCellRentalId),
             'cellDeviceOptions' => $this->cellDeviceOptions(),
             'cellRentalOptions' => $this->cellRentalOptions($selectedCellDeviceId),
             'selectedCellDeviceId' => $selectedCellDeviceId,
@@ -62,6 +64,8 @@ class DashboardController extends Controller
         return response()->json([
             'data' => $this->bikeMapData(),
             'cells' => $this->cellMapData($selectedCellDeviceId, $selectedCellRentalId),
+            'cell_route' => $this->cellRouteData($selectedCellDeviceId, $selectedCellRentalId),
+            'cell_handovers' => $this->cellHandoverData($selectedCellDeviceId, $selectedCellRentalId),
             'cell_rental_options' => $this->cellRentalOptions($selectedCellDeviceId),
             'selected_cell_device_id' => $selectedCellDeviceId,
             'selected_cell_rental_id' => $selectedCellRentalId,
@@ -199,6 +203,80 @@ class DashboardController extends Controller
             ->sortByDesc('last_seen_at')
             ->take(500)
             ->values();
+    }
+
+    private function cellRouteData(?int $deviceUserId, ?int $rentalId): Collection
+    {
+        if ($deviceUserId === null || $rentalId === null) {
+            return collect();
+        }
+
+        return $this->cellObservationSequence($deviceUserId, $rentalId)
+            ->map(fn (CellObservation $observation): array => [
+                'id' => $observation->id,
+                'cell_tower_id' => $observation->cell_tower_id,
+                'operator_label' => $observation->operator_label ?? $observation->cellTower?->operator_label,
+                'radio_type' => $observation->cellTower?->radio_type,
+                'cell_id' => $observation->cellTower?->cell_id,
+                'latitude' => (float) $observation->latitude,
+                'longitude' => (float) $observation->longitude,
+                'accuracy_meters' => $observation->accuracy_meters !== null ? (float) $observation->accuracy_meters : null,
+                'signal_dbm' => $observation->signal_dbm,
+                'observed_at' => $observation->observed_at?->format('Y-m-d H:i:s'),
+            ])
+            ->values();
+    }
+
+    private function cellHandoverData(?int $deviceUserId, ?int $rentalId): Collection
+    {
+        if ($deviceUserId === null || $rentalId === null) {
+            return collect();
+        }
+
+        $previous = null;
+
+        return $this->cellObservationSequence($deviceUserId, $rentalId)
+            ->map(function (CellObservation $observation) use (&$previous): ?array {
+                $current = $observation;
+                $from = $previous;
+                $previous = $current;
+
+                if (! $from || (int) $from->cell_tower_id === (int) $current->cell_tower_id) {
+                    return null;
+                }
+
+                return [
+                    'id' => "{$from->id}-{$current->id}",
+                    'from_cell_tower_id' => $from->cell_tower_id,
+                    'to_cell_tower_id' => $current->cell_tower_id,
+                    'from_operator_label' => $from->operator_label ?? $from->cellTower?->operator_label,
+                    'to_operator_label' => $current->operator_label ?? $current->cellTower?->operator_label,
+                    'from_radio_type' => $from->cellTower?->radio_type,
+                    'to_radio_type' => $current->cellTower?->radio_type,
+                    'from_cell_id' => $from->cellTower?->cell_id,
+                    'to_cell_id' => $current->cellTower?->cell_id,
+                    'latitude' => (float) $current->latitude,
+                    'longitude' => (float) $current->longitude,
+                    'signal_dbm' => $current->signal_dbm,
+                    'observed_at' => $current->observed_at?->format('Y-m-d H:i:s'),
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    private function cellObservationSequence(int $deviceUserId, int $rentalId): Collection
+    {
+        return CellObservation::query()
+            ->with('cellTower')
+            ->where('device_user_id', $deviceUserId)
+            ->where('rental_id', $rentalId)
+            ->whereBetween('latitude', self::LOMBOK_LATITUDE_RANGE)
+            ->whereBetween('longitude', self::LOMBOK_LONGITUDE_RANGE)
+            ->orderBy('observed_at')
+            ->orderBy('id')
+            ->limit(5000)
+            ->get();
     }
 
     private function selectedCellDeviceId(Request $request): ?int
