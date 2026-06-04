@@ -114,6 +114,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   _MapFollowMode _followMode = _MapFollowMode.auto;
   bool _mapControlsExpanded = false;
   final MapController _mapController = MapController();
+  final ValueNotifier<int> _monitoringPanelRevision = ValueNotifier<int>(0);
 
   bool get _hasActiveRental => _summary?.rental != null;
   bool get _isGpsWarmupActive =>
@@ -136,6 +137,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() => _now = DateTime.now());
+        _refreshMonitoringPanel();
       }
     });
     _refreshController = AnimationController(
@@ -155,7 +157,18 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     _clockTimer?.cancel();
     _refreshController.dispose();
     _mapController.dispose();
+    _monitoringPanelRevision.dispose();
     super.dispose();
+  }
+
+  void _refreshMonitoringPanel() {
+    _monitoringPanelRevision.value++;
+  }
+
+  void _setStateAndRefreshMonitoring(VoidCallback update) {
+    if (!mounted) return;
+    setState(update);
+    _refreshMonitoringPanel();
   }
 
   Future<void> _enableWakeLock() async {
@@ -219,12 +232,12 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   Future<void> _loadBike() async {
     try {
       final bike = await widget.api.currentAssignment();
-      if (mounted) setState(() => _bike = bike);
+      if (mounted) _setStateAndRefreshMonitoring(() => _bike = bike);
       _autoStartRealGpsIfReady();
     } catch (e) {
       _showMessage('Gagal memuat sepeda: $e');
     } finally {
-      if (mounted) setState(() => _loadingBike = false);
+      if (mounted) _setStateAndRefreshMonitoring(() => _loadingBike = false);
     }
   }
 
@@ -232,7 +245,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     try {
       final summary = await widget.api.activeRentalSummary();
       if (!mounted) return;
-      setState(() {
+      _setStateAndRefreshMonitoring(() {
         _summary = summary;
         _bike = summary.bike ?? _bike;
         final nextRentalId = summary.rental?.id;
@@ -448,23 +461,31 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   void _listenNetwork() {
     _networkSub = Connectivity().onConnectivityChanged.listen((results) {
       if (!mounted) return;
-      setState(() => _networkType = _connectivityLabel(results));
+      _setStateAndRefreshMonitoring(
+        () => _networkType = _connectivityLabel(results),
+      );
     });
     Connectivity().checkConnectivity().then((results) {
-      if (mounted) setState(() => _networkType = _connectivityLabel(results));
+      if (mounted) {
+        _setStateAndRefreshMonitoring(
+          () => _networkType = _connectivityLabel(results),
+        );
+      }
     });
   }
 
   Future<void> _loadBattery() async {
     try {
       final level = await _battery.batteryLevel;
-      if (mounted) setState(() => _batteryPercent = level);
+      if (mounted) _setStateAndRefreshMonitoring(() => _batteryPercent = level);
       _batteryTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
         final nextLevel = await _battery.batteryLevel;
-        if (mounted) setState(() => _batteryPercent = nextLevel);
+        if (mounted) {
+          _setStateAndRefreshMonitoring(() => _batteryPercent = nextLevel);
+        }
       });
     } catch (_) {
-      if (mounted) setState(() => _batteryPercent = 0);
+      if (mounted) _setStateAndRefreshMonitoring(() => _batteryPercent = 0);
     }
   }
 
@@ -479,7 +500,9 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     required bool requestIfDenied,
     bool showMessage = true,
   }) async {
-    if (mounted) setState(() => _checkingLocationAccess = true);
+    if (mounted) {
+      _setStateAndRefreshMonitoring(() => _checkingLocationAccess = true);
+    }
 
     final access = await _gps.ensureLocationAccess(
       requestIfDenied: requestIfDenied,
@@ -487,7 +510,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     final message = _locationAccessText(access.status);
 
     if (!mounted) return access.granted;
-    setState(() {
+    _setStateAndRefreshMonitoring(() {
       _checkingLocationAccess = false;
       _locationAccessGranted = access.granted;
       _locationAccessStatus = access.status;
@@ -551,7 +574,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     }
 
     _stopRealGps();
-    setState(() {
+    _setStateAndRefreshMonitoring(() {
       _streaming = true;
       _locationMode = 'Real GPS';
     });
@@ -566,7 +589,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
       _handleRealGpsPosition(pos);
     }, onError: (Object error) {
       if (!mounted) return;
-      setState(() {
+      _setStateAndRefreshMonitoring(() {
         _streaming = false;
         _locationMode = 'GPS error';
         _lastServerMsg = 'GPS gagal: $error';
@@ -599,14 +622,14 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     final sampledAt = _effectiveGpsSampleTime(pos);
     final rentalActive = _hasActiveRental;
 
-    setState(() {
+    _setStateAndRefreshMonitoring(() {
       _accuracyMeters = pos.accuracy;
       _lastGpsReadAt = sampledAt;
       _locationMode = 'Real GPS';
     });
 
     if (pos.accuracy > _maxAcceptedGpsAccuracyMeters) {
-      setState(() {
+      _setStateAndRefreshMonitoring(() {
         _speedKmh = 0;
         _lastServerMsg =
             'GPS kurang akurat (${pos.accuracy.toStringAsFixed(1)} m), titik diabaikan';
@@ -616,7 +639,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
 
     if (!rentalActive) {
       _resetSpeedSmoothing();
-      setState(() => _speedKmh = 0);
+      _setStateAndRefreshMonitoring(() => _speedKmh = 0);
       _sendLocation(pos, speedKmh: 0);
       return;
     }
@@ -655,10 +678,10 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     final displaySpeedKmh =
         warmupReady ? _smoothDisplaySpeed(targetSpeedKmh, sampledAt) : 0.0;
 
-    setState(() => _speedKmh = displaySpeedKmh);
+    _setStateAndRefreshMonitoring(() => _speedKmh = displaySpeedKmh);
 
     if (!warmupReady) {
-      setState(() {
+      _setStateAndRefreshMonitoring(() {
         _lastServerMsg =
             'Mengunci GPS awal (${_gpsWarmupSampleCount.clamp(1, _gpsWarmupMinSamples)}/$_gpsWarmupMinSamples)';
       });
@@ -669,7 +692,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     }
 
     if (distance < movementThreshold) {
-      setState(() {
+      _setStateAndRefreshMonitoring(() {
         if (displaySpeedKmh < _minReliableSpeedKmh) {
           _speedKmh = 0;
         }
@@ -681,7 +704,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     }
 
     if (impliedSpeedKmh > _maxAcceptedJumpSpeedKmh) {
-      setState(() {
+      _setStateAndRefreshMonitoring(() {
         _speedKmh = 0;
         _lastServerMsg =
             'GPS loncat, titik diabaikan (${impliedSpeedKmh.toStringAsFixed(1)} km/h)';
@@ -703,7 +726,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     _stopRealGps();
     _stopHeartbeat();
     if (mounted) {
-      setState(() {
+      _setStateAndRefreshMonitoring(() {
         _streaming = false;
         _locationMode = 'Belum aktif';
       });
@@ -878,7 +901,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     _lastAcceptedGpsPoint = point;
     _lastStationarySentAt = null;
 
-    setState(() {
+    _setStateAndRefreshMonitoring(() {
       _speedKmh = speedKmh;
       if (point.headingDegrees != null) {
         _headingDegrees = _smoothHeading(
@@ -948,7 +971,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
       return;
     }
 
-    setState(() => _sending = true);
+    _setStateAndRefreshMonitoring(() => _sending = true);
     try {
       final cell = _streaming && _recordCellSurvey
           ? await _cellInfo.currentServingCell()
@@ -964,16 +987,18 @@ class _SimulatorScreenState extends State<SimulatorScreen>
         cell: cell,
       );
       if (mounted) {
-        setState(() {
+        _setStateAndRefreshMonitoring(() {
           _lastSentAt = DateTime.now();
           _lastServerMsg = res['message']?.toString() ?? 'OK';
         });
         _loadRentalSummary(silent: true);
       }
     } catch (e) {
-      if (mounted) setState(() => _lastServerMsg = 'Error: $e');
+      if (mounted) {
+        _setStateAndRefreshMonitoring(() => _lastServerMsg = 'Error: $e');
+      }
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) _setStateAndRefreshMonitoring(() => _sending = false);
       final pending = _pendingLocationUpdate;
       if (pending != null && mounted) {
         _pendingLocationUpdate = null;
@@ -994,7 +1019,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     final previousKey = _lastCellKey;
     final nextKey = cell.identityKey;
 
-    setState(() {
+    _setStateAndRefreshMonitoring(() {
       _currentCell = cell;
       if (nextKey != null) {
         _lastCellKey = nextKey;
@@ -1011,7 +1036,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   }
 
   void _setCellSurveyRecording(bool value) {
-    setState(() {
+    _setStateAndRefreshMonitoring(() {
       _recordCellSurvey = value;
       if (value) {
         _lastCellEvent = 'Mengecek BTS aktif';
@@ -1032,7 +1057,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     if (!mounted || !_recordCellSurvey) return;
 
     if (cell == null) {
-      setState(() {
+      _setStateAndRefreshMonitoring(() {
         _lastCellEvent = _streaming
             ? 'BTS aktif, menunggu data cell dari Android'
             : 'BTS aktif, menunggu GPS aktif';
@@ -1041,7 +1066,9 @@ class _SimulatorScreenState extends State<SimulatorScreen>
       _updateCellStatus(cell);
       if (!mounted || !_recordCellSurvey) return;
       if (!_streaming) {
-        setState(() => _lastCellEvent = 'BTS siap, menunggu GPS aktif');
+        _setStateAndRefreshMonitoring(
+          () => _lastCellEvent = 'BTS siap, menunggu GPS aktif',
+        );
       }
     }
 
@@ -1051,7 +1078,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     if (!mounted || !_recordCellSurvey || currentPosition == null) return;
 
     if (currentPosition.accuracy > _maxAcceptedGpsAccuracyMeters) {
-      setState(() {
+      _setStateAndRefreshMonitoring(() {
         _lastCellEvent =
             'BTS aktif, menunggu GPS akurat (${currentPosition.accuracy.toStringAsFixed(1)} m)';
       });
@@ -1717,206 +1744,221 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   }
 
   Widget _buildAdvancedControlsModal(Bike bike, ActiveBikeRental? rental) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(32),
-          topRight: Radius.circular(32),
-        ),
-      ),
-      padding: EdgeInsets.zero,
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.max,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header Awal (Content Lowered)
-            Container(
-              padding: const EdgeInsets.only(
-                  top: 35, bottom: 15, left: 16, right: 16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x0A0F172A),
-                    blurRadius: 10,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 24),
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                  const Text(
-                    'Monitoring & Kontrol Unit',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 22, // Dikecilkan (dari 26 ke 22)
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -1.0,
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      onPressed: _isRefreshing
-                          ? null
-                          : () async {
-                              setState(() => _isRefreshing = true);
-                              _refreshController.repeat(); // Mulai berputar
+    return ValueListenableBuilder<int>(
+      valueListenable: _monitoringPanelRevision,
+      builder: (context, _, __) {
+        final currentBike = _bike ?? bike;
+        final currentRental = _summary?.rental ?? rental;
 
-                              try {
-                                // Memanggil ulang data dari server
-                                await Future.wait([
-                                  _loadBike(),
-                                  _loadRentalSummary(),
-                                  _loadBattery(),
-                                  Future.delayed(const Duration(
-                                      milliseconds:
-                                          800)), // Minimal durasi putaran
-                                ]);
-                              } finally {
-                                if (mounted) {
-                                  _refreshController
-                                      .stop(); // Berhenti berputar
-                                  _refreshController.reset();
-                                  setState(() => _isRefreshing = false);
-
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Data berhasil diperbarui dari server'),
-                                      duration: Duration(seconds: 1),
-                                      backgroundColor: Color(0xFF10B981),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                      icon: RotationTransition(
-                        turns: _refreshController,
-                        child: const Icon(Icons.refresh_rounded, size: 32),
-                      ),
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                ],
-              ),
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.9,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(32),
+              topRight: Radius.circular(32),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sectionHeader('Status Koneksi & GPS',
-                        'Pantau real-time koneksi perangkat dengan server'),
-                    _Panel(
-                      child: _StatusBanner(
-                        streaming: _streaming,
-                        mode: _locationMode,
-                        sending: _sending,
-                        serverMessage: _lastServerMsg,
-                        lastGpsReadAt: _lastGpsReadAt,
-                        lastSentAt: _lastSentAt,
+          ),
+          padding: EdgeInsets.zero,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header Awal (Content Lowered)
+                Container(
+                  padding: const EdgeInsets.only(
+                      top: 35, bottom: 15, left: 16, right: 16),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(32),
+                      topRight: Radius.circular(32),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x0A0F172A),
+                        blurRadius: 10,
+                        offset: Offset(0, 2),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _CellSurveyRecordingControl(
-                      enabled: _recordCellSurvey,
-                      onChanged: _setCellSurveyRecording,
-                    ),
-                    const SizedBox(height: 24),
-                    _sectionHeader('Informasi Sepeda & Perangkat',
-                        'Identitas unit, status daya baterai, dan stabilitas transmisi data'),
-                    _Panel(
-                      child: _DeviceSummary(
-                        bike: bike,
-                        batteryPercent: _batteryPercent,
-                        networkType: _networkType,
-                        recordCellSurvey: _recordCellSurvey,
-                        cellInfo: _currentCell,
-                        cellEvent: _lastCellEvent,
-                        pointsSent: _routePoints.length,
-                        locationMode: _locationMode,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _openDeviceDetails(bike, rental);
-                        },
-                        icon: const Icon(Icons.open_in_new_rounded),
-                        label: const Text('Buka detail perangkat'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0F172A),
-                          side: const BorderSide(color: Color(0xFFE2E8F0)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                          ),
+                    ],
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                              size: 24),
+                          color: const Color(0xFF0F172A),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    _sectionHeader('Ringkasan Perjalanan',
-                        'Statistik kecepatan, jarak, dan estimasi biaya sewa'),
-                    _Panel(
-                      backgroundColor:
-                          const Color(0xFF10B981), // Bright Emerald Green
-                      child: _CompactStatsRow(
-                        speedKmh: _smoothedSpeedKmh,
-                        distanceKm: rental?.totalDistanceKilometers ?? 0,
-                        totalCost: rental?.totalCost ?? 0,
+                      const Text(
+                        'Monitoring & Kontrol Unit',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 22, // Dikecilkan (dari 26 ke 22)
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -1.0,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-                    _sectionHeader('Status Kesiapan Perangkat',
-                        'Informasi dan ringkasan diagnostik sensor serta izin akses perangkat secara real-time'),
-                    _FieldTestChecklist(
-                      locationAccess: _locationAccessGranted,
-                      gpsEnabled: _locationAccessStatus !=
-                          LocationAccessStatus.serviceDisabled,
-                      autoStart: _streaming,
-                      networkType: _networkType,
-                      lastGpsAt: _lastGpsReadAt,
-                      lastServerAt: _lastSentAt,
-                      accuracyMeters: _accuracyMeters ??
-                          rental?.latestLocationPoint?.accuracyMeters,
-                      rentalActive: rental != null,
-                      recordCellSurvey: _recordCellSurvey,
-                    ),
-                    const SizedBox(
-                        height:
-                            40), // Ruang ekstra di bawah agar kartu terakhir terlihat penuh
-                  ],
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: IconButton(
+                          onPressed: _isRefreshing
+                              ? null
+                              : () async {
+                                  _setStateAndRefreshMonitoring(
+                                      () => _isRefreshing = true);
+                                  _refreshController.repeat(); // Mulai berputar
+
+                                  try {
+                                    // Memanggil ulang data dari server
+                                    await Future.wait([
+                                      _loadBike(),
+                                      _loadRentalSummary(),
+                                      _loadBattery(),
+                                      Future.delayed(const Duration(
+                                          milliseconds:
+                                              800)), // Minimal durasi putaran
+                                    ]);
+                                  } finally {
+                                    if (mounted) {
+                                      _refreshController
+                                          .stop(); // Berhenti berputar
+                                      _refreshController.reset();
+                                      _setStateAndRefreshMonitoring(
+                                          () => _isRefreshing = false);
+
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Data berhasil diperbarui dari server'),
+                                            duration: Duration(seconds: 1),
+                                            backgroundColor: Color(0xFF10B981),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                          icon: RotationTransition(
+                            turns: _refreshController,
+                            child: const Icon(Icons.refresh_rounded, size: 32),
+                          ),
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _sectionHeader('Status Koneksi & GPS',
+                            'Pantau real-time koneksi perangkat dengan server'),
+                        _Panel(
+                          child: _StatusBanner(
+                            streaming: _streaming,
+                            mode: _locationMode,
+                            sending: _sending,
+                            serverMessage: _lastServerMsg,
+                            lastGpsReadAt: _lastGpsReadAt,
+                            lastSentAt: _lastSentAt,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _CellSurveyRecordingControl(
+                          enabled: _recordCellSurvey,
+                          onChanged: _setCellSurveyRecording,
+                        ),
+                        const SizedBox(height: 24),
+                        _sectionHeader('Informasi Sepeda & Perangkat',
+                            'Identitas unit, status daya baterai, dan stabilitas transmisi data'),
+                        _Panel(
+                          child: _DeviceSummary(
+                            bike: currentBike,
+                            batteryPercent: _batteryPercent,
+                            networkType: _networkType,
+                            recordCellSurvey: _recordCellSurvey,
+                            cellInfo: _currentCell,
+                            cellEvent: _lastCellEvent,
+                            pointsSent: _routePoints.length,
+                            locationMode: _locationMode,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _openDeviceDetails(currentBike, currentRental);
+                            },
+                            icon: const Icon(Icons.open_in_new_rounded),
+                            label: const Text('Buka detail perangkat'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF0F172A),
+                              side: const BorderSide(color: Color(0xFFE2E8F0)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _sectionHeader('Ringkasan Perjalanan',
+                            'Statistik kecepatan, jarak, dan estimasi biaya sewa'),
+                        _Panel(
+                          backgroundColor:
+                              const Color(0xFF10B981), // Bright Emerald Green
+                          child: _CompactStatsRow(
+                            speedKmh: _smoothedSpeedKmh,
+                            distanceKm:
+                                currentRental?.totalDistanceKilometers ?? 0,
+                            totalCost: currentRental?.totalCost ?? 0,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        _sectionHeader('Status Kesiapan Perangkat',
+                            'Informasi dan ringkasan diagnostik sensor serta izin akses perangkat secara real-time'),
+                        _FieldTestChecklist(
+                          locationAccess: _locationAccessGranted,
+                          gpsEnabled: _locationAccessStatus !=
+                              LocationAccessStatus.serviceDisabled,
+                          autoStart: _streaming,
+                          networkType: _networkType,
+                          lastGpsAt: _lastGpsReadAt,
+                          lastServerAt: _lastSentAt,
+                          accuracyMeters: _accuracyMeters ??
+                              currentRental
+                                  ?.latestLocationPoint?.accuracyMeters,
+                          rentalActive: currentRental != null,
+                          recordCellSurvey: _recordCellSurvey,
+                        ),
+                        const SizedBox(
+                            height:
+                                40), // Ruang ekstra di bawah agar kartu terakhir terlihat penuh
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
