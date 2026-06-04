@@ -35,18 +35,15 @@
 
         .map-live-badge { display: inline-flex; align-items: center; gap: 0.45rem; min-height: 34px; padding: 0 0.8rem; border: 1px solid #ccfbf1; border-radius: 999px; background: #f0fdfa; color: #0f766e; font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
         .map-live-badge svg { width: 1rem; height: 1rem; stroke-width: 2.4; }
-        .map-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; width: 100%; align-items: stretch; }
-        .map-filter-shell { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: stretch; min-width: 0; }
+        .map-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; width: 100%; align-items: start; }
+        .map-filter-shell { min-width: 0; }
         
-        .cell-map-count { display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem; min-height: 56px; font-size: 0.88rem; color: #0f766e; background: #f0fdfa; padding: 0 1rem; border-radius: 0.8rem; font-weight: 800; white-space: nowrap; border: 1px solid #ccfbf1; box-shadow: inset 0 1px 0 rgba(255,255,255,0.75); }
-        .cell-map-count svg { width: 1.1rem; height: 1.1rem; stroke-width: 2.4; flex-shrink: 0; }
-        
-        .cell-filter-form { display: flex; flex-wrap: wrap; flex: 1; min-width: 250px; gap: 0.75rem; }
+        .cell-filter-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 0.75rem; min-width: 0; }
         .cell-filter-form .premium-select-field { flex: 1; min-width: 220px; min-height: 56px; padding: 0.5rem 0.75rem; border-radius: 0.8rem; box-sizing: border-box; }
         .cell-filter-form .premium-select-icon { width: 34px; height: 34px; border-radius: 0.65rem; }
         .cell-filter-form .premium-select-hint { display: none; }
         
-        .map-actions-primary { display: flex; gap: 0.65rem; align-items: stretch; justify-content: flex-end; flex-wrap: nowrap; }
+        .map-actions-primary { display: flex; gap: 0.65rem; align-items: flex-start; justify-content: flex-end; flex-wrap: nowrap; }
         .map-actions-secondary { display: flex; justify-content: flex-end; min-width: max-content; }
 
         .dash-map-action-button, .cell-clear-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0 0.9rem !important; border-radius: 0.75rem !important; font-size: 0.86rem !important; font-weight: 800 !important; cursor: pointer; transition: all 0.2s ease !important; min-height: 44px; white-space: nowrap; }
@@ -92,15 +89,13 @@
             .map-actions { grid-template-columns: 1fr; }
             .map-actions-primary { justify-content: flex-start; flex-wrap: wrap; }
         }
-        @media (max-width: 900px) {
-            .cell-map-count { min-height: 50px; justify-content: center; }
-        }
         @media (max-width: 768px) {
             .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
             .dash-map-header { padding: 1.25rem; }
             .dash-map-title { font-size: 1.25rem; }
             .dash-map-subtitle { font-size: 0.88rem; }
-            .cell-map-count, .dash-map-action-button, .cell-clear-button, #cell-clear-form { width: 100%; }
+            .cell-filter-form { grid-template-columns: 1fr; }
+            .dash-map-action-button, .cell-clear-button, #cell-clear-form { width: 100%; }
             .map-actions-primary { display: grid; grid-template-columns: 1fr; }
             .dash-card { padding: 0.75rem; }
             .dash-card-icon { width: 1.75rem; height: 1.75rem; border-radius: 0.375rem; }
@@ -269,10 +264,6 @@
                         ->values();
                 @endphp
                 <div class="map-filter-shell">
-                    <span class="cell-map-count">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M8 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M16 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 17 9 9h4l3 8"/><path d="M9 9 5 17"/><path d="M13 9l2-4h3"/></svg>
-                        <span id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
-                    </span>
                     <form method="get" action="{{ route('admin.dashboard') }}" class="cell-filter-form">
                         <x-admin.premium-select
                             name="cell_device_id"
@@ -626,11 +617,13 @@
                 mapEmptyElement.hidden = hasMapData;
                 mapElement.hidden = ! hasMapData;
                 mapCenterButton.disabled = ! hasMapData;
-                mapCountElement.textContent = selectedCellDeviceId
-                    ? selectedCellRentalId
-                        ? `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS perjalanan terpilih`
-                        : `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS akun terpilih`
-                    : `${nextBikes.length} sepeda lokasi, pilih akun untuk BTS`;
+                if (mapCountElement) {
+                    mapCountElement.textContent = selectedCellDeviceId
+                        ? selectedCellRentalId
+                            ? `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS perjalanan terpilih`
+                            : `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS akun terpilih`
+                        : `${nextBikes.length} sepeda lokasi, pilih akun untuk BTS`;
+                }
                 currentBounds = bounds;
 
                 if (bounds.length === 0) {
@@ -668,7 +661,9 @@
                     const payload = await response.json();
                     renderMapData(payload.data ?? [], payload.cells ?? []);
                 } catch (_error) {
-                    mapCountElement.textContent = 'Peta belum bisa diperbarui otomatis';
+                    if (mapCountElement) {
+                        mapCountElement.textContent = 'Peta belum bisa diperbarui otomatis';
+                    }
                 }
             };
 
