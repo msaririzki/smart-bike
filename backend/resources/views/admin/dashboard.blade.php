@@ -24,26 +24,33 @@
         .dash-card.accent-purple .dash-card-icon { color: #8b5cf6; background: #ede9fe; }
         .dash-card-value { font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: 0; line-height: 1; }
 
-        .dash-map-panel { background: #ffffff; border-radius: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); overflow: hidden; display: flex; flex-direction: column; position: relative; }
-        .dash-map-header { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; border-bottom: 1px solid #e2e8f0; background: #ffffff; position: relative; z-index: 10; }
-        .dash-map-heading { display: flex; flex-direction: column; gap: 0.5rem; max-width: 62rem; }
-        .dash-map-title { margin: 0; color: #0f172a; font-size: 1.75rem; font-weight: 800; display: flex; align-items: center; gap: 0.75rem; letter-spacing: -0.025em; }
-        .dash-map-title svg { stroke: #ffffff; background: linear-gradient(135deg, #0f766e, #0d9488); border-radius: 0.75rem; padding: 0.4rem; width: 2.25rem; height: 2.25rem; box-shadow: 0 4px 6px -1px rgba(15, 118, 110, 0.3); }
-        .dash-map-subtitle { margin: 0; color: #64748b; font-size: 1rem; font-weight: 500; }
+        .dash-map-panel { background: #ffffff; border-radius: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 18px 28px -18px rgba(15, 23, 42, 0.3); overflow: hidden; display: flex; flex-direction: column; position: relative; }
+        .dash-map-header { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; border-bottom: 1px solid #e2e8f0; background: #ffffff; position: relative; z-index: 10; }
+        .dash-map-heading { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
+        .dash-map-title-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+        .dash-map-title { margin: 0; color: #0f172a; font-size: 1.55rem; font-weight: 800; display: flex; align-items: center; gap: 0.7rem; letter-spacing: 0; }
+        .dash-map-title svg { stroke: #ffffff; background: #0f766e; border-radius: 0.7rem; padding: 0.38rem; width: 2.1rem; height: 2.1rem; box-shadow: 0 8px 18px -10px rgba(15, 118, 110, 0.75); flex-shrink: 0; }
+        .dash-map-subtitle { margin: 0; color: #64748b; font-size: 0.95rem; font-weight: 500; }
         .dash-map-canvas { height: 70vh; min-height: 550px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
 
-        .map-actions { display: flex; flex-wrap: wrap; gap: 1rem; width: 100%; align-items: flex-start; }
-        .map-filter-shell { display: flex; flex-wrap: wrap; gap: 1rem; align-items: stretch; flex: 1 1 500px; min-width: 0; }
+        .map-live-badge { display: inline-flex; align-items: center; gap: 0.45rem; min-height: 34px; padding: 0 0.8rem; border: 1px solid #ccfbf1; border-radius: 999px; background: #f0fdfa; color: #0f766e; font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
+        .map-live-badge svg { width: 1rem; height: 1rem; stroke-width: 2.4; }
+        .map-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; width: 100%; align-items: stretch; }
+        .map-filter-shell { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: stretch; min-width: 0; }
         
-        .cell-map-count { display: flex; align-items: center; justify-content: center; min-height: 64px; font-size: 0.9rem; color: #0f766e; background: #f0fdfa; padding: 0 1.25rem; border-radius: 12px; font-weight: 700; white-space: nowrap; border: 1px solid #ccfbf1; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .cell-map-count { display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem; min-height: 56px; font-size: 0.88rem; color: #0f766e; background: #f0fdfa; padding: 0 1rem; border-radius: 0.8rem; font-weight: 800; white-space: nowrap; border: 1px solid #ccfbf1; box-shadow: inset 0 1px 0 rgba(255,255,255,0.75); }
+        .cell-map-count svg { width: 1.1rem; height: 1.1rem; stroke-width: 2.4; flex-shrink: 0; }
         
-        .cell-filter-form { display: flex; flex-wrap: wrap; flex: 1; min-width: 250px; gap: 1rem; }
-        .cell-filter-form .premium-select-field { flex: 1; min-width: 200px; box-sizing: border-box; }
+        .cell-filter-form { display: flex; flex-wrap: wrap; flex: 1; min-width: 250px; gap: 0.75rem; }
+        .cell-filter-form .premium-select-field { flex: 1; min-width: 220px; min-height: 56px; padding: 0.5rem 0.75rem; border-radius: 0.8rem; box-sizing: border-box; }
+        .cell-filter-form .premium-select-icon { width: 34px; height: 34px; border-radius: 0.65rem; }
+        .cell-filter-form .premium-select-hint { display: none; }
         
-        .map-actions-primary { display: flex; gap: 1rem; align-items: stretch; flex-wrap: wrap; justify-content: flex-start; flex: 1 1 auto; }
-        .map-actions-secondary { display: flex; justify-content: flex-end; flex: 1 1 auto; min-width: max-content; }
+        .map-actions-primary { display: flex; gap: 0.65rem; align-items: stretch; justify-content: flex-end; flex-wrap: nowrap; }
+        .map-actions-secondary { display: flex; justify-content: flex-end; min-width: max-content; }
 
-        .dash-map-action-button, .cell-clear-button { display: inline-flex; align-items: center; justify-content: center; padding: 0 1.25rem !important; border-radius: 12px !important; font-size: 0.9rem !important; font-weight: 700 !important; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important; min-height: 64px; white-space: nowrap; }
+        .dash-map-action-button, .cell-clear-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0 0.9rem !important; border-radius: 0.75rem !important; font-size: 0.86rem !important; font-weight: 800 !important; cursor: pointer; transition: all 0.2s ease !important; min-height: 44px; white-space: nowrap; }
+        .dash-map-action-button svg, .cell-clear-button svg { width: 1rem; height: 1rem; stroke-width: 2.4; flex-shrink: 0; }
 
         .dash-map-action-button { background: #ffffff !important; border: 1px solid #e2e8f0 !important; color: #334155 !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
         .dash-map-action-button:hover { background: #f8fafc !important; border-color: #cbd5e1 !important; color: #0f172a !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; transform: translateY(-1px); }
@@ -51,7 +58,7 @@
         .cell-layer-button.active { background: #0f766e !important; border-color: #0f766e !important; color: #ffffff !important; box-shadow: 0 4px 6px -1px rgba(15, 118, 110, 0.2) !important; }
         .cell-layer-button.active:hover { background: #0d9488 !important; border-color: #0d9488 !important; }
 
-        .cell-clear-button { background: #fff1f2; border: 1px solid #ffe4e6; color: #e11d48; width: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .cell-clear-button { background: #fff7f8; border: 1px solid #ffe4e6; color: #e11d48; width: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .cell-clear-button:hover:not(:disabled) { background: #ffe4e6; border-color: #fecdd3; color: #be123c; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(225, 29, 72, 0.1); }
         .cell-clear-button:disabled { background: #f8fafc; border-color: #e2e8f0; color: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
         .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
@@ -82,15 +89,19 @@
 
 
         @media (max-width: 1180px) {
-            /* Flex layout handles wrapping automatically */
+            .map-actions { grid-template-columns: 1fr; }
+            .map-actions-primary { justify-content: flex-start; flex-wrap: wrap; }
         }
         @media (max-width: 900px) {
-            .cell-map-count { min-height: 52px; justify-content: center; }
+            .cell-map-count { min-height: 50px; justify-content: center; }
         }
         @media (max-width: 768px) {
             .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
             .dash-map-header { padding: 1.25rem; }
+            .dash-map-title { font-size: 1.25rem; }
+            .dash-map-subtitle { font-size: 0.88rem; }
             .cell-map-count, .dash-map-action-button, .cell-clear-button, #cell-clear-form { width: 100%; }
+            .map-actions-primary { display: grid; grid-template-columns: 1fr; }
             .dash-card { padding: 0.75rem; }
             .dash-card-icon { width: 1.75rem; height: 1.75rem; border-radius: 0.375rem; }
             .dash-card-icon svg { width: 1rem; height: 1rem; }
@@ -229,10 +240,16 @@
     <div class="dash-map-panel" style="margin-bottom: 2.5rem;">
         <div class="dash-map-header">
             <div class="dash-map-heading">
-                <h2 class="dash-map-title">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    Peta Lokasi Sepeda
-                </h2>
+                <div class="dash-map-title-row">
+                    <h2 class="dash-map-title">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        Peta Lokasi Sepeda
+                    </h2>
+                    <span class="map-live-badge">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.8 9.8 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.8 9.8 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                        Auto 10 dtk
+                    </span>
+                </div>
                 <p class="dash-map-subtitle">Peta otomatis diperbarui. Klik penanda untuk melihat ringkasan sepeda dan membuka halaman detail.</p>
             </div>
             <div class="map-actions">
@@ -252,7 +269,10 @@
                         ->values();
                 @endphp
                 <div class="map-filter-shell">
-                    <span class="cell-map-count" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
+                    <span class="cell-map-count">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M8 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M16 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 17 9 9h4l3 8"/><path d="M9 9 5 17"/><path d="M13 9l2-4h3"/></svg>
+                        <span id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
+                    </span>
                     <form method="get" action="{{ route('admin.dashboard') }}" class="cell-filter-form">
                         <x-admin.premium-select
                             name="cell_device_id"
@@ -278,15 +298,24 @@
                     </form>
                 </div>
                 <div class="map-actions-primary">
-                    <button class="button secondary cell-layer-button dash-map-action-button" type="button" id="cell-layer-toggle">BTS Terdeteksi ({{ $mapCells->count() }})</button>
+                    <button class="button secondary cell-layer-button dash-map-action-button" type="button" id="cell-layer-toggle">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 13a10 10 0 0 1 14 0"/><path d="M2 9.5a15 15 0 0 1 20 0"/></svg>
+                        <span id="cell-layer-label">BTS ({{ $mapCells->count() }})</span>
+                    </button>
                     <form method="post" action="{{ route('admin.dashboard.cell-survey.clear') }}" id="cell-clear-form">
                         @csrf
                         <input type="hidden" name="device_user_id" value="{{ $selectedCellDeviceId }}">
                         <input type="hidden" name="cell_rental_id" value="{{ $selectedCellRentalId }}">
-                        <button class="cell-clear-button" type="submit" @disabled($selectedCellDeviceId === null)>Bersihkan Rekaman</button>
+                        <button class="cell-clear-button" type="submit" @disabled($selectedCellDeviceId === null)>
+                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+                            Bersihkan
+                        </button>
                     </form>
                     <div class="map-actions-secondary">
-                        <button class="button secondary dash-map-action-button" type="button" id="bike-map-center">Pusatkan Peta</button>
+                        <button class="button secondary dash-map-action-button" type="button" id="bike-map-center">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/></svg>
+                            Pusatkan
+                        </button>
                     </div>
                 </div>
             </div>
@@ -331,6 +360,7 @@
         const mapCountElement = document.getElementById('bike-map-count');
         const mapCenterButton = document.getElementById('bike-map-center');
         const cellLayerToggle = document.getElementById('cell-layer-toggle');
+        const cellLayerLabel = document.getElementById('cell-layer-label');
         const cellDeviceFilter = document.getElementById('cell-device-filter');
         const cellRentalFilter = document.getElementById('cell-rental-filter');
         const cellClearForm = document.getElementById('cell-clear-form');
@@ -536,7 +566,9 @@
                     }
                 });
 
-                cellLayerToggle.textContent = `BTS Terdeteksi (${nextCells.length})`;
+                if (cellLayerLabel) {
+                    cellLayerLabel.textContent = `BTS (${nextCells.length})`;
+                }
                 cellLayerToggle.classList.toggle('active', Boolean(selectedCellDeviceId) && cellsVisible);
                 cellLayerToggle.disabled = ! selectedCellDeviceId;
             };
