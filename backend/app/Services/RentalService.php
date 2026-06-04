@@ -32,6 +32,12 @@ class RentalService
             ]);
         }
 
+        if (! $bike->is_online) {
+            throw ValidationException::withMessages([
+                'bike_id' => 'Bike sedang offline dan tidak bisa disewa.',
+            ]);
+        }
+
         return DB::transaction(function () use ($user, $bike) {
             $rental = Rental::query()->create([
                 'user_id' => $user->id,

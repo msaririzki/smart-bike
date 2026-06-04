@@ -31,7 +31,10 @@ class DashboardController extends Controller
 
         return view('admin.dashboard', [
             'totalBikes' => Bike::query()->count(),
-            'availableBikes' => Bike::query()->where('status', 'available')->count(),
+            'availableBikes' => Bike::query()
+                ->where('status', 'available')
+                ->where('is_online', true)
+                ->count(),
             'inUseBikes' => Bike::query()->whereIn('status', ['in_use', 'idle'])->count(),
             'offlineBikes' => Bike::query()->where('is_online', false)->count(),
             'activeRentals' => Rental::query()->whereIn('status', $activeRentalStatuses)->count(),
