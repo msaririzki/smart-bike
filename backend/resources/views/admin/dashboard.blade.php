@@ -82,8 +82,8 @@
         .map-popup-footer a { color: #0f766e; font-weight: 600; font-size: 0.875rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s; }
         .map-popup-footer a:hover { color: #0f172a; text-decoration: underline; }
         .cell-map-marker { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: #7c2d12; background: #fed7aa; border: 3px solid #fff7ed; box-shadow: 0 8px 18px rgba(124, 45, 18, .26); font-size: 16px; }
-        .cell-handover-marker { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: #ffffff; background: #2563eb; border: 3px solid #dbeafe; box-shadow: 0 10px 20px rgba(37, 99, 235, .32); font-size: 14px; font-weight: 900; }
-        .cell-route-line { filter: drop-shadow(0 4px 8px rgba(37, 99, 235, .25)); }
+        .cell-handover-marker { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: #ffffff; background: #2563eb; border: 3px solid #dbeafe; box-shadow: 0 10px 20px rgba(37, 99, 235, .32); font-size: 15px; font-weight: 900; }
+        .cell-route-line { filter: drop-shadow(0 4px 8px rgba(37, 99, 235, .22)); }
         .cell-layer-button.active { background: #0f766e !important; border-color: #0f766e !important; color: white !important; }
 
 
@@ -477,9 +477,9 @@
             const handoverIcon = () => L.divIcon({
                 className: 'cell-handover-marker',
                 html: '&#8644;',
-                iconSize: [28, 28],
-                iconAnchor: [14, 14],
-                popupAnchor: [0, -14],
+                iconSize: [30, 30],
+                iconAnchor: [15, 15],
+                popupAnchor: [0, -15],
             });
 
             const cellPopupHtml = (cell) => {
@@ -595,9 +595,8 @@
                 const positions = routePoints.map((point) => [point.latitude, point.longitude]);
                 cellRouteLine = L.polyline(positions, {
                     color: '#2563eb',
-                    weight: 4,
-                    opacity: 0.78,
-                    dashArray: '10 8',
+                    weight: 5,
+                    opacity: 0.9,
                     lineCap: 'round',
                     lineJoin: 'round',
                     className: 'cell-route-line',
