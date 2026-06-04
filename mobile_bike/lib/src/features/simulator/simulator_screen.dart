@@ -1312,41 +1312,54 @@ class _SimulatorScreenState extends State<SimulatorScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               child: _buildTopOverlay(bike, isRented: false),
             ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: QrRentalPanel(
-                api: widget.api,
-                hasAssignedBike: true,
-                hasActiveRental: false,
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 32),
+                    QrRentalPanel(
+                      api: widget.api,
+                      hasAssignedBike: true,
+                      hasActiveRental: false,
+                    ),
+                    const SizedBox(height: 14),
+                    _CellSurveyRecordingControl(
+                      enabled: _recordCellSurvey,
+                      onChanged: _setCellSurveyRecording,
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFF334155)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                                color: Color(0xFF10b981),
+                                shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Sepeda Tersedia',
+                              style: TextStyle(
+                                  color: Color(0xFFE2E8F0),
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 48),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF334155)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                        color: Color(0xFF10b981), shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text('Sepeda Tersedia',
-                      style: TextStyle(
-                          color: Color(0xFFE2E8F0),
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-            const Spacer(),
           ],
         ),
       ),
@@ -1718,6 +1731,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
 
   Widget _buildAdvancedControlsModal(Bike bike, ActiveBikeRental? rental) {
     return Container(
+      height: MediaQuery.of(context).size.height * 0.9,
       decoration: const BoxDecoration(
         color: Color(0xFFF8FAFC),
         borderRadius: BorderRadius.only(
@@ -1728,7 +1742,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
       padding: EdgeInsets.zero,
       child: SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Header Awal (Content Lowered)
@@ -2385,21 +2399,29 @@ class _StatusRow extends StatelessWidget {
             color:
                 isActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
         const SizedBox(width: 10),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF475569),
-            fontWeight: FontWeight.w600,
+        Expanded(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF475569),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF0F172A),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
+            ),
           ),
         ),
       ],
