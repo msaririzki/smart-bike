@@ -354,8 +354,11 @@
         const cellDeviceFilter = document.getElementById('cell-device-filter');
         const cellRentalFilter = document.getElementById('cell-rental-filter');
         const cellClearForm = document.getElementById('cell-clear-form');
-        const selectedCellDeviceId = @json($selectedCellDeviceId);
-        const selectedCellRentalId = @json($selectedCellRentalId);
+        const cellClearDeviceInput = cellClearForm?.querySelector('input[name="device_user_id"]');
+        const cellClearRentalInput = cellClearForm?.querySelector('input[name="cell_rental_id"]');
+        const cellClearButton = cellClearForm?.querySelector('.cell-clear-button');
+        let selectedCellDeviceId = @json($selectedCellDeviceId);
+        let selectedCellRentalId = @json($selectedCellRentalId);
         const mapDataUrl = @json(route('admin.dashboard.map-data'));
         const mapDataRequestUrl = () => {
             const url = new URL(mapDataUrl, window.location.origin);
@@ -647,6 +650,152 @@
                 requestAnimationFrame(() => map.invalidateSize());
             };
 
+            const optionMeta = (option) => option.meta ?? (option.observation_count ? `${option.observation_count} data` : '');
+
+            const setPremiumSelectDisabled = (selectElement, disabled) => {
+                const field = selectElement?.closest('[data-premium-select]');
+                const trigger = field?.querySelector('.premium-select-trigger');
+
+                if (! selectElement || ! field || ! trigger) {
+                    return;
+                }
+
+                selectElement.disabled = disabled;
+                trigger.disabled = disabled;
+                field.classList.toggle('is-disabled', disabled);
+
+                if (disabled && window.closePremiumSelect) {
+                    window.closePremiumSelect(field);
+                }
+            };
+
+            const rebuildPremiumSelectOptions = (selectElement, options, selectedValue = '') => {
+                const field = selectElement?.closest('[data-premium-select]');
+                const menu = field?.querySelector('.premium-select-menu');
+
+                if (! selectElement || ! field || ! menu) {
+                    return;
+                }
+
+                selectElement.innerHTML = '';
+                menu.innerHTML = '';
+
+                options.forEach((option) => {
+                    const value = String(option.value ?? '');
+                    const title = String(option.title ?? option.label ?? value);
+                    const meta = String(optionMeta(option) ?? '');
+                    const label = String(option.label ?? title);
+                    const selected = String(selectedValue ?? '') === value;
+
+                    const nativeOption = document.createElement('option');
+                    nativeOption.value = value;
+                    nativeOption.textContent = meta && ! label.includes(meta) ? `${label} - ${meta}` : label;
+                    nativeOption.selected = selected;
+                    selectElement.appendChild(nativeOption);
+
+                    const button = document.createElement('button');
+                    button.className = 'premium-select-option';
+                    button.type = 'button';
+                    button.setAttribute('role', 'option');
+                    button.setAttribute('aria-selected', selected ? 'true' : 'false');
+                    button.dataset.value = value;
+                    button.dataset.title = title;
+                    button.dataset.meta = meta;
+
+                    const check = document.createElement('span');
+                    check.className = 'premium-select-option-check';
+                    check.setAttribute('aria-hidden', 'true');
+                    check.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"/></svg>';
+
+                    const copy = document.createElement('span');
+                    copy.className = 'premium-select-option-copy';
+
+                    const titleElement = document.createElement('span');
+                    titleElement.className = 'premium-select-option-title';
+                    titleElement.textContent = title;
+                    copy.appendChild(titleElement);
+
+                    if (meta) {
+                        const metaElement = document.createElement('span');
+                        metaElement.className = 'premium-select-option-meta';
+                        metaElement.textContent = meta;
+                        copy.appendChild(metaElement);
+                    }
+
+                    button.append(check, copy);
+                    menu.appendChild(button);
+                });
+
+                selectElement.value = String(selectedValue ?? '');
+                window.syncPremiumSelect?.(field);
+            };
+
+            const updateFilterUrl = () => {
+                const url = new URL(window.location.href);
+                if (selectedCellDeviceId) {
+                    url.searchParams.set('cell_device_id', selectedCellDeviceId);
+                } else {
+                    url.searchParams.delete('cell_device_id');
+                }
+
+                if (selectedCellRentalId) {
+                    url.searchParams.set('cell_rental_id', selectedCellRentalId);
+                } else {
+                    url.searchParams.delete('cell_rental_id');
+                }
+
+                window.history.replaceState({}, '', url);
+            };
+
+            const updateCellClearState = () => {
+                if (cellClearDeviceInput) {
+                    cellClearDeviceInput.value = selectedCellDeviceId ?? '';
+                }
+                if (cellClearRentalInput) {
+                    cellClearRentalInput.value = selectedCellRentalId ?? '';
+                }
+                if (cellClearButton) {
+                    cellClearButton.disabled = ! selectedCellDeviceId;
+                }
+            };
+
+            const updateRentalFilterOptions = (rentalOptions) => {
+                const options = [
+                    { value: '', label: 'Semua perjalanan akun', title: 'Semua perjalanan akun', meta: '' },
+                    ...rentalOptions.map((option) => ({
+                        value: option.id,
+                        label: option.label,
+                        title: option.label,
+                        meta: `${option.observation_count ?? 0} data`,
+                    })),
+                ];
+
+                rebuildPremiumSelectOptions(cellRentalFilter, options, selectedCellRentalId ?? '');
+                setPremiumSelectDisabled(cellRentalFilter, ! selectedCellDeviceId);
+            };
+
+            const applyDashboardFilters = async ({ updateRentals = false, fitMap = true } = {}) => {
+                updateFilterUrl();
+                updateCellClearState();
+
+                try {
+                    const response = await fetch(mapDataRequestUrl(), { headers: { Accept: 'application/json' } });
+                    const payload = await response.json();
+                    selectedCellDeviceId = payload.selected_cell_device_id;
+                    selectedCellRentalId = payload.selected_cell_rental_id;
+
+                    if (updateRentals) {
+                        updateRentalFilterOptions(payload.cell_rental_options ?? []);
+                    }
+
+                    renderMapData(payload.data ?? [], payload.cells ?? [], fitMap);
+                    updateFilterUrl();
+                    updateCellClearState();
+                } catch (_error) {
+                    window.showToast?.('Filter peta gagal', 'Data peta belum bisa diperbarui. Coba lagi sebentar.', 'error');
+                }
+            };
+
             const refreshBikes = async () => {
                 try {
                     const response = await fetch(mapDataRequestUrl(), { headers: { Accept: 'application/json' } });
@@ -681,13 +830,22 @@
                 renderCells(latestCells);
             });
             cellDeviceFilter?.addEventListener('change', () => {
+                selectedCellDeviceId = cellDeviceFilter.value ? Number(cellDeviceFilter.value) : null;
+                selectedCellRentalId = null;
                 if (cellRentalFilter) {
                     cellRentalFilter.value = '';
                 }
-                cellDeviceFilter.form?.submit();
+                applyDashboardFilters({ updateRentals: true });
             });
             cellRentalFilter?.addEventListener('change', () => {
-                cellRentalFilter.form?.submit();
+                selectedCellRentalId = cellRentalFilter.value ? Number(cellRentalFilter.value) : null;
+                applyDashboardFilters({ updateRentals: false });
+            });
+            cellDeviceFilter?.form?.addEventListener('submit', (event) => {
+                event.preventDefault();
+                selectedCellDeviceId = cellDeviceFilter.value ? Number(cellDeviceFilter.value) : null;
+                selectedCellRentalId = cellRentalFilter?.value ? Number(cellRentalFilter.value) : null;
+                applyDashboardFilters({ updateRentals: true });
             });
             cellClearForm?.addEventListener('submit', (event) => {
                 const scope = selectedCellRentalId ? 'perjalanan yang dipilih' : 'akun device yang dipilih';

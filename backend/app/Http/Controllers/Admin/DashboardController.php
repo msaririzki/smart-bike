@@ -62,6 +62,9 @@ class DashboardController extends Controller
         return response()->json([
             'data' => $this->bikeMapData(),
             'cells' => $this->cellMapData($selectedCellDeviceId, $selectedCellRentalId),
+            'cell_rental_options' => $this->cellRentalOptions($selectedCellDeviceId),
+            'selected_cell_device_id' => $selectedCellDeviceId,
+            'selected_cell_rental_id' => $selectedCellRentalId,
             'updated_at' => now()->format('Y-m-d H:i:s'),
         ]);
     }

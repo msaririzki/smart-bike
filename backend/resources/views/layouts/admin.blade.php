@@ -468,11 +468,14 @@
             selected?.scrollIntoView({ block: 'nearest' });
         };
 
+        window.syncPremiumSelect = syncPremiumSelect;
+        window.closePremiumSelect = closePremiumSelect;
+
         document.querySelectorAll('[data-premium-select]').forEach((field) => {
             const nativeSelect = field.querySelector('.premium-select-native');
             const trigger = field.querySelector('.premium-select-trigger');
             const menu = field.querySelector('.premium-select-menu');
-            const options = Array.from(field.querySelectorAll('.premium-select-option'));
+            const getOptions = () => Array.from(field.querySelectorAll('.premium-select-option'));
 
             syncPremiumSelect(field);
 
@@ -487,6 +490,7 @@
             });
 
             trigger?.addEventListener('keydown', (event) => {
+                const options = getOptions();
                 const currentIndex = Math.max(0, options.findIndex((option) => option.getAttribute('aria-selected') === 'true'));
 
                 if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
@@ -503,35 +507,38 @@
                 }
             });
 
-            options.forEach((option, index) => {
-                option.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    if (! nativeSelect) return;
+            menu?.addEventListener('click', (event) => {
+                const option = event.target.closest('.premium-select-option');
+                if (! option || ! menu.contains(option) || ! nativeSelect) return;
 
-                    nativeSelect.value = option.dataset.value ?? '';
-                    syncPremiumSelect(field);
+                event.stopPropagation();
+                nativeSelect.value = option.dataset.value ?? '';
+                syncPremiumSelect(field);
+                closePremiumSelect(field);
+                nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+
+            menu?.addEventListener('keydown', (event) => {
+                const option = event.target.closest('.premium-select-option');
+                const options = getOptions();
+                const index = options.indexOf(option);
+
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    options[Math.min(options.length - 1, index + 1)]?.focus();
+                }
+                if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    options[Math.max(0, index - 1)]?.focus();
+                }
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    option?.click();
+                }
+                if (event.key === 'Escape') {
                     closePremiumSelect(field);
-                    nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                });
-
-                option.addEventListener('keydown', (event) => {
-                    if (event.key === 'ArrowDown') {
-                        event.preventDefault();
-                        options[Math.min(options.length - 1, index + 1)]?.focus();
-                    }
-                    if (event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        options[Math.max(0, index - 1)]?.focus();
-                    }
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        option.click();
-                    }
-                    if (event.key === 'Escape') {
-                        closePremiumSelect(field);
-                        trigger?.focus();
-                    }
-                });
+                    trigger?.focus();
+                }
             });
 
             nativeSelect?.addEventListener('change', () => syncPremiumSelect(field));
