@@ -130,8 +130,8 @@ class AuthAndRentalApiTest extends TestCase
             'password' => 'password',
             'role' => 'user',
         ]);
-        $bike = Bike::query()->create(['code' => 'BIKE-T1', 'name' => 'Bike Test', 'status' => 'available']);
-        $secondBike = Bike::query()->create(['code' => 'BIKE-T2', 'name' => 'Bike Test 2', 'status' => 'available']);
+        $bike = Bike::query()->create(['code' => 'BIKE-T1', 'name' => 'Bike Test', 'status' => 'available', 'is_online' => true]);
+        $secondBike = Bike::query()->create(['code' => 'BIKE-T2', 'name' => 'Bike Test 2', 'status' => 'available', 'is_online' => true]);
 
         Sanctum::actingAs($user);
 
@@ -149,5 +149,27 @@ class AuthAndRentalApiTest extends TestCase
             ->assertJsonPath('data.status', Rental::STATUS_COMPLETED);
 
         $this->assertDatabaseHas('bikes', ['id' => $bike->id, 'status' => 'available']);
+    }
+
+    public function test_user_cannot_start_rental_when_bike_is_offline(): void
+    {
+        $user = User::query()->create([
+            'name' => 'User',
+            'email' => 'offline-user@example.test',
+            'password' => 'password',
+            'role' => 'user',
+        ]);
+        $bike = Bike::query()->create([
+            'code' => 'BIKE-OFFLINE',
+            'name' => 'Offline Bike',
+            'status' => 'available',
+            'is_online' => false,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/rentals/start', ['bike_id' => $bike->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('bike_id');
     }
 }

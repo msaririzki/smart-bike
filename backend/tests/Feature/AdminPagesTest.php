@@ -52,7 +52,11 @@ class AdminPagesTest extends TestCase
 
         $this->actingAs($admin);
 
-        $this->get('/admin')->assertOk()->assertSee('Sepeda Tersedia');
+        $dashboard = $this->get('/admin')->assertOk()->assertSee('Sepeda Tersedia');
+        $this->assertMatchesRegularExpression(
+            '/Sepeda Tersedia.*?<p class="dash-card-value">0<\/p>/s',
+            $dashboard->getContent(),
+        );
         $this->get('/admin/dashboard/map-data')->assertOk()->assertJsonPath('data.0.code', 'BIKE-ADMIN-1');
         $this->get('/admin/rentals?status=running')->assertOk()->assertSee('rental berjalan');
         $this->get("/admin/rentals/{$rental->id}/route-map-data")->assertOk()->assertJsonPath('data.0.latitude', -8.583000);

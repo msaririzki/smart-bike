@@ -51,6 +51,12 @@ class BikeQrRentalService
                 'last_seen_at' => now(),
             ]);
             $bike->refresh();
+        } elseif ($bike->status === 'available' && ! $bike->is_online) {
+            $bike->update([
+                'is_online' => true,
+                'last_seen_at' => now(),
+            ]);
+            $bike->refresh();
         }
 
         if ($bike->status !== 'available') {

@@ -46,6 +46,7 @@ class LocationBillingAndIdleTest extends TestCase
             'code' => 'BIKE-GPS',
             'name' => 'GPS Bike',
             'status' => 'available',
+            'is_online' => true,
             'assigned_device_user_id' => $this->device->id,
         ]);
         $this->rental = app(RentalService::class)->start($this->user, $this->bike);
