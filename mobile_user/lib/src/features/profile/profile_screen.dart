@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../services/api_client.dart';
 import '../../theme/app_colors.dart';
@@ -26,7 +27,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   String _name = '-';
   String _email = '-';
   String _phone = '-';
-  num? _weight;
+  int? _weight;
   String _memberSince = '-';
   int _totalTrips = 0;
   String? _error;
@@ -53,7 +54,9 @@ class ProfileScreenState extends State<ProfileScreen> {
         _name = _readString(user['name'], fallback: 'Pengguna FlowBike');
         _email = _readString(user['email']);
         _phone = _readString(user['phone'], fallback: 'Belum diisi');
-        _weight = user['weight'] != null ? num.tryParse(user['weight'].toString()) : null;
+        _weight = user['weight'] != null
+            ? int.tryParse(user['weight'].toString())
+            : null;
         _totalTrips = (historyData['total'] as num?)?.toInt() ?? 0;
 
         // Simple member since formatting
@@ -143,7 +146,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                       : phoneController.text.trim(),
                   weight: weightController.text.trim().isEmpty
                       ? null
-                      : num.tryParse(weightController.text.trim()),
+                      : int.tryParse(weightController.text.trim()),
                 );
 
                 if (!mounted) return;
@@ -179,156 +182,172 @@ class ProfileScreenState extends State<ProfileScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Edit Profil',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xff1e293b),
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(sheetContext),
-                          child: const Text(
-                            'Batal',
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Edit Profil',
                             style: TextStyle(
-                              color: Color(0xff64748b),
-                              fontWeight: FontWeight.w600,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xff1e293b),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Perbarui informasi identitas Anda agar tetap akurat.',
-                      style: TextStyle(color: Color(0xff64748b), fontSize: 14),
-                    ),
-                    const SizedBox(height: 32),
-                    if (sheetError != null) ...[
-                      _SheetBanner(
-                        icon: Icons.error_outline_rounded,
-                        message: sheetError!,
-                        color: Colors.red,
-                        backgroundColor: const Color(0xfffff1f2),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    TextFormField(
-                      controller: nameController,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                      decoration: _buildInputDecoration(
-                        label: 'Nama Lengkap',
-                        icon: Icons.person_rounded,
-                      ),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? 'Nama wajib diisi' : null,
-                    ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                      decoration: _buildInputDecoration(
-                        label: 'Email',
-                        icon: Icons.alternate_email_rounded,
-                      ),
-                      validator: (v) => v == null || !v.contains('@')
-                          ? 'Email tidak valid'
-                          : null,
-                    ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: phoneController,
-                      keyboardType: TextInputType.phone,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                      decoration: _buildInputDecoration(
-                        label: 'Nomor Telepon',
-                        icon: Icons.phone_rounded,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: weightController,
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                      decoration: _buildInputDecoration(
-                        label: 'Berat Badan (kg)',
-                        icon: Icons.monitor_weight_rounded,
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryLight.withValues(
-                              alpha: 0.25,
+                          TextButton(
+                            onPressed: () => Navigator.pop(sheetContext),
+                            child: const Text(
+                              'Batal',
+                              style: TextStyle(
+                                color: Color(0xff64748b),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),
-                      child: FilledButton(
-                        onPressed: isBusy ? null : saveProfile,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primaryLight,
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Perbarui informasi identitas Anda agar tetap akurat.',
+                        style: TextStyle(
+                          color: Color(0xff64748b),
+                          fontSize: 14,
                         ),
-                        child: isBusy
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.check_circle_outline_rounded,
-                                    size: 20,
-                                  ),
-                                  SizedBox(width: 10),
-                                  Text(
-                                    'Simpan Perubahan',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 32),
+                      if (sheetError != null) ...[
+                        _SheetBanner(
+                          icon: Icons.error_outline_rounded,
+                          message: sheetError!,
+                          color: Colors.red,
+                          backgroundColor: const Color(0xfffff1f2),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      TextFormField(
+                        controller: nameController,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        decoration: _buildInputDecoration(
+                          label: 'Nama Lengkap',
+                          icon: Icons.person_rounded,
+                        ),
+                        validator: (v) =>
+                            v == null || v.isEmpty ? 'Nama wajib diisi' : null,
+                      ),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        decoration: _buildInputDecoration(
+                          label: 'Email',
+                          icon: Icons.alternate_email_rounded,
+                        ),
+                        validator: (v) => v == null || !v.contains('@')
+                            ? 'Email tidak valid'
+                            : null,
+                      ),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        decoration: _buildInputDecoration(
+                          label: 'Nomor Telepon',
+                          icon: Icons.phone_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        controller: weightController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        decoration: _buildInputDecoration(
+                          label: 'Berat Badan (kg)',
+                          icon: Icons.monitor_weight_rounded,
+                        ),
+                        validator: (value) {
+                          final text = value?.trim() ?? '';
+                          if (text.isEmpty) return null;
+
+                          final weight = int.tryParse(text);
+                          if (weight == null || weight < 30 || weight > 300) {
+                            return 'Berat badan harus 30-300 kg';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 40),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primaryLight.withValues(
+                                alpha: 0.25,
+                              ),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: FilledButton(
+                          onPressed: isBusy ? null : saveProfile,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primaryLight,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: isBusy
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_outline_rounded,
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Simpan Perubahan',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
         );
       },
     );
@@ -650,7 +669,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                     _ProfileInfoTile(
                       icon: Icons.monitor_weight_rounded,
                       title: 'Berat Badan',
-                      subtitle: _weight != null ? '${_weight} kg' : 'Belum diisi',
+                      subtitle: _weight != null ? '$_weight kg' : 'Belum diisi',
                       iconBgColor: const Color(0xfff0fdf4),
                       iconColor: const Color(0xff16a34a),
                       onTap: _showEditProfileSheet,

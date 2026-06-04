@@ -34,10 +34,13 @@ class ApiClient {
       authenticated: false,
     );
 
+    final user = json['user'] as Map<String, dynamic>;
+
     await _sessionStore.saveSession(
       token: json['token'] as String,
-      name: json['user']['name'] as String,
-      email: json['user']['email'] as String,
+      name: user['name'] as String,
+      email: user['email'] as String,
+      weight: user['weight']?.toString(),
     );
   }
 
@@ -52,10 +55,13 @@ class ApiClient {
       authenticated: false,
     );
 
+    final user = json['user'] as Map<String, dynamic>;
+
     await _sessionStore.saveSession(
       token: json['token'] as String,
-      name: json['user']['name'] as String,
-      email: json['user']['email'] as String,
+      name: user['name'] as String,
+      email: user['email'] as String,
+      weight: user['weight']?.toString(),
     );
   }
 
@@ -65,7 +71,18 @@ class ApiClient {
 
   Future<Map<String, dynamic>> currentUser() async {
     final json = await _get('/auth/me');
-    return json['user'] as Map<String, dynamic>;
+    final user = json['user'] as Map<String, dynamic>;
+    await _sessionStore.updateUser(
+      name: user['name'] as String,
+      email: user['email'] as String,
+      weight: user['weight']?.toString(),
+    );
+    return user;
+  }
+
+  Future<num?> cachedUserWeight() async {
+    final weight = await _sessionStore.userWeight;
+    return weight == null ? null : num.tryParse(weight);
   }
 
   Future<Map<String, dynamic>> updateProfile({

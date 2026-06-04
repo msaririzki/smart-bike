@@ -38,12 +38,12 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
   Future<void> _loadDetails() async {
     try {
       final data = await widget.api.rentalDetail(widget.history.id);
-      final user = await widget.api.currentUser();
-      
+      final userWeight = await widget.api.cachedUserWeight();
+
       if (mounted) {
         setState(() {
           _currentHistory = RentalHistory.fromJson(data);
-          _userWeight = user['weight'] != null ? num.tryParse(user['weight'].toString()) : null;
+          _userWeight = userWeight;
           _isLoading = false;
           _detailError = null;
         });
@@ -125,9 +125,29 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _ShareSheet(history: _currentHistory),
+      builder: (context) =>
+          _ShareSheet(history: _currentHistory, userWeight: _userWeight),
     );
   }
+}
+
+double _estimatedCyclingCalories(RentalHistory history, num? userWeight) {
+  final durationHours = history.durationMinutes / 60.0;
+  if (durationHours <= 0) return 0;
+
+  final speed = history.averageSpeed;
+  final weight = (userWeight ?? 60).toDouble();
+
+  double met = 4.0;
+  if (speed > 22) {
+    met = 10.0;
+  } else if (speed >= 19) {
+    met = 8.0;
+  } else if (speed >= 16) {
+    met = 6.8;
+  }
+
+  return met * weight * durationHours;
 }
 
 class _InlineErrorBanner extends StatelessWidget {
@@ -294,20 +314,7 @@ class _RideMetricsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final speed = history.averageSpeed;
-    final durationHours = history.durationMinutes / 60.0;
-    final weight = userWeight ?? 60.0; // Default 60 kg if not set
-    
-    double met = 4.0; // < 16 km/h
-    if (speed > 22) {
-      met = 10.0;
-    } else if (speed >= 19) {
-      met = 8.0;
-    } else if (speed >= 16) {
-      met = 6.8;
-    }
-    
-    final calories = met * weight * durationHours;
+    final calories = _estimatedCyclingCalories(history, userWeight);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -504,9 +511,7 @@ class _TimelineRow extends StatelessWidget {
                 : const Color(0xfff1f5f9),
             shape: BoxShape.circle,
             border: Border.all(
-              color: isStart
-                  ? AppColors.primaryLight
-                  : const Color(0xffcbd5e1),
+              color: isStart ? AppColors.primaryLight : const Color(0xffcbd5e1),
               width: 2,
             ),
           ),
@@ -677,16 +682,16 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-
-
 class _ShareSheet extends StatelessWidget {
-  const _ShareSheet({required this.history});
+  const _ShareSheet({required this.history, this.userWeight});
 
   final RentalHistory history;
+  final num? userWeight;
 
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('EEEE, d MMM yyyy', 'id_ID');
+    final calories = _estimatedCyclingCalories(history, userWeight);
 
     return Container(
       constraints: BoxConstraints(
@@ -829,9 +834,7 @@ class _ShareSheet extends StatelessWidget {
                                 ),
                                 _CompactStat(
                                   label: 'KALORI',
-                                  value: history.caloriesBurned.toStringAsFixed(
-                                    0,
-                                  ),
+                                  value: calories.toStringAsFixed(0),
                                   unit: 'kkal',
                                 ),
                                 Column(
@@ -880,7 +883,7 @@ class _ShareSheet extends StatelessWidget {
 Sepeda: ${history.bike?.code ?? 'N/A'}
 Jarak: ${history.totalDistanceKilometers.toStringAsFixed(2)} km
 Durasi: ${history.durationString}
-Est. Kalori: ${history.caloriesBurned.toStringAsFixed(0)} kkal
+Est. Kalori: ${calories.toStringAsFixed(0)} kkal
 Total Biaya: Rp${NumberFormat('#,###', 'id_ID').format(history.totalCost)}
 
 #SmartBike #EcoFriendly #Cycling

@@ -30,11 +30,13 @@ class SessionStore {
     required String token,
     required String name,
     required String email,
+    String? weight,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_nameKey, name);
     await prefs.setString(_emailKey, email);
+    await _writeWeight(prefs, weight);
   }
 
   Future<void> updateUser({
@@ -45,6 +47,10 @@ class SessionStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_nameKey, name);
     await prefs.setString(_emailKey, email);
+    await _writeWeight(prefs, weight);
+  }
+
+  Future<void> _writeWeight(SharedPreferences prefs, String? weight) async {
     if (weight != null) {
       await prefs.setString(_weightKey, weight);
     } else {
