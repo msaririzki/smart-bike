@@ -11,9 +11,25 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('notifications')) {
+            return;
+        }
+
+        if (
+            Schema::hasColumn('notifications', 'start_time')
+            && Schema::hasColumn('notifications', 'end_time')
+        ) {
+            return;
+        }
+
         Schema::table('notifications', function (Blueprint $table) {
-            $table->dateTime('start_time')->nullable();
-            $table->dateTime('end_time')->nullable();
+            if (! Schema::hasColumn('notifications', 'start_time')) {
+                $table->dateTime('start_time')->nullable();
+            }
+
+            if (! Schema::hasColumn('notifications', 'end_time')) {
+                $table->dateTime('end_time')->nullable();
+            }
         });
     }
 
@@ -22,8 +38,19 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('notifications')) {
+            return;
+        }
+
         Schema::table('notifications', function (Blueprint $table) {
-            $table->dropColumn(['start_time', 'end_time']);
+            $columns = array_filter([
+                Schema::hasColumn('notifications', 'start_time') ? 'start_time' : null,
+                Schema::hasColumn('notifications', 'end_time') ? 'end_time' : null,
+            ]);
+
+            if ($columns !== []) {
+                $table->dropColumn($columns);
+            }
         });
     }
 };
