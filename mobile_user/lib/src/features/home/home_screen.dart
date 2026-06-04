@@ -530,6 +530,7 @@ class _GreetingBlock extends StatelessWidget {
           hasActiveRental ? 'Perjalanan sedang berjalan' : 'Siap bersepeda?',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w900,
+            fontSize: 29,
             height: 1.05,
           ),
         ),
@@ -540,6 +541,7 @@ class _GreetingBlock extends StatelessWidget {
               : '$bikeCount sepeda siap digunakan. Scan QR di sepeda untuk mulai.',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: const Color(0xff6b7280),
+            fontSize: 16.5,
             height: 1.35,
           ),
         ),
@@ -641,7 +643,7 @@ class _NoActiveRental extends StatelessWidget {
               Text(
                 'Belum ada rental aktif',
                 style: TextStyle(
-                  fontSize: 17,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
@@ -649,7 +651,7 @@ class _NoActiveRental extends StatelessWidget {
               SizedBox(height: 4),
               Text(
                 'Scan QR di perangkat sepeda untuk mulai.',
-                style: TextStyle(color: Color(0xFFa7c4b8)),
+                style: TextStyle(color: Color(0xFFa7c4b8), fontSize: 14.5),
               ),
             ],
           ),
@@ -702,7 +704,7 @@ class _ActiveRentalSummary extends StatelessWidget {
                   Text(
                     rental.bike?.code ?? 'SMART BIKE',
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 21,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                     ),
@@ -710,7 +712,10 @@ class _ActiveRentalSummary extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     rental.status.replaceAll('_', ' '),
-                    style: const TextStyle(color: Color(0xFFa7c4b8)),
+                    style: const TextStyle(
+                      color: Color(0xFFa7c4b8),
+                      fontSize: 14.5,
+                    ),
                   ),
                 ],
               ),
@@ -822,7 +827,7 @@ class _InlineStats extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 17,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
                         ),
@@ -835,7 +840,7 @@ class _InlineStats extends StatelessWidget {
                   stats[index].label,
                   style: const TextStyle(
                     color: Color(0xFFa7c4b8),
-                    fontSize: 12,
+                    fontSize: 13,
                   ),
                 ),
               ],
@@ -865,7 +870,7 @@ class _HistoryPreviewList extends StatelessWidget {
     if (history.isEmpty) {
       return const Text(
         'Belum ada perjalanan yang selesai.',
-        style: TextStyle(color: Color(0xff6b7280)),
+        style: TextStyle(color: Color(0xff6b7280), fontSize: 15),
       );
     }
 
@@ -878,7 +883,7 @@ class _HistoryPreviewList extends StatelessWidget {
           LayoutBuilder(
             builder: (_, constraints) {
               final totalText = currency.format(item.totalCost);
-              final priceWidth = (totalText.length * 8.2).clamp(44.0, 96.0);
+              final priceWidth = (totalText.length * 8.8).clamp(48.0, 108.0);
 
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -889,6 +894,7 @@ class _HistoryPreviewList extends StatelessWidget {
                       dateFormat.format(item.startedAt),
                       style: const TextStyle(
                         color: Color(0xff6b7280),
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -903,7 +909,10 @@ class _HistoryPreviewList extends StatelessWidget {
                           item.bike?.code ?? 'SMART BIKE',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w900),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -912,7 +921,7 @@ class _HistoryPreviewList extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Color(0xff6b7280),
-                            fontSize: 12,
+                            fontSize: 13,
                           ),
                         ),
                       ],
@@ -940,6 +949,7 @@ class _HistoryPreviewList extends StatelessWidget {
                       textAlign: TextAlign.right,
                       style: const TextStyle(
                         color: AppColors.primaryLight,
+                        fontSize: 14,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -973,7 +983,7 @@ class _HistoryTimeRail extends StatelessWidget {
           start,
           style: const TextStyle(
             color: Color(0xff6b7280),
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -1001,7 +1011,7 @@ class _HistoryTimeRail extends StatelessWidget {
           end,
           style: const TextStyle(
             color: AppColors.primaryDark,
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1112,7 +1122,7 @@ class _BikeListTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xff133c36),
-                          fontSize: 16,
+                          fontSize: 17,
                           fontWeight: FontWeight.w900,
                           height: 1.05,
                         ),
@@ -1128,7 +1138,7 @@ class _BikeListTile extends StatelessWidget {
                         textAlign: TextAlign.right,
                         style: const TextStyle(
                           color: Color(0xff6b7280),
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w800,
                           height: 1.05,
                         ),
@@ -1232,7 +1242,7 @@ class _BikeTableMetric extends StatelessWidget {
           : MainAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: color),
+        Icon(icon, size: 14, color: color),
         const SizedBox(width: 4),
         Flexible(
           child: Text(
@@ -1241,7 +1251,7 @@ class _BikeTableMetric extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: color,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w900,
               height: 1,
             ),
@@ -1287,7 +1297,7 @@ class _BikePaginationBar extends StatelessWidget {
               '$startItem-$endItem dari $totalItems sepeda',
               style: const TextStyle(
                 color: Color(0xff4b5563),
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -1296,7 +1306,7 @@ class _BikePaginationBar extends StatelessWidget {
             '${currentPage + 1}/$pageCount',
             style: const TextStyle(
               color: Color(0xff133c36),
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1362,15 +1372,19 @@ class _SectionHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   subtitle!,
-                  style: const TextStyle(color: Color(0xff6b7280)),
+                  style: const TextStyle(
+                    color: Color(0xff6b7280),
+                    fontSize: 14.5,
+                  ),
                 ),
               ],
             ],
@@ -1479,7 +1493,7 @@ class _EmptyState extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: 24),
       child: Text(
         'Belum ada data sepeda.',
-        style: TextStyle(color: Color(0xff6b7280)),
+        style: TextStyle(color: Color(0xff6b7280), fontSize: 15),
       ),
     );
   }
