@@ -24,12 +24,13 @@ class NotificationData {
   });
 
   factory NotificationData.fromJson(Map<String, dynamic> json) {
-    // Parse time directly without toLocal if it represents local time, or remove Z if Laravel appends it incorrectly
-    DateTime parseTime(String t) {
-      if (t.endsWith('Z')) t = t.substring(0, t.length - 1);
-      return DateTime.parse(t);
+    DateTime? parseTime(dynamic value) {
+      if (value == null) {
+        return null;
+      }
+      return DateTime.tryParse(value.toString())?.toLocal();
     }
-    
+
     return NotificationData(
       id: json['id'],
       userId: json['user_id'],
@@ -37,11 +38,9 @@ class NotificationData {
       message: json['message'],
       type: json['type'] ?? 'pengumuman',
       isRead: json['is_read'] == true || json['is_read'] == 1,
-      createdAt: json['created_at'] != null 
-          ? parseTime(json['created_at']) 
-          : DateTime.now(),
-      startTime: json['start_time'] != null ? parseTime(json['start_time']) : null,
-      endTime: json['end_time'] != null ? parseTime(json['end_time']) : null,
+      createdAt: parseTime(json['created_at']) ?? DateTime.now(),
+      startTime: parseTime(json['start_time']),
+      endTime: parseTime(json['end_time']),
       data: json['data'] is Map<String, dynamic> ? json['data'] : null,
     );
   }

@@ -30,7 +30,7 @@ class RentalLocationPoint {
       accuracyMeters: _toDouble(json['accuracy_meters']),
       recordedAt: json['recorded_at'] == null
           ? null
-          : DateTime.tryParse(json['recorded_at'] as String),
+          : DateTime.tryParse(json['recorded_at'].toString())?.toLocal(),
     );
   }
 }

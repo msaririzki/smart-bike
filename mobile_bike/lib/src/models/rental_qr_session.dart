@@ -13,7 +13,7 @@ class RentalQrSession {
     return RentalQrSession(
       token: json['token'] as String,
       payload: json['payload'] as String,
-      expiresAt: DateTime.parse(json['expires_at'] as String),
+      expiresAt: DateTime.parse(json['expires_at'] as String).toLocal(),
       bikeId: bike['id'] as int? ?? 0,
       bikeCode: bike['code'] as String? ?? '',
       bikeName: bike['name'] as String? ?? '',

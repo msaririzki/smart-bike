@@ -30,7 +30,7 @@ class Bike {
           ? double.tryParse(json['last_accuracy'].toString())
           : null,
       lastSeenAt: json['last_seen_at'] != null
-          ? DateTime.tryParse(json['last_seen_at'].toString())
+          ? DateTime.tryParse(json['last_seen_at'].toString())?.toLocal()
           : null,
     );
   }
