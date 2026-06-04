@@ -1014,13 +1014,51 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     setState(() {
       _recordCellSurvey = value;
       if (value) {
-        _lastCellEvent = 'Menunggu data BTS';
+        _lastCellEvent = 'Mengecek BTS aktif';
       } else {
         _currentCell = null;
         _lastCellKey = null;
         _lastCellEvent = 'Perekaman BTS nonaktif';
       }
     });
+
+    if (value) {
+      unawaited(_primeCellSurveyRecording());
+    }
+  }
+
+  Future<void> _primeCellSurveyRecording() async {
+    final cell = await _cellInfo.currentServingCell();
+    if (!mounted || !_recordCellSurvey) return;
+
+    if (cell == null) {
+      setState(() {
+        _lastCellEvent = _streaming
+            ? 'BTS aktif, menunggu data cell dari Android'
+            : 'BTS aktif, menunggu GPS aktif';
+      });
+    } else {
+      _updateCellStatus(cell);
+      if (!mounted || !_recordCellSurvey) return;
+      if (!_streaming) {
+        setState(() => _lastCellEvent = 'BTS siap, menunggu GPS aktif');
+      }
+    }
+
+    if (!_streaming) return;
+
+    final currentPosition = await _gps.getCurrentPosition();
+    if (!mounted || !_recordCellSurvey || currentPosition == null) return;
+
+    if (currentPosition.accuracy > _maxAcceptedGpsAccuracyMeters) {
+      setState(() {
+        _lastCellEvent =
+            'BTS aktif, menunggu GPS akurat (${currentPosition.accuracy.toStringAsFixed(1)} m)';
+      });
+      return;
+    }
+
+    unawaited(_sendLocation(currentPosition, speedKmh: _speedKmh ?? 0));
   }
 
   void _addRoutePoint({
