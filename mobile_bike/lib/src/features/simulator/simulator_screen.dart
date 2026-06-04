@@ -1312,54 +1312,41 @@ class _SimulatorScreenState extends State<SimulatorScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               child: _buildTopOverlay(bike, isRented: false),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 32),
-                    QrRentalPanel(
-                      api: widget.api,
-                      hasAssignedBike: true,
-                      hasActiveRental: false,
-                    ),
-                    const SizedBox(height: 14),
-                    _CellSurveyRecordingControl(
-                      enabled: _recordCellSurvey,
-                      onChanged: _setCellSurveyRecording,
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFF334155)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                                color: Color(0xFF10b981),
-                                shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text('Sepeda Tersedia',
-                              style: TextStyle(
-                                  color: Color(0xFFE2E8F0),
-                                  fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: QrRentalPanel(
+                api: widget.api,
+                hasAssignedBike: true,
+                hasActiveRental: false,
               ),
             ),
+            const SizedBox(height: 48),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                        color: Color(0xFF10b981), shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Sepeda Tersedia',
+                      style: TextStyle(
+                          color: Color(0xFFE2E8F0),
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            const Spacer(),
           ],
         ),
       ),
