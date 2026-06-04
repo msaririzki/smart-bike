@@ -348,7 +348,6 @@
         const statusLabels = @json($adminStatusLabels);
         const mapElement = document.getElementById('bike-map');
         const mapEmptyElement = document.getElementById('bike-map-empty');
-        const mapCountElement = document.getElementById('bike-map-count');
         const mapCenterButton = document.getElementById('bike-map-center');
         const cellLayerToggle = document.getElementById('cell-layer-toggle');
         const cellLayerLabel = document.getElementById('cell-layer-label');
@@ -617,13 +616,6 @@
                 mapEmptyElement.hidden = hasMapData;
                 mapElement.hidden = ! hasMapData;
                 mapCenterButton.disabled = ! hasMapData;
-                if (mapCountElement) {
-                    mapCountElement.textContent = selectedCellDeviceId
-                        ? selectedCellRentalId
-                            ? `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS perjalanan terpilih`
-                            : `${nextBikes.length} sepeda lokasi, ${nextCells.length} BTS akun terpilih`
-                        : `${nextBikes.length} sepeda lokasi, pilih akun untuk BTS`;
-                }
                 currentBounds = bounds;
 
                 if (bounds.length === 0) {
@@ -661,9 +653,7 @@
                     const payload = await response.json();
                     renderMapData(payload.data ?? [], payload.cells ?? []);
                 } catch (_error) {
-                    if (mapCountElement) {
-                        mapCountElement.textContent = 'Peta belum bisa diperbarui otomatis';
-                    }
+                    return;
                 }
             };
 
