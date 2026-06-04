@@ -140,6 +140,7 @@
         .premium-select-hint { color: #1e293b; font-size: 13px; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .premium-select-control { position: relative; display: block; min-width: 0; }
         .premium-select-field select { width: 100%; min-height: 24px; margin: 0; padding: 0 28px 0 0; border: 0; background: transparent; color: #0f172a; font-size: 14px; font-weight: 700; line-height: 1.25; appearance: none; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none; }
+        .premium-select-field select option { background: #ffffff; color: #0f172a; font-weight: 500; padding: 12px; font-size: 14px; }
         .premium-select-field select:focus { box-shadow: none; outline: none; }
         .premium-select-field select:disabled { cursor: not-allowed; }
         .premium-select-chevron { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none; display: grid; place-items: center; transition: color 0.2s; }

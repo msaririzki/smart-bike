@@ -32,16 +32,16 @@
         .dash-map-subtitle { margin: 0; color: #64748b; font-size: 1rem; font-weight: 500; }
         .dash-map-canvas { height: 70vh; min-height: 550px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
 
-        .map-actions { display: flex; flex-wrap: wrap; align-items: stretch; gap: 1rem; width: 100%; }
-        .map-filter-shell { display: flex; flex: 1; min-width: 0; gap: 1rem; flex-wrap: wrap; align-items: stretch; }
+        .map-actions { display: flex; flex-direction: column; gap: 1rem; width: 100%; }
+        .map-filter-shell { display: flex; flex-wrap: wrap; gap: 1rem; align-items: stretch; }
 
         .cell-map-count { display: flex; align-items: center; justify-content: center; min-height: 64px; font-size: 0.9rem; color: #0f766e; background: #f0fdfa; padding: 0 1.25rem; border-radius: 12px; font-weight: 700; white-space: nowrap; border: 1px solid #ccfbf1; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
 
-        .cell-filter-form { display: flex; flex: 1; min-width: 0; gap: 1rem; }
-        .cell-filter-form .premium-select-field { flex: 1; min-width: 220px; box-sizing: border-box; }
+        .cell-filter-form { display: flex; flex-wrap: wrap; flex: 1; min-width: 250px; gap: 1rem; }
+        .cell-filter-form .premium-select-field { flex: 1; min-width: 250px; box-sizing: border-box; }
 
-        .map-actions-primary { display: flex; gap: 1rem; align-items: stretch; flex-wrap: wrap; }
-        .map-actions-secondary { display: flex; justify-content: flex-end; flex: 1; }
+        .map-actions-primary { display: flex; gap: 1rem; align-items: stretch; flex-wrap: wrap; justify-content: flex-start; border-top: 1px solid #f1f5f9; padding-top: 1rem; }
+        .map-actions-secondary { display: flex; justify-content: flex-end; flex: 1; min-width: 200px; }
 
         .dash-map-action-button, .cell-clear-button { display: inline-flex; align-items: center; justify-content: center; padding: 0 1.25rem !important; border-radius: 12px !important; font-size: 0.9rem !important; font-weight: 700 !important; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important; min-height: 64px; white-space: nowrap; }
 
@@ -51,7 +51,7 @@
         .cell-layer-button.active { background: #0f766e !important; border-color: #0f766e !important; color: #ffffff !important; box-shadow: 0 4px 6px -1px rgba(15, 118, 110, 0.2) !important; }
         .cell-layer-button.active:hover { background: #0d9488 !important; border-color: #0d9488 !important; }
 
-        .cell-clear-button { background: #fff1f2; border: 1px solid #ffe4e6; color: #e11d48; width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .cell-clear-button { background: #fff1f2; border: 1px solid #ffe4e6; color: #e11d48; width: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .cell-clear-button:hover:not(:disabled) { background: #ffe4e6; border-color: #fecdd3; color: #be123c; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(225, 29, 72, 0.1); }
         .cell-clear-button:disabled { background: #f8fafc; border-color: #e2e8f0; color: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
         .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
