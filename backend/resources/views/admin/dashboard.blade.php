@@ -25,18 +25,22 @@
         .dash-card-value { font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: 0; line-height: 1; }
 
         .dash-map-panel { background: white; border-radius: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); overflow: hidden; display: flex; flex-direction: column; }
-        .dash-map-header { padding: 1.75rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid #e2e8f0; background: linear-gradient(to bottom, #ffffff, #f8fafc); }
+        .dash-map-header { padding: 1.75rem 2rem; display: flex; flex-direction: column; gap: 1.25rem; border-bottom: 1px solid #e2e8f0; background: linear-gradient(to bottom, #ffffff, #f8fafc); }
+        .dash-map-heading { max-width: 62rem; }
         .dash-map-title { margin: 0; color: #0f172a; font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
         .dash-map-title svg { stroke: #0f766e; background: #ccfbf1; border-radius: 0.5rem; padding: 0.25rem; width: 2rem; height: 2rem; }
         .dash-map-subtitle { margin: 0.5rem 0 0 0; color: #64748b; font-size: 0.95rem; }
         .dash-map-canvas { height: 70vh; min-height: 550px; width: 100%; background: #eef2f6; z-index: 1; position: relative; }
-        .map-actions { width: 100%; display: grid; grid-template-columns: minmax(13rem, auto) minmax(24rem, 1fr) auto; align-items: center; gap: 0.85rem; }
-        .map-actions-primary { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end; }
-        .cell-map-count { font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.7rem 1rem; border-radius: 8px; font-weight: 800; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .08); }
-        .cell-filter-form { display: grid; grid-template-columns: repeat(2, minmax(15rem, 1fr)); gap: 0.75rem; }
-        .cell-clear-button { padding: 0.7rem 1rem; border-radius: 8px; background: white; border: 1px solid #fecaca; color: #b91c1c; font-weight: 800; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); cursor: pointer; min-height: 44px; white-space: nowrap; }
+        .map-actions { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 1rem; }
+        .map-filter-shell { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: stretch; gap: 0.85rem; min-width: 0; }
+        .map-actions-primary { display: grid; grid-template-columns: repeat(2, minmax(10rem, 1fr)); gap: 0.75rem; align-items: stretch; min-width: 22rem; }
+        .map-actions-secondary { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+        .cell-map-count { display: flex; align-items: center; min-height: 64px; font-size: 0.875rem; color: #0f766e; background: #ccfbf1; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 800; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .08); }
+        .cell-filter-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; min-width: 0; }
+        .cell-filter-form .premium-select-field { width: 100%; min-width: 0; min-height: 64px; box-sizing: border-box; }
+        .cell-clear-button { padding: 0.7rem 1rem; border-radius: 8px; background: white; border: 1px solid #fecaca; color: #b91c1c; font-weight: 800; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); cursor: pointer; min-height: 54px; white-space: nowrap; width: 100%; }
         .cell-clear-button:disabled { color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; }
-        .dash-map-action-button { padding: 0.7rem 1rem !important; border-radius: 8px !important; background: white !important; border: 1px solid #cbd5e1 !important; color: #334155 !important; font-weight: 800 !important; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05) !important; transition: all 0.2s !important; min-height: 44px; white-space: nowrap; }
+        .dash-map-action-button { padding: 0.7rem 1rem !important; border-radius: 8px !important; background: white !important; border: 1px solid #cbd5e1 !important; color: #334155 !important; font-weight: 800 !important; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05) !important; transition: all 0.2s !important; min-height: 54px; white-space: nowrap; width: 100%; }
         .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05); overflow: hidden; padding: 0; }
         .leaflet-popup-content { margin: 0; width: 320px !important; }
         .map-popup { padding: 0; font-family: inherit; }
@@ -64,11 +68,19 @@
         .cell-layer-button.active { background: #0f766e !important; border-color: #0f766e !important; color: white !important; }
 
 
+        @media (max-width: 1180px) {
+            .map-actions { grid-template-columns: 1fr; }
+            .map-actions-primary { min-width: 0; }
+        }
+        @media (max-width: 900px) {
+            .map-filter-shell { grid-template-columns: 1fr; }
+            .cell-filter-form { grid-template-columns: 1fr; }
+            .cell-map-count { min-height: 52px; justify-content: center; }
+        }
         @media (max-width: 768px) {
             .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-            .map-actions { grid-template-columns: 1fr; }
-            .map-actions-primary { justify-content: flex-start; }
-            .cell-filter-form { grid-template-columns: 1fr; width: 100%; }
+            .dash-map-header { padding: 1.25rem; }
+            .map-actions-primary { grid-template-columns: 1fr; }
             .cell-map-count, .dash-map-action-button, .cell-clear-button, #cell-clear-form { width: 100%; }
             .dash-card { padding: 0.75rem; }
             .dash-card-icon { width: 1.75rem; height: 1.75rem; border-radius: 0.375rem; }
@@ -207,7 +219,7 @@
 
     <div class="dash-map-panel" style="margin-bottom: 2.5rem;">
         <div class="dash-map-header">
-            <div>
+            <div class="dash-map-heading">
                 <h2 class="dash-map-title">
                     <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                     Peta Lokasi Sepeda
@@ -215,7 +227,6 @@
                 <p class="dash-map-subtitle">Peta otomatis diperbarui. Klik penanda untuk melihat ringkasan sepeda dan membuka halaman detail.</p>
             </div>
             <div class="map-actions">
-                <span class="cell-map-count" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
                 @php
                     $cellDeviceSelectOptions = $cellDeviceOptions
                         ->map(fn ($device) => [
@@ -231,29 +242,32 @@
                         ])
                         ->values();
                 @endphp
-                <form method="get" action="{{ route('admin.dashboard') }}" class="cell-filter-form">
-                    <x-admin.premium-select
-                        name="cell_device_id"
-                        id="cell-device-filter"
-                        label="Akun Perekam"
-                        icon="bike"
-                        placeholder="Pilih akun device"
-                        hint="Sumber rekaman BTS"
-                        :options="$cellDeviceSelectOptions"
-                        :selected="$selectedCellDeviceId"
-                    />
-                    <x-admin.premium-select
-                        name="cell_rental_id"
-                        id="cell-rental-filter"
-                        label="Perjalanan"
-                        icon="route"
-                        placeholder="Semua perjalanan akun"
-                        hint="Sesi pengujian"
-                        :options="$cellRentalSelectOptions"
-                        :selected="$selectedCellRentalId"
-                        :disabled="$selectedCellDeviceId === null"
-                    />
-                </form>
+                <div class="map-filter-shell">
+                    <span class="cell-map-count" id="bike-map-count">{{ $mapBikes->count() }} sepeda memiliki data lokasi</span>
+                    <form method="get" action="{{ route('admin.dashboard') }}" class="cell-filter-form">
+                        <x-admin.premium-select
+                            name="cell_device_id"
+                            id="cell-device-filter"
+                            label="Akun Perekam"
+                            icon="bike"
+                            placeholder="Pilih akun device"
+                            hint="Sumber rekaman BTS"
+                            :options="$cellDeviceSelectOptions"
+                            :selected="$selectedCellDeviceId"
+                        />
+                        <x-admin.premium-select
+                            name="cell_rental_id"
+                            id="cell-rental-filter"
+                            label="Perjalanan"
+                            icon="route"
+                            placeholder="Semua perjalanan akun"
+                            hint="Sesi pengujian"
+                            :options="$cellRentalSelectOptions"
+                            :selected="$selectedCellRentalId"
+                            :disabled="$selectedCellDeviceId === null"
+                        />
+                    </form>
+                </div>
                 <div class="map-actions-primary">
                     <button class="button secondary cell-layer-button dash-map-action-button" type="button" id="cell-layer-toggle">BTS Terdeteksi ({{ $mapCells->count() }})</button>
                     <form method="post" action="{{ route('admin.dashboard.cell-survey.clear') }}" id="cell-clear-form">
@@ -262,7 +276,9 @@
                         <input type="hidden" name="cell_rental_id" value="{{ $selectedCellRentalId }}">
                         <button class="cell-clear-button" type="submit" @disabled($selectedCellDeviceId === null)>Bersihkan Rekaman</button>
                     </form>
-                    <button class="button secondary dash-map-action-button" type="button" id="bike-map-center">Pusatkan Peta</button>
+                    <div class="map-actions-secondary">
+                        <button class="button secondary dash-map-action-button" type="button" id="bike-map-center">Pusatkan Peta</button>
+                    </div>
                 </div>
             </div>
         </div>
