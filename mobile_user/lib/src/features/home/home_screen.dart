@@ -446,7 +446,6 @@ class _DashboardPageState extends State<_DashboardPage> {
           ],
           _GreetingBlock(
             activeRental: _activeRental,
-            bikeCount: _bikes.where((bike) => bike.isAvailable).length,
           ),
           const SizedBox(height: 20),
           _ActiveRentalPanel(
@@ -514,10 +513,9 @@ class _DashboardPageState extends State<_DashboardPage> {
 }
 
 class _GreetingBlock extends StatelessWidget {
-  const _GreetingBlock({required this.activeRental, required this.bikeCount});
+  const _GreetingBlock({required this.activeRental});
 
   final Rental? activeRental;
-  final int bikeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -534,17 +532,17 @@ class _GreetingBlock extends StatelessWidget {
             height: 1.05,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          hasActiveRental
-              ? 'Pantau biaya dan akhiri sewa saat tujuan sudah tercapai.'
-              : '$bikeCount sepeda siap digunakan. Scan QR di sepeda untuk mulai.',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: const Color(0xff6b7280),
-            fontSize: 16.5,
-            height: 1.35,
+        if (hasActiveRental) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Pantau biaya dan akhiri sewa saat tujuan sudah tercapai.',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: const Color(0xff6b7280),
+              fontSize: 16.5,
+              height: 1.35,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
