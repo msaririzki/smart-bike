@@ -3,7 +3,7 @@
 @section('content')
     <h2 style="margin: 0; color: var(--teal-800); margin-bottom: 24px;">Monitoring Sepeda</h2>
 
-    <form class="card toolbar" method="get" action="{{ route('admin.monitoring.index') }}">
+    <form class="card toolbar monitoring-filter-toolbar" method="get" action="{{ route('admin.monitoring.index') }}">
         @php
             $statusOptions = collect($filters)
                 ->map(fn ($option) => [
@@ -14,9 +14,8 @@
         @endphp
         <x-admin.premium-select
             name="status"
-            label="Filter Status"
+            label="Status"
             icon="status"
-            hint="Monitoring unit"
             :options="$statusOptions"
             :selected="$filter"
         />

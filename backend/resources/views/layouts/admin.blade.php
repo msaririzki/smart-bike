@@ -128,6 +128,19 @@
         .toolbar { position: relative; z-index: 30; display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-bottom: 16px; overflow: visible; }
         .toolbar label { margin-top: 0; min-width: 180px; }
         .toolbar .actions { display: flex; gap: 8px; margin-top: 5px; }
+        .monitoring-filter-toolbar { z-index: 60; align-items: center; gap: 12px; padding: 18px 24px; }
+        .monitoring-filter-toolbar .premium-select-field { min-width: 180px; min-height: 50px; gap: 10px; padding: 8px 12px; border-radius: 10px; }
+        .monitoring-filter-toolbar .premium-select-icon { width: 32px; height: 32px; border-radius: 8px; }
+        .monitoring-filter-toolbar .premium-select-icon svg { width: 16px; height: 16px; }
+        .monitoring-filter-toolbar .premium-select-label { font-size: 10px; }
+        .monitoring-filter-toolbar .premium-select-trigger { min-height: 22px; gap: 6px; }
+        .monitoring-filter-toolbar .premium-select-current-title { font-size: 13px; font-weight: 700; }
+        .monitoring-filter-toolbar .premium-select-menu { top: calc(100% + 6px); max-height: 13rem; padding: 6px; border-radius: 12px; }
+        .monitoring-filter-toolbar .premium-select-option { min-height: 36px; padding: 6px 8px; gap: 8px; border-radius: 8px; }
+        .monitoring-filter-toolbar .premium-select-option-title { font-size: 13px; font-weight: 700; }
+        .monitoring-filter-toolbar .premium-select-option-check { width: 20px; height: 20px; }
+        .monitoring-filter-toolbar label { min-width: 300px; flex: 1 1 300px; }
+        .monitoring-filter-toolbar .actions { margin-top: 0; }
         .premium-filter-group { display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap; }
         .premium-select-field { position: relative; z-index: 1; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; min-width: 250px; min-height: 64px; margin: 0; padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
         .premium-select-field:hover { border-color: #cbd5e1; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.025); transform: translateY(-1px); }
