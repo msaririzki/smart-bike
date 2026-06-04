@@ -72,16 +72,18 @@ class ApiClient {
     required String name,
     required String email,
     String? phone,
+    num? weight,
   }) async {
     final json = await _patch(
       '/auth/me',
-      body: {'name': name, 'email': email, 'phone': phone},
+      body: {'name': name, 'email': email, 'phone': phone, 'weight': weight},
     );
     final user = json['user'] as Map<String, dynamic>;
 
     await _sessionStore.updateUser(
       name: user['name'] as String,
       email: user['email'] as String,
+      weight: user['weight']?.toString(),
     );
 
     return user;
@@ -228,6 +230,7 @@ class ApiClient {
     final headers = {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
+      'Bypass-Tunnel-Reminder': 'true',
     };
 
     if (authenticated) {

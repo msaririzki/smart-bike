@@ -26,6 +26,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
   late RentalHistory _currentHistory;
   bool _isLoading = true;
   String? _detailError;
+  num? _userWeight;
 
   @override
   void initState() {
@@ -37,9 +38,12 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
   Future<void> _loadDetails() async {
     try {
       final data = await widget.api.rentalDetail(widget.history.id);
+      final user = await widget.api.currentUser();
+      
       if (mounted) {
         setState(() {
           _currentHistory = RentalHistory.fromJson(data);
+          _userWeight = user['weight'] != null ? num.tryParse(user['weight'].toString()) : null;
           _isLoading = false;
           _detailError = null;
         });
@@ -95,13 +99,11 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                 const SizedBox(height: 24),
                 _RentalRouteMap(history: history),
                 const SizedBox(height: 24),
-                _RideMetricsGrid(history: history),
+                _RideMetricsGrid(history: history, userWeight: _userWeight),
                 const SizedBox(height: 24),
                 _TripTimeline(history: history, timeFormat: timeFormat),
                 const SizedBox(height: 24),
                 _BillingDetailCard(history: history, currency: currency),
-                const SizedBox(height: 24),
-                _GreenImpactCard(history: history),
                 const SizedBox(height: 32),
               ],
             ),
@@ -286,11 +288,27 @@ class _BikeHeader extends StatelessWidget {
 }
 
 class _RideMetricsGrid extends StatelessWidget {
-  const _RideMetricsGrid({required this.history});
+  const _RideMetricsGrid({required this.history, this.userWeight});
   final RentalHistory history;
+  final num? userWeight;
 
   @override
   Widget build(BuildContext context) {
+    final speed = history.averageSpeed;
+    final durationHours = history.durationMinutes / 60.0;
+    final weight = userWeight ?? 60.0; // Default 60 kg if not set
+    
+    double met = 4.0; // < 16 km/h
+    if (speed > 22) {
+      met = 10.0;
+    } else if (speed >= 19) {
+      met = 8.0;
+    } else if (speed >= 16) {
+      met = 6.8;
+    }
+    
+    final calories = met * weight * durationHours;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -335,7 +353,7 @@ class _RideMetricsGrid extends StatelessWidget {
               Container(width: 1, height: 40, color: const Color(0xffe3ebe7)),
               _MetricItem(
                 label: 'Est. Kalori',
-                value: history.caloriesBurned.toStringAsFixed(0),
+                value: calories.toStringAsFixed(0),
                 unit: 'kkal',
                 icon: Icons.local_fire_department_rounded,
                 color: Colors.red,
@@ -659,58 +677,7 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-class _GreenImpactCard extends StatelessWidget {
-  const _GreenImpactCard({required this.history});
 
-  final RentalHistory history;
-
-  @override
-  Widget build(BuildContext context) {
-    final co2Gram = history.totalDistanceKilometers * 120;
-    final co2Text = co2Gram >= 1000
-        ? '${(co2Gram / 1000).toStringAsFixed(1)} kg'
-        : '${co2Gram.toStringAsFixed(0)} g';
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xfff0fdf4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xffdcfce7)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.eco_rounded, color: Color(0xff166534), size: 30),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Estimasi CO2',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xff166534),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Kamu berhasil menyelamatkan bumi dari $co2Text emisi CO2 dengan bersepeda!',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xff15803d),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _ShareSheet extends StatelessWidget {
   const _ShareSheet({required this.history});

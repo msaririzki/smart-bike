@@ -176,12 +176,14 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:30'],
+            'weight' => ['nullable', 'numeric', 'min:30', 'max:300'],
         ]);
 
         $user->forceFill([
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
+            'weight' => $data['weight'] ?? null,
         ])->save();
 
         return response()->json([

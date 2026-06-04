@@ -839,10 +839,6 @@ class _HistorySummaryHeader extends StatelessWidget {
       (sum, e) => sum + e.totalDistanceKilometers,
     );
     final totalRentals = history.length;
-    final totalCo2Gram = totalKm * 120;
-    final co2Text = totalCo2Gram >= 1000
-        ? '${(totalCo2Gram / 1000).toStringAsFixed(1)} kg'
-        : '${totalCo2Gram.toStringAsFixed(0)} g';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -894,8 +890,6 @@ class _HistorySummaryHeader extends StatelessWidget {
                     value: '$totalRentals',
                     unit: 'kali',
                   ),
-                  _StatDivider(),
-                  _StatItem(label: 'Estimasi', value: co2Text, unit: 'CO2'),
                 ],
               ),
               const Padding(
@@ -1054,7 +1048,7 @@ class _StatItem extends StatelessWidget {
           value,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 17,
+            fontSize: 24,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1062,16 +1056,16 @@ class _StatItem extends StatelessWidget {
           unit,
           style: const TextStyle(
             color: Colors.white70,
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           label,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.4),
-            fontSize: 9,
+            fontSize: 11,
             letterSpacing: 0.5,
           ),
         ),

@@ -26,6 +26,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   String _name = '-';
   String _email = '-';
   String _phone = '-';
+  num? _weight;
   String _memberSince = '-';
   int _totalTrips = 0;
   String? _error;
@@ -52,6 +53,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         _name = _readString(user['name'], fallback: 'Pengguna FlowBike');
         _email = _readString(user['email']);
         _phone = _readString(user['phone'], fallback: 'Belum diisi');
+        _weight = user['weight'] != null ? num.tryParse(user['weight'].toString()) : null;
         _totalTrips = (historyData['total'] as num?)?.toInt() ?? 0;
 
         // Simple member since formatting
@@ -107,6 +109,9 @@ class ProfileScreenState extends State<ProfileScreen> {
     final phoneController = TextEditingController(
       text: _phone == 'Belum diisi' ? '' : _phone,
     );
+    final weightController = TextEditingController(
+      text: _weight != null ? _weight.toString() : '',
+    );
     final formKey = GlobalKey<FormState>();
     var isBusy = false;
     String? sheetError;
@@ -136,6 +141,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                   phone: phoneController.text.trim().isEmpty
                       ? null
                       : phoneController.text.trim(),
+                  weight: weightController.text.trim().isEmpty
+                      ? null
+                      : num.tryParse(weightController.text.trim()),
                 );
 
                 if (!mounted) return;
@@ -157,19 +165,20 @@ class ProfileScreenState extends State<ProfileScreen> {
               }
             }
 
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                28,
-                20,
-                28,
-                28 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+            return SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  28,
+                  20,
+                  28,
+                  28 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                     Center(
                       child: Container(
                         width: 40,
@@ -252,6 +261,16 @@ class ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.phone_rounded,
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: weightController,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      decoration: _buildInputDecoration(
+                        label: 'Berat Badan (kg)',
+                        icon: Icons.monitor_weight_rounded,
+                      ),
+                    ),
                     const SizedBox(height: 40),
                     Container(
                       decoration: BoxDecoration(
@@ -307,8 +326,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
-            );
-          },
+            ),
+          );
+        },
         );
       },
     );
@@ -316,6 +336,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     nameController.dispose();
     emailController.dispose();
     phoneController.dispose();
+    weightController.dispose();
   }
 
   InputDecoration _buildInputDecoration({
@@ -623,6 +644,15 @@ class ProfileScreenState extends State<ProfileScreen> {
                       subtitle: _phone,
                       iconBgColor: const Color(0xfff5f3ff),
                       iconColor: const Color(0xff8b5cf6),
+                      onTap: _showEditProfileSheet,
+                    ),
+                    _MenuDivider(),
+                    _ProfileInfoTile(
+                      icon: Icons.monitor_weight_rounded,
+                      title: 'Berat Badan',
+                      subtitle: _weight != null ? '${_weight} kg' : 'Belum diisi',
+                      iconBgColor: const Color(0xfff0fdf4),
+                      iconColor: const Color(0xff16a34a),
                       onTap: _showEditProfileSheet,
                     ),
                   ],
