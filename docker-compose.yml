@@ -11,6 +11,8 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
+      TZ: ${APP_TIMEZONE:-Asia/Makassar}
       DB_CONNECTION: mariadb
       DB_HOST: db
       DB_PORT: 3306
@@ -33,6 +35,8 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
+      TZ: ${APP_TIMEZONE:-Asia/Makassar}
       DB_CONNECTION: mariadb
       DB_HOST: db
       DB_PORT: 3306
@@ -55,6 +59,8 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
+      TZ: ${APP_TIMEZONE:-Asia/Makassar}
       DB_CONNECTION: mariadb
       DB_HOST: db
       DB_PORT: 3306
