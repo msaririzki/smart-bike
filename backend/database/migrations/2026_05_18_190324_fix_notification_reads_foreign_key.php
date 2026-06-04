@@ -11,17 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys=OFF;');
-        Schema::dropIfExists('notification_reads');
+        if (Schema::hasTable('notification_reads')) {
+            return;
+        }
+
         Schema::create('notification_reads', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('notification_id')->constrained('notifications')->cascadeOnDelete();
             $table->timestamps();
-            
+
             $table->unique(['user_id', 'notification_id']);
         });
-        \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys=ON;');
     }
 
     /**
