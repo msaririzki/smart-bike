@@ -125,14 +125,15 @@
         .button.secondary:hover { background: var(--gray-200); color: #0f172a; }
         .button:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
         
-        .toolbar { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-bottom: 16px; }
+        .toolbar { position: relative; z-index: 30; display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-bottom: 16px; overflow: visible; }
         .toolbar label { margin-top: 0; min-width: 180px; }
         .toolbar .actions { display: flex; gap: 8px; margin-top: 5px; }
         .premium-filter-group { display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap; }
-        .premium-select-field { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; min-width: 250px; min-height: 64px; margin: 0; padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .premium-select-field { position: relative; z-index: 1; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; min-width: 250px; min-height: 64px; margin: 0; padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
         .premium-select-field:hover { border-color: #cbd5e1; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.025); transform: translateY(-1px); }
         .toolbar .premium-select-field { min-width: 230px; }
         .premium-select-field:focus-within, .premium-select-field.is-open { border-color: var(--teal-600); box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.15), 0 10px 15px -3px rgba(0, 0, 0, 0.05); transform: translateY(-1px); }
+        .premium-select-field.is-open { z-index: 6000; }
         .premium-select-field.is-disabled { opacity: 0.7; background: #f8fafc; transform: none; box-shadow: none; pointer-events: none; cursor: not-allowed; }
         .premium-select-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; color: var(--teal-700); background: #f0fdfa; flex-shrink: 0; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); }
         .premium-select-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; justify-content: center; }
