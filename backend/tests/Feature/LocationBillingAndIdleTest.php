@@ -140,7 +140,7 @@ class LocationBillingAndIdleTest extends TestCase
             'accuracy_meters' => 5,
             'recorded_at' => now()->subSeconds(55)->toISOString(),
         ])->assertOk()
-            ->assertJsonPath('message', 'Over-speed movement recorded but not billed.');
+            ->assertJsonPath('message', 'Movement ignored as GPS anomaly.');
 
         $this->rental->refresh();
         $this->assertGreaterThan(100, (float) $this->rental->total_distance_meters);
@@ -150,6 +150,34 @@ class LocationBillingAndIdleTest extends TestCase
             'ignored_reason' => 'speed_anomaly',
             'is_anomaly' => true,
         ]);
+    }
+
+    public function test_reported_normal_speed_keeps_movement_billable_when_timestamp_implies_too_fast(): void
+    {
+        Sanctum::actingAs($this->device);
+
+        $baseTime = now()->subMinute();
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.583000,
+            'longitude' => 116.116000,
+            'accuracy_meters' => 5,
+            'recorded_at' => $baseTime->toISOString(),
+        ])->assertOk();
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.582500,
+            'longitude' => 116.116000,
+            'speed_kmh' => 32.6,
+            'accuracy_meters' => 5,
+            'recorded_at' => $baseTime->copy()->addSeconds(2)->toISOString(),
+        ])->assertOk()
+            ->assertJsonPath('message', 'Valid movement processed.');
+
+        $this->rental->refresh();
+
+        $this->assertGreaterThan(50, (float) $this->rental->total_distance_meters);
+        $this->assertSame(0, $this->rental->distance_cost);
     }
 
     public function test_tracking_and_billing_resume_from_speed_anomaly_anchor(): void
@@ -176,6 +204,7 @@ class LocationBillingAndIdleTest extends TestCase
         $this->postJson('/api/device/location-update', [
             'latitude' => -8.580000,
             'longitude' => 116.116000,
+            'speed_kmh' => 58,
             'accuracy_meters' => 5,
             'recorded_at' => $baseTime->copy()->addMinutes(2)->addSeconds(5)->toISOString(),
         ])->assertOk()

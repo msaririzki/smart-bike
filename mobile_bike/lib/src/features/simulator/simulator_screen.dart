@@ -711,11 +711,11 @@ class _SimulatorScreenState extends State<SimulatorScreen>
       return;
     }
 
-    if (impliedSpeedKmh > _maxBillableSpeedKmh) {
-      final anomalySpeedKmh = math.max(
-        impliedSpeedKmh,
-        pos.speed.isFinite && pos.speed > 0 ? pos.speed * 3.6 : 0.0,
-      );
+    final validationSpeedKmh =
+        targetSpeedKmh >= _minReliableSpeedKmh ? targetSpeedKmh : impliedSpeedKmh;
+
+    if (validationSpeedKmh > _maxBillableSpeedKmh) {
+      final anomalySpeedKmh = validationSpeedKmh;
       final displayAnomalySpeedKmh =
           anomalySpeedKmh.clamp(0.0, _maxAcceptedJumpSpeedKmh).toDouble();
 

@@ -116,6 +116,7 @@ class LocationProcessingService
             $speedKmh = ($distance / $seconds) * 3.6;
             $maxSpeed = (float) $this->pricing->get('max_reasonable_speed_kmh');
             $reportedSpeedKmh = isset($data['speed_kmh']) ? (float) $data['speed_kmh'] : null;
+            $hasReliableReportedSpeed = $reportedSpeedKmh !== null && $reportedSpeedKmh >= self::MIN_RELIABLE_REPORTED_SPEED_KMH;
 
             if ($this->looksLikeStationaryJitter($reportedSpeedKmh, $distance, $threshold)) {
                 $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, 'stationary_jitter', $distance);
@@ -124,10 +125,22 @@ class LocationProcessingService
                 return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Stationary GPS jitter ignored; not billed.'];
             }
 
+            if ($speedKmh > $maxSpeed && $hasReliableReportedSpeed && $reportedSpeedKmh <= $maxSpeed) {
+                $speedKmh = $reportedSpeedKmh;
+            }
+
             if ($speedKmh > $maxSpeed) {
                 $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, 'speed_anomaly', $distance, true);
 
-                return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Over-speed movement recorded but not billed.'];
+                if ($hasReliableReportedSpeed) {
+                    $rental->last_movement_at = $recordedAt;
+                    $rental->save();
+                    $this->idleDetection->resumeIfMoving($rental->refresh());
+
+                    return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Over-speed movement recorded but not billed.'];
+                }
+
+                return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Movement ignored as GPS anomaly.'];
             }
 
             $point = $this->storePoint($deviceUser, $bike, $rental, $data, $recordedAt, null, $distance, false, true);
