@@ -7,6 +7,7 @@ use App\Models\Bike;
 use App\Services\BikeQrRentalService;
 use App\Services\BikeStatusService;
 use App\Services\LocationProcessingService;
+use App\Services\PricingConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,6 +17,7 @@ class DeviceController extends Controller
         private readonly BikeStatusService $bikeStatus,
         private readonly LocationProcessingService $locations,
         private readonly BikeQrRentalService $qrService,
+        private readonly PricingConfigService $pricing,
     ) {}
 
     public function currentAssignment(Request $request): JsonResponse
@@ -88,6 +90,9 @@ class DeviceController extends Controller
                         'recorded_at' => $latestPoint->recorded_at?->toISOString(),
                     ] : null,
                 ] : null,
+                'settings' => [
+                    'max_reasonable_speed_kmh' => (float) $this->pricing->get('max_reasonable_speed_kmh'),
+                ],
             ],
         ]);
     }

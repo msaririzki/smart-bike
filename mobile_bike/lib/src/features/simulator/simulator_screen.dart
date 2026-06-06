@@ -41,7 +41,7 @@ class SimulatorScreen extends StatefulWidget {
 class _SimulatorScreenState extends State<SimulatorScreen>
     with SingleTickerProviderStateMixin {
   static const double _maxAcceptedGpsAccuracyMeters = 50;
-  static const double _maxBillableSpeedKmh = 40;
+  static const double _defaultMaxBillableSpeedKmh = 40;
   static const double _maxAcceptedJumpSpeedKmh = 80;
   static const double _minRouteDistanceMeters = 1.5;
   static const double _maxDynamicMovementThresholdMeters = 35;
@@ -97,8 +97,10 @@ class _SimulatorScreenState extends State<SimulatorScreen>
   bool _autoStartAttempted = false;
   bool _idleDialogOpen = false;
   String? _lastIdleAlertKey;
+  DateTime? _lastOverspeedAlertAt;
   LocationAccessStatus _locationAccessStatus = LocationAccessStatus.denied;
   String _locationAccessMessage = 'Mengecek akses lokasi perangkat...';
+  double _maxBillableSpeedKmh = _defaultMaxBillableSpeedKmh;
   final List<_RoutePoint> _routePoints = [];
   _RoutePoint? _lastAcceptedGpsPoint;
   _PendingLocationUpdate? _pendingLocationUpdate;
@@ -256,6 +258,11 @@ class _SimulatorScreenState extends State<SimulatorScreen>
       _setStateAndRefreshMonitoring(() {
         _summary = summary;
         _bike = summary.bike ?? _bike;
+        final maxReasonableSpeedKmh = summary.settings?.maxReasonableSpeedKmh;
+        _maxBillableSpeedKmh =
+            maxReasonableSpeedKmh != null && maxReasonableSpeedKmh > 0
+                ? maxReasonableSpeedKmh
+                : _defaultMaxBillableSpeedKmh;
         final nextRentalId = summary.rental?.id;
         if (nextRentalId != _activeRentalId) {
           _resetRealtimeTrackingState();
@@ -729,6 +736,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
         message:
             'Melebihi batas ${_maxBillableSpeedKmh.toStringAsFixed(0)} km/h; segmen ditandai merah.',
       );
+      _showOverspeedAlert(anomalySpeedKmh);
       return;
     }
 
@@ -1362,6 +1370,76 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+
+  void _showOverspeedAlert(double speedKmh) {
+    if (!mounted) return;
+
+    final now = DateTime.now();
+    final lastAlertAt = _lastOverspeedAlertAt;
+    if (lastAlertAt != null &&
+        now.difference(lastAlertAt) < const Duration(seconds: 12)) {
+      return;
+    }
+
+    _lastOverspeedAlertAt = now;
+    final speedText = speedKmh.toStringAsFixed(1);
+    final limitText = _maxBillableSpeedKmh.toStringAsFixed(0);
+    final messenger = ScaffoldMessenger.of(context);
+
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+        backgroundColor: const Color(0xFF991B1B),
+        margin: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        content: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEE2E2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.speed_rounded,
+                color: Color(0xFFB91C1C),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Batas kecepatan terlampaui',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$speedText km/h melewati batas $limitText km/h. Jalur ditandai merah.',
+                    style: const TextStyle(
+                      color: Color(0xFFFEE2E2),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

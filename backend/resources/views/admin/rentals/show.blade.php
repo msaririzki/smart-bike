@@ -151,10 +151,12 @@
                 Number(initialRouteCenter.latitude),
                 Number(initialRouteCenter.longitude),
             ], 15);
-            const routeLine = L.polyline([], { color: '#0f766e', weight: 5, opacity: 0.85 }).addTo(routeMap);
+            const routeLayer = L.layerGroup().addTo(routeMap);
             const pointLayer = L.layerGroup().addTo(routeMap);
             let hasFittedRoute = false;
             let currentRouteCoordinates = [];
+            const normalRouteStyle = { color: '#0f766e', weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round' };
+            const speedAnomalyRouteStyle = { color: '#ef4444', weight: 6, opacity: 0.92, lineCap: 'round', lineJoin: 'round' };
 
             const startIcon = L.divIcon({
                 className: 'badge available',
@@ -185,26 +187,53 @@
                     <p><strong>Catatan:</strong> ${routeEscapeHtml(point.ignored_reason)}</p>
                 </div>
             `;
+            const isSpeedAnomalyPoint = (point) => point?.ignored_reason === 'speed_anomaly';
+
+            const drawRouteSegments = (points) => {
+                routeLayer.clearLayers();
+
+                for (let index = 1; index < points.length; index += 1) {
+                    const previous = points[index - 1];
+                    const current = points[index];
+                    const style = isSpeedAnomalyPoint(current) ? speedAnomalyRouteStyle : normalRouteStyle;
+
+                    L.polyline([
+                        [previous.latitude, previous.longitude],
+                        [current.latitude, current.longitude],
+                    ], style).addTo(routeLayer);
+                }
+            };
 
             const renderRoute = (points, fitRoute = false) => {
                 const coordinates = points.map((point) => [point.latitude, point.longitude]);
-                routeLine.setLatLngs(coordinates);
+                drawRouteSegments(points);
                 pointLayer.clearLayers();
+                const speedAnomalyCount = points.filter(isSpeedAnomalyPoint).length;
 
                 points.forEach((point, index) => {
-                    if (index !== 0 && index !== points.length - 1) {
-                        return;
+                    if (isSpeedAnomalyPoint(point)) {
+                        L.circleMarker([point.latitude, point.longitude], {
+                            radius: 5,
+                            color: '#dc2626',
+                            weight: 2,
+                            fillColor: '#fee2e2',
+                            fillOpacity: 0.95,
+                        }).addTo(pointLayer).bindPopup(pointPopup(point, 'Overspeed'));
                     }
 
-                    L.marker([point.latitude, point.longitude], {
-                        icon: index === 0 ? startIcon : finishIcon,
-                    }).addTo(pointLayer).bindPopup(pointPopup(point, index === 0 ? 'Titik Mulai' : 'Lokasi Terbaru'));
+                    if (index === 0 || index === points.length - 1) {
+                        L.marker([point.latitude, point.longitude], {
+                            icon: index === 0 ? startIcon : finishIcon,
+                        }).addTo(pointLayer).bindPopup(pointPopup(point, index === 0 ? 'Titik Mulai' : 'Lokasi Terbaru'));
+                    }
                 });
 
                 routeMapEmptyElement.hidden = points.length > 0;
                 routeMapElement.hidden = points.length === 0;
                 routeMapCenterButton.disabled = points.length === 0;
-                routeMapCountElement.textContent = `${points.length} titik lokasi`;
+                routeMapCountElement.textContent = speedAnomalyCount > 0
+                    ? `${points.length} titik lokasi · ${speedAnomalyCount} overspeed`
+                    : `${points.length} titik lokasi`;
                 currentRouteCoordinates = coordinates;
 
                 if (coordinates.length === 0) {

@@ -281,7 +281,8 @@ class LocationBillingAndIdleTest extends TestCase
             ->assertJsonPath('data.rental.status', Rental::STATUS_ACTIVE)
             ->assertJsonPath('data.rental.user.name', 'User')
             ->assertJsonPath('data.rental.latest_location_point.network_type', 'wifi')
-            ->assertJsonPath('data.rental.current_speed_kmh', 12.5);
+            ->assertJsonPath('data.rental.current_speed_kmh', 12.5)
+            ->assertJsonPath('data.settings.max_reasonable_speed_kmh', 40);
     }
 
     public function test_device_location_update_restores_stale_offline_status_during_active_rental(): void

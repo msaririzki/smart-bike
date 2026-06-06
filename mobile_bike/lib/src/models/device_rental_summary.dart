@@ -4,14 +4,17 @@ class DeviceRentalSummary {
   const DeviceRentalSummary({
     this.bike,
     this.rental,
+    this.settings,
   });
 
   final Bike? bike;
   final ActiveBikeRental? rental;
+  final DeviceRentalSettings? settings;
 
   factory DeviceRentalSummary.fromJson(Map<String, dynamic> json) {
     final bikeJson = json['bike'];
     final rentalJson = json['rental'];
+    final settingsJson = json['settings'];
 
     return DeviceRentalSummary(
       bike: bikeJson is Map
@@ -20,6 +23,25 @@ class DeviceRentalSummary {
       rental: rentalJson is Map
           ? ActiveBikeRental.fromJson(Map<String, dynamic>.from(rentalJson))
           : null,
+      settings: settingsJson is Map
+          ? DeviceRentalSettings.fromJson(
+              Map<String, dynamic>.from(settingsJson),
+            )
+          : null,
+    );
+  }
+}
+
+class DeviceRentalSettings {
+  const DeviceRentalSettings({
+    this.maxReasonableSpeedKmh,
+  });
+
+  final double? maxReasonableSpeedKmh;
+
+  factory DeviceRentalSettings.fromJson(Map<String, dynamic> json) {
+    return DeviceRentalSettings(
+      maxReasonableSpeedKmh: _toDouble(json['max_reasonable_speed_kmh']),
     );
   }
 }
