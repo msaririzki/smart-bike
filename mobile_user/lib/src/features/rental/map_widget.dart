@@ -46,6 +46,7 @@ class MapWidget extends StatefulWidget {
     this.latestLocationLabel = 'Lokasi sepeda terakhir',
     this.routeLabel = 'Jalur dari perangkat sepeda',
     this.routeColor,
+    this.routeGapBreakMeters = 350,
     this.onRoutePointTap,
     this.onSpotTap,
     this.bikeLabel,
@@ -73,6 +74,7 @@ class MapWidget extends StatefulWidget {
   final String latestLocationLabel;
   final String routeLabel;
   final Color? routeColor;
+  final double routeGapBreakMeters;
   final void Function(int index, LatLng point)? onRoutePointTap;
   final void Function(PopularSpot spot)? onSpotTap;
 
@@ -492,24 +494,55 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
 
   PolylineLayer _buildRouteLayer() {
     final isSatellite = widget.mapType != MapType.standard;
+    final segments = _routeSegments(
+      widget.routePoints,
+    ).where((segment) => segment.length >= 2).toList();
+
     return PolylineLayer(
-      polylines: [
-        Polyline(
-          points: widget.routePoints,
-          color:
-              widget.routeColor ??
-              (isSatellite ? const Color(0xff38bdf8) : const Color(0xff0d9488)),
-          strokeWidth: 4,
-          borderColor:
-              (widget.routeColor ??
-                      (isSatellite
-                          ? const Color(0xff0284c7)
-                          : const Color(0xff0f766e)))
-                  .withValues(alpha: 0.3),
-          borderStrokeWidth: 2,
-        ),
-      ],
+      polylines: segments
+          .map(
+            (segment) => Polyline(
+              points: segment,
+              color:
+                  widget.routeColor ??
+                  (isSatellite
+                      ? const Color(0xff38bdf8)
+                      : const Color(0xff0d9488)),
+              strokeWidth: 4,
+              borderColor:
+                  (widget.routeColor ??
+                          (isSatellite
+                              ? const Color(0xff0284c7)
+                              : const Color(0xff0f766e)))
+                      .withValues(alpha: 0.3),
+              borderStrokeWidth: 2,
+            ),
+          )
+          .toList(),
     );
+  }
+
+  List<List<LatLng>> _routeSegments(List<LatLng> points) {
+    if (points.isEmpty) {
+      return const [];
+    }
+
+    final segments = <List<LatLng>>[];
+    var current = <LatLng>[points.first];
+
+    for (final point in points.skip(1)) {
+      final distance = calculateDistance(current.last, point);
+      if (distance > widget.routeGapBreakMeters) {
+        segments.add(current);
+        current = <LatLng>[point];
+        continue;
+      }
+
+      current.add(point);
+    }
+
+    segments.add(current);
+    return segments;
   }
 
   MarkerLayer _buildPickupMarker() {
@@ -804,12 +837,12 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     return MarkerLayer(
       markers: bikes.map((bike) {
         final pos = LatLng(bike.latitude!, bike.longitude!);
-        
+
         // Determine color based on status
         Color mainColor;
         Color textColor;
         Color bgColor = Colors.white;
-        
+
         if (!bike.isOnline) {
           mainColor = const Color(0xff9ca3af); // Grey for Offline
           textColor = const Color(0xff4b5563);

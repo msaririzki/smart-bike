@@ -21,6 +21,8 @@ class ActiveRentalScreen extends StatefulWidget {
 }
 
 class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
+  static const _routeDuplicateThresholdMeters = 1.0;
+
   final _currency = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp',
@@ -217,23 +219,52 @@ class _ActiveRentalScreenState extends State<ActiveRentalScreen> {
       _routePoints
         ..clear()
         ..addAll(_cleanRouteHistory(routeHistory));
+      return;
+    }
+
+    final latestPoint = _latestRentalPoint(rental);
+    if (latestPoint != null &&
+        (_routePoints.isEmpty ||
+            calculateDistance(_routePoints.last, latestPoint) >=
+                _routeDuplicateThresholdMeters)) {
+      _routePoints.add(latestPoint);
     }
   }
 
   List<LatLng> _cleanRouteHistory(List<LatLng> points) {
-    if (points.length < 2) {
-      return points;
-    }
+    final cleaned = <LatLng>[];
+    for (final point in points) {
+      if (!_isValidLatLng(point)) {
+        continue;
+      }
 
-    final cleaned = <LatLng>[points.first];
-    for (final point in points.skip(1)) {
-      final distance = calculateDistance(cleaned.last, point);
-      if (distance <= 250) {
+      if (cleaned.isEmpty ||
+          calculateDistance(cleaned.last, point) >=
+              _routeDuplicateThresholdMeters) {
         cleaned.add(point);
       }
     }
 
     return cleaned;
+  }
+
+  LatLng? _latestRentalPoint(Rental rental) {
+    final latitude = rental.latitude;
+    final longitude = rental.longitude;
+
+    if (latitude == null || longitude == null) {
+      return null;
+    }
+
+    final point = LatLng(latitude, longitude);
+    return _isValidLatLng(point) ? point : null;
+  }
+
+  bool _isValidLatLng(LatLng point) {
+    return point.latitude >= -90 &&
+        point.latitude <= 90 &&
+        point.longitude >= -180 &&
+        point.longitude <= 180;
   }
 
   void _handleIdleStatus(Rental? rental) {
