@@ -81,8 +81,8 @@
         .map-popup-footer { display: flex; justify-content: space-between; padding: 1rem 1.25rem; background: white; border-top: 1px solid #f1f5f9; }
         .map-popup-footer a { color: #0f766e; font-weight: 600; font-size: 0.875rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s; }
         .map-popup-footer a:hover { color: #0f172a; text-decoration: underline; }
-        .cell-map-marker { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: #7c2d12; background: #fed7aa; border: 3px solid #fff7ed; box-shadow: 0 8px 18px rgba(124, 45, 18, .26); font-size: 16px; }
-        .cell-handover-marker { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: #ffffff; background: #2563eb; border: 3px solid #dbeafe; box-shadow: 0 10px 20px rgba(37, 99, 235, .32); font-size: 15px; font-weight: 900; }
+        .cell-map-marker { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: #7c2d12; background: #fed7aa; border: 2px solid #fff7ed; box-shadow: 0 8px 18px rgba(124, 45, 18, .24); font-size: 15px; }
+        .cell-handover-marker { width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; color: #ffffff; background: #2563eb; border: 2px solid #dbeafe; box-shadow: 0 8px 16px rgba(37, 99, 235, .28); font-size: 12px; font-weight: 900; }
         .cell-route-line { filter: drop-shadow(0 4px 8px rgba(37, 99, 235, .22)); }
         .cell-layer-button.active { background: #0f766e !important; border-color: #0f766e !important; color: white !important; }
 
@@ -363,6 +363,7 @@
         const cellClearButton = cellClearForm?.querySelector('.cell-clear-button');
         let selectedCellDeviceId = @json($selectedCellDeviceId);
         let selectedCellRentalId = @json($selectedCellRentalId);
+        const maxVisibleHandoverMarkers = 24;
         const mapDataUrl = @json(route('admin.dashboard.map-data'));
         const mapDataRequestUrl = () => {
             const url = new URL(mapDataUrl, window.location.origin);
@@ -477,9 +478,9 @@
             const handoverIcon = () => L.divIcon({
                 className: 'cell-handover-marker',
                 html: '&#8644;',
-                iconSize: [30, 30],
-                iconAnchor: [15, 15],
-                popupAnchor: [0, -15],
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+                popupAnchor: [0, -12],
             });
 
             const cellPopupHtml = (cell) => {
@@ -547,6 +548,9 @@
                 const fromOperator = event.from_operator_label ?? 'Cell awal';
                 const toOperator = event.to_operator_label ?? 'Cell baru';
                 const signal = event.signal_dbm === null ? '-' : `${event.signal_dbm} dBm`;
+                const sampleNote = event.display_total && event.display_total > maxVisibleHandoverMarkers
+                    ? `<p><strong>Tampilan:</strong> Sampel ${escapeHtml(event.display_position)} dari ${escapeHtml(event.display_total)} perpindahan. Total tetap dihitung penuh di tombol BTS.</p>`
+                    : '';
 
                 return `
                     <div class="map-popup">
@@ -577,9 +581,31 @@
                         </div>
                         <div class="map-popup-details">
                             <p><strong>Catatan:</strong> Titik ini adalah lokasi GPS saat perangkat terdeteksi berpindah dari satu cell ke cell lain dalam perjalanan yang dipilih.</p>
+                            ${sampleNote}
                         </div>
                     </div>
                 `;
+            };
+
+            const visibleHandoverEvents = (events) => {
+                if (events.length <= maxVisibleHandoverMarkers) {
+                    return events;
+                }
+
+                const indexes = new Set([0, events.length - 1]);
+                const step = (events.length - 1) / (maxVisibleHandoverMarkers - 1);
+
+                for (let index = 1; index < maxVisibleHandoverMarkers - 1; index += 1) {
+                    indexes.add(Math.round(index * step));
+                }
+
+                return [...indexes]
+                    .sort((left, right) => left - right)
+                    .map((eventIndex, displayIndex) => ({
+                        ...events[eventIndex],
+                        display_position: displayIndex + 1,
+                        display_total: events.length,
+                    }));
             };
 
             const renderCellRoute = (routePoints) => {
@@ -612,8 +638,9 @@
 
             const renderHandovers = (events) => {
                 const visibleIds = new Set();
+                const displayEvents = visibleHandoverEvents(events);
 
-                events.forEach((event) => {
+                displayEvents.forEach((event) => {
                     const id = String(event.id);
                     const position = [event.latitude, event.longitude];
                     visibleIds.add(id);
@@ -680,6 +707,12 @@
                     cellLayerLabel.textContent = handoverCount > 0
                         ? `BTS (${nextCells.length}) / Pindah (${handoverCount})`
                         : `BTS (${nextCells.length})`;
+                }
+                if (cellLayerToggle) {
+                    const displayedHandovers = visibleHandoverEvents(latestCellHandovers).length;
+                    cellLayerToggle.title = latestCellHandovers.length > displayedHandovers
+                        ? `${latestCellHandovers.length} perpindahan terdeteksi, ${displayedHandovers} marker ditampilkan agar peta tetap ringan.`
+                        : '';
                 }
                 cellLayerToggle.classList.toggle('active', Boolean(selectedCellDeviceId) && cellsVisible);
                 cellLayerToggle.disabled = ! selectedCellDeviceId;
