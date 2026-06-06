@@ -92,6 +92,28 @@ class AdminCellSurveyDashboardTest extends TestCase
             ->assertJsonPath('cells.0.cell_id', '111');
     }
 
+    public function test_admin_classifies_cell_handovers_as_confirmed_or_fluctuation(): void
+    {
+        [$admin, $device] = $this->users();
+        [$towerA, $towerB] = $this->towers();
+        $bike = $this->bike('BIKE-A', $device);
+        $rental = $this->rental($bike);
+        $startedAt = now()->subMinute();
+
+        $this->observation($towerA, $bike, $device, -8.583000, 116.116000, $rental, $startedAt);
+        $this->observation($towerB, $bike, $device, -8.583010, 116.116010, $rental, $startedAt->copy()->addSeconds(5));
+        $this->observation($towerA, $bike, $device, -8.583020, 116.116020, $rental, $startedAt->copy()->addSeconds(10));
+        $this->observation($towerB, $bike, $device, -8.583500, 116.116500, $rental, $startedAt->copy()->addSeconds(30));
+
+        $this->actingAs($admin)
+            ->get("/admin/dashboard/map-data?cell_device_id={$device->id}&cell_rental_id={$rental->id}")
+            ->assertOk()
+            ->assertJsonCount(3, 'cell_handovers')
+            ->assertJsonPath('cell_handovers.0.classification', 'fluctuation')
+            ->assertJsonPath('cell_handovers.1.classification', 'fluctuation')
+            ->assertJsonPath('cell_handovers.2.classification', 'confirmed');
+    }
+
     public function test_admin_can_clear_cell_survey_for_selected_rental_only(): void
     {
         [$admin, $device] = $this->users();
@@ -210,6 +232,7 @@ class AdminCellSurveyDashboardTest extends TestCase
         float $latitude,
         float $longitude,
         ?Rental $rental = null,
+        mixed $observedAt = null,
     ): CellObservation
     {
         return CellObservation::query()->create([
@@ -224,7 +247,7 @@ class AdminCellSurveyDashboardTest extends TestCase
             'is_registered' => true,
             'operator_label' => $tower->operator_label,
             'network_operator_code' => "{$tower->mcc}{$tower->mnc}",
-            'observed_at' => now(),
+            'observed_at' => $observedAt ?? now(),
         ]);
     }
 }

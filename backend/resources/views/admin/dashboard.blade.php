@@ -83,6 +83,7 @@
         .map-popup-footer a:hover { color: #0f172a; text-decoration: underline; }
         .cell-map-marker { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: #7c2d12; background: #fed7aa; border: 2px solid #fff7ed; box-shadow: 0 8px 18px rgba(124, 45, 18, .24); font-size: 15px; }
         .cell-handover-marker { width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; color: #ffffff; background: #2563eb; border: 2px solid #dbeafe; box-shadow: 0 8px 16px rgba(37, 99, 235, .28); font-size: 12px; font-weight: 900; }
+        .cell-handover-marker.fluctuation { color: #334155; background: #e2e8f0; border-color: #f8fafc; box-shadow: 0 6px 12px rgba(51, 65, 85, .18); opacity: .78; }
         .cell-route-line { filter: drop-shadow(0 4px 8px rgba(37, 99, 235, .22)); }
         .cell-layer-button.active { background: #0f766e !important; border-color: #0f766e !important; color: white !important; }
 
@@ -363,7 +364,7 @@
         const cellClearButton = cellClearForm?.querySelector('.cell-clear-button');
         let selectedCellDeviceId = @json($selectedCellDeviceId);
         let selectedCellRentalId = @json($selectedCellRentalId);
-        const maxVisibleHandoverMarkers = 24;
+        const maxVisibleHandoverMarkers = 120;
         const mapDataUrl = @json(route('admin.dashboard.map-data'));
         const mapDataRequestUrl = () => {
             const url = new URL(mapDataUrl, window.location.origin);
@@ -475,8 +476,8 @@
                 popupAnchor: [0, -15],
             });
 
-            const handoverIcon = () => L.divIcon({
-                className: 'cell-handover-marker',
+            const handoverIcon = (event) => L.divIcon({
+                className: `cell-handover-marker ${event.classification === 'fluctuation' ? 'fluctuation' : 'confirmed'}`,
                 html: '&#8644;',
                 iconSize: [24, 24],
                 iconAnchor: [12, 12],
@@ -548,6 +549,11 @@
                 const fromOperator = event.from_operator_label ?? 'Cell awal';
                 const toOperator = event.to_operator_label ?? 'Cell baru';
                 const signal = event.signal_dbm === null ? '-' : `${event.signal_dbm} dBm`;
+                const distance = event.distance_from_previous_meters === null || event.distance_from_previous_meters === undefined
+                    ? '-'
+                    : `${Number(event.distance_from_previous_meters).toFixed(1)} m`;
+                const classificationLabel = event.classification_label ?? 'Pindah raw';
+                const classificationReason = event.classification_reason ?? 'Cell ID berubah dari observasi sebelumnya.';
                 const sampleNote = event.display_total && event.display_total > maxVisibleHandoverMarkers
                     ? `<p><strong>Tampilan:</strong> Sampel ${escapeHtml(event.display_position)} dari ${escapeHtml(event.display_total)} perpindahan. Total tetap dihitung penuh di tombol BTS.</p>`
                     : '';
@@ -556,10 +562,10 @@
                     <div class="map-popup">
                         <div class="map-popup-header" style="background: linear-gradient(135deg, #1d4ed8, #38bdf8);">
                             <div>
-                                <h3 class="map-popup-title">Pindah BTS/Cell</h3>
+                                <h3 class="map-popup-title">${escapeHtml(classificationLabel)}</h3>
                                 <div class="map-popup-subtitle">${escapeHtml(fromOperator)} &rarr; ${escapeHtml(toOperator)}</div>
                             </div>
-                            <span class="badge">Handover</span>
+                            <span class="badge">${escapeHtml(event.classification === 'fluctuation' ? 'Cek' : 'Valid')}</span>
                         </div>
                         <div class="map-popup-grid">
                             <div class="map-popup-item">
@@ -575,12 +581,17 @@
                                 <span class="map-popup-value">${escapeHtml(signal)}</span>
                             </div>
                             <div class="map-popup-item">
+                                <span class="map-popup-label">Jarak GPS</span>
+                                <span class="map-popup-value">${escapeHtml(distance)}</span>
+                            </div>
+                            <div class="map-popup-item">
                                 <span class="map-popup-label">Waktu</span>
                                 <span class="map-popup-value">${escapeHtml(event.observed_at ?? '-')}</span>
                             </div>
                         </div>
                         <div class="map-popup-details">
                             <p><strong>Catatan:</strong> Titik ini adalah lokasi GPS saat perangkat terdeteksi berpindah dari satu cell ke cell lain dalam perjalanan yang dipilih.</p>
+                            <p><strong>Klasifikasi:</strong> ${escapeHtml(classificationReason)}</p>
                             ${sampleNote}
                         </div>
                     </div>
@@ -648,9 +659,10 @@
                     if (handoverMarkers.has(id)) {
                         handoverMarkers.get(id)
                             .setLatLng(position)
+                            .setIcon(handoverIcon(event))
                             .setPopupContent(handoverPopupHtml(event));
                     } else {
-                        const marker = L.marker(position, { icon: handoverIcon(), zIndexOffset: 650 }).bindPopup(handoverPopupHtml(event), { autoPan: false, className: 'animated-popup' });
+                        const marker = L.marker(position, { icon: handoverIcon(event), zIndexOffset: 650 }).bindPopup(handoverPopupHtml(event), { autoPan: false, className: 'animated-popup' });
                         handoverMarkers.set(id, marker);
                     }
 
@@ -704,8 +716,10 @@
 
                 if (cellLayerLabel) {
                     const handoverCount = latestCellHandovers.length;
+                    const confirmedCount = latestCellHandovers.filter((event) => event.classification !== 'fluctuation').length;
+                    const fluctuationCount = handoverCount - confirmedCount;
                     cellLayerLabel.textContent = handoverCount > 0
-                        ? `BTS (${nextCells.length}) / Pindah (${handoverCount})`
+                        ? `BTS (${nextCells.length}) / Pindah valid (${confirmedCount}) / Fluktuasi (${fluctuationCount})`
                         : `BTS (${nextCells.length})`;
                 }
                 if (cellLayerToggle) {

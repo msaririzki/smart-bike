@@ -23,6 +23,14 @@ class DashboardController extends Controller
 
     private const LOMBOK_LONGITUDE_RANGE = [115.75, 116.75];
 
+    private const CONFIRMED_HANDOVER_DISTANCE_METERS = 25.0;
+
+    private const PING_PONG_DISTANCE_METERS = 35.0;
+
+    private const PING_PONG_SECONDS = 120;
+
+    private const CONFIRMED_HANDOVER_SAMPLE_COUNT = 2;
+
     public function __invoke(Request $request): View
     {
         $activeRentalStatuses = [Rental::STATUS_ACTIVE, Rental::STATUS_IDLE_WARNING, Rental::STATUS_IDLE_BILLING];
@@ -233,36 +241,138 @@ class DashboardController extends Controller
             return collect();
         }
 
-        $previous = null;
+        $observations = $this->cellObservationSequence($deviceUserId, $rentalId)->values();
+        $events = collect();
 
-        return $this->cellObservationSequence($deviceUserId, $rentalId)
-            ->map(function (CellObservation $observation) use (&$previous): ?array {
-                $current = $observation;
-                $from = $previous;
-                $previous = $current;
+        for ($index = 1; $index < $observations->count(); $index++) {
+            /** @var CellObservation $from */
+            $from = $observations->get($index - 1);
+            /** @var CellObservation $current */
+            $current = $observations->get($index);
 
-                if (! $from || (int) $from->cell_tower_id === (int) $current->cell_tower_id) {
-                    return null;
-                }
+            if ((int) $from->cell_tower_id === (int) $current->cell_tower_id) {
+                continue;
+            }
 
-                return [
-                    'id' => "{$from->id}-{$current->id}",
-                    'from_cell_tower_id' => $from->cell_tower_id,
-                    'to_cell_tower_id' => $current->cell_tower_id,
-                    'from_operator_label' => $from->operator_label ?? $from->cellTower?->operator_label,
-                    'to_operator_label' => $current->operator_label ?? $current->cellTower?->operator_label,
-                    'from_radio_type' => $from->cellTower?->radio_type,
-                    'to_radio_type' => $current->cellTower?->radio_type,
-                    'from_cell_id' => $from->cellTower?->cell_id,
-                    'to_cell_id' => $current->cellTower?->cell_id,
-                    'latitude' => (float) $current->latitude,
-                    'longitude' => (float) $current->longitude,
-                    'signal_dbm' => $current->signal_dbm,
-                    'observed_at' => $current->observed_at?->format('Y-m-d H:i:s'),
-                ];
-            })
-            ->filter()
-            ->values();
+            $classification = $this->classifyHandover($observations, $index);
+
+            $events->push([
+                'id' => "{$from->id}-{$current->id}",
+                'from_cell_tower_id' => $from->cell_tower_id,
+                'to_cell_tower_id' => $current->cell_tower_id,
+                'from_operator_label' => $from->operator_label ?? $from->cellTower?->operator_label,
+                'to_operator_label' => $current->operator_label ?? $current->cellTower?->operator_label,
+                'from_radio_type' => $from->cellTower?->radio_type,
+                'to_radio_type' => $current->cellTower?->radio_type,
+                'from_cell_id' => $from->cellTower?->cell_id,
+                'to_cell_id' => $current->cellTower?->cell_id,
+                'latitude' => (float) $current->latitude,
+                'longitude' => (float) $current->longitude,
+                'signal_dbm' => $current->signal_dbm,
+                'distance_from_previous_meters' => $this->distanceMeters($from, $current),
+                'classification' => $classification['classification'],
+                'classification_label' => $classification['label'],
+                'classification_reason' => $classification['reason'],
+                'observed_at' => $current->observed_at?->format('Y-m-d H:i:s'),
+            ]);
+        }
+
+        return $events->values();
+    }
+
+    /**
+     * @param Collection<int, CellObservation> $observations
+     * @return array{classification: string, label: string, reason: string}
+     */
+    private function classifyHandover(Collection $observations, int $index): array
+    {
+        /** @var CellObservation $from */
+        $from = $observations->get($index - 1);
+        /** @var CellObservation $current */
+        $current = $observations->get($index);
+        /** @var CellObservation|null $beforeFrom */
+        $beforeFrom = $observations->get($index - 2);
+        $distanceMeters = $this->distanceMeters($from, $current);
+        $newCellRunLength = $this->sameCellRunLength($observations, $index);
+        $isShortPingPong = $beforeFrom
+            && (int) $beforeFrom->cell_tower_id === (int) $current->cell_tower_id
+            && $this->distanceMeters($beforeFrom, $current) <= self::PING_PONG_DISTANCE_METERS
+            && $this->secondsBetween($beforeFrom, $current) <= self::PING_PONG_SECONDS;
+
+        if ($isShortPingPong) {
+            return [
+                'classification' => 'fluctuation',
+                'label' => 'Fluktuasi',
+                'reason' => 'Pola ping-pong cell saat posisi relatif dekat.',
+            ];
+        }
+
+        if ($distanceMeters >= self::CONFIRMED_HANDOVER_DISTANCE_METERS) {
+            return [
+                'classification' => 'confirmed',
+                'label' => 'Pindah valid',
+                'reason' => 'Cell berubah bersamaan dengan perpindahan GPS yang cukup jauh.',
+            ];
+        }
+
+        if ($newCellRunLength >= self::CONFIRMED_HANDOVER_SAMPLE_COUNT) {
+            return [
+                'classification' => 'confirmed',
+                'label' => 'Pindah valid',
+                'reason' => 'Cell baru bertahan pada beberapa observasi berikutnya.',
+            ];
+        }
+
+        return [
+            'classification' => 'fluctuation',
+            'label' => 'Fluktuasi',
+            'reason' => 'Cell berubah singkat saat perpindahan GPS kecil.',
+        ];
+    }
+
+    /**
+     * @param Collection<int, CellObservation> $observations
+     */
+    private function sameCellRunLength(Collection $observations, int $startIndex): int
+    {
+        /** @var CellObservation $start */
+        $start = $observations->get($startIndex);
+        $count = 0;
+
+        for ($index = $startIndex; $index < $observations->count(); $index++) {
+            /** @var CellObservation $observation */
+            $observation = $observations->get($index);
+            if ((int) $observation->cell_tower_id !== (int) $start->cell_tower_id) {
+                break;
+            }
+
+            $count++;
+        }
+
+        return $count;
+    }
+
+    private function distanceMeters(CellObservation $from, CellObservation $to): float
+    {
+        $earthRadiusMeters = 6371000;
+        $fromLatitude = deg2rad((float) $from->latitude);
+        $toLatitude = deg2rad((float) $to->latitude);
+        $latitudeDelta = deg2rad((float) $to->latitude - (float) $from->latitude);
+        $longitudeDelta = deg2rad((float) $to->longitude - (float) $from->longitude);
+
+        $angle = sin($latitudeDelta / 2) ** 2
+            + cos($fromLatitude) * cos($toLatitude) * sin($longitudeDelta / 2) ** 2;
+
+        return round($earthRadiusMeters * 2 * atan2(sqrt($angle), sqrt(1 - $angle)), 2);
+    }
+
+    private function secondsBetween(CellObservation $from, CellObservation $to): int
+    {
+        if (! $from->observed_at || ! $to->observed_at) {
+            return PHP_INT_MAX;
+        }
+
+        return (int) abs($to->observed_at->diffInSeconds($from->observed_at));
     }
 
     private function cellObservationSequence(int $deviceUserId, int $rentalId): Collection
