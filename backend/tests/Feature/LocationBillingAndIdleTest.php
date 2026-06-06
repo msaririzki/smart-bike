@@ -180,6 +180,40 @@ class LocationBillingAndIdleTest extends TestCase
         $this->assertSame(0, $this->rental->distance_cost);
     }
 
+    public function test_large_gps_jump_is_ignored_even_when_reported_speed_looks_normal(): void
+    {
+        Sanctum::actingAs($this->device);
+
+        $baseTime = now()->subMinute();
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.5845963,
+            'longitude' => 116.1139007,
+            'accuracy_meters' => 5,
+            'recorded_at' => $baseTime->toISOString(),
+        ])->assertOk();
+
+        $this->postJson('/api/device/location-update', [
+            'latitude' => -8.5641733,
+            'longitude' => 116.1019343,
+            'speed_kmh' => 6.99,
+            'accuracy_meters' => 5,
+            'recorded_at' => $baseTime->copy()->addSeconds(4)->toISOString(),
+        ])->assertOk()
+            ->assertJsonPath('message', 'Over-speed movement recorded but not billed.');
+
+        $this->rental->refresh();
+
+        $this->assertSame('0.00', $this->rental->total_distance_meters);
+        $this->assertSame(0, $this->rental->distance_cost);
+        $this->assertDatabaseHas('rental_location_points', [
+            'rental_id' => $this->rental->id,
+            'ignored_reason' => 'speed_anomaly',
+            'is_valid_movement' => false,
+            'is_anomaly' => true,
+        ]);
+    }
+
     public function test_tracking_and_billing_resume_from_speed_anomaly_anchor(): void
     {
         Sanctum::actingAs($this->device);

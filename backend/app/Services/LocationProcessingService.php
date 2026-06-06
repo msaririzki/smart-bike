@@ -17,6 +17,8 @@ class LocationProcessingService
 
     private const MAX_STATIONARY_JITTER_METERS = 120.0;
 
+    private const MAX_REPORTED_SPEED_OVERRIDE_DISTANCE_METERS = 250.0;
+
     public function __construct(
         private readonly PricingConfigService $pricing,
         private readonly BillingService $billing,
@@ -125,7 +127,12 @@ class LocationProcessingService
                 return ['bike' => $bike->refresh(), 'rental' => $rental->refresh(), 'point' => $point, 'message' => 'Stationary GPS jitter ignored; not billed.'];
             }
 
-            if ($speedKmh > $maxSpeed && $hasReliableReportedSpeed && $reportedSpeedKmh <= $maxSpeed) {
+            if (
+                $speedKmh > $maxSpeed
+                && $hasReliableReportedSpeed
+                && $reportedSpeedKmh <= $maxSpeed
+                && $distance <= self::MAX_REPORTED_SPEED_OVERRIDE_DISTANCE_METERS
+            ) {
                 $speedKmh = $reportedSpeedKmh;
             }
 
