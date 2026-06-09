@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
@@ -40,16 +42,22 @@ class HistoryScreenState extends State<HistoryScreen> {
   int _currentPage = 1;
   bool _hasMore = true;
   bool _isLoadMoreLoading = false;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     loadHistory();
     _scrollController.addListener(_onScroll);
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _silentRefresh(),
+    );
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -100,6 +108,26 @@ class HistoryScreenState extends State<HistoryScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  /// Auto-refresh tanpa menampilkan shimmer loading (silent background update)
+  Future<void> _silentRefresh() async {
+    if (!mounted || _isLoading || _isLoadMoreLoading) return;
+    try {
+      final data = await widget.api.rentalHistory(page: 1);
+      final rawList = data['data'] as List<dynamic>;
+      final history = rawList
+          .map((item) => RentalHistory.fromJson(item as Map<String, dynamic>))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _history = history;
+        _currentPage = 1;
+        _hasMore = data['current_page'] < data['last_page'];
+      });
+    } catch (_) {
+      // Silent fail — jangan tampilkan error pada auto-refresh
     }
   }
 
@@ -305,7 +333,10 @@ class HistoryScreenState extends State<HistoryScreen> {
 
   Widget _buildBody(BuildContext context) {
     return _isLoading
-        ? const _ShimmerLoadingView()
+        ? RefreshIndicator(
+            onRefresh: loadHistory,
+            child: const _ShimmerLoadingView(),
+          )
         : _error != null
         ? RefreshIndicator(
             onRefresh: loadHistory,
@@ -1330,6 +1361,7 @@ class _ShimmerLoadingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [

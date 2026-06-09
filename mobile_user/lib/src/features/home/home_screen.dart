@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
@@ -237,11 +239,22 @@ class _DashboardPageState extends State<_DashboardPage> {
   bool _isLocatingUser = false;
   bool _isBusy = false;
   String? _error;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     load();
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _silentRefresh(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> load() async {
@@ -288,6 +301,31 @@ class _DashboardPageState extends State<_DashboardPage> {
 
     if (mounted && _error == null) {
       _loadUserPositionInBackground();
+    }
+  }
+
+  /// Auto-refresh tanpa menampilkan loading spinner (silent background update)
+  Future<void> _silentRefresh() async {
+    if (!mounted || _isLoading || _isBusy) return;
+    try {
+      final results = await Future.wait([
+        widget.api.bikes(),
+        widget.api.activeRental(),
+        widget.api.rentalHistory(page: 1),
+      ]);
+      final historyPayload = results[2] as Map<String, dynamic>;
+      final historyItems = historyPayload['data'] as List<dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _bikes = results[0] as List<Bike>;
+        _activeRental = results[1] as Rental?;
+        _historyPreview = historyItems
+            .take(3)
+            .map((item) => RentalHistory.fromJson(item as Map<String, dynamic>))
+            .toList();
+      });
+    } catch (_) {
+      // Silent fail — jangan tampilkan error pada auto-refresh
     }
   }
 
@@ -430,8 +468,31 @@ class _DashboardPageState extends State<_DashboardPage> {
     final visibleBikes = bikes.sublist(bikeStart, bikeEnd);
 
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primaryLight),
+      return RefreshIndicator(
+        onRefresh: load,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: AppColors.primaryLight),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Memuat data...',
+                      style: TextStyle(
+                        color: Color(0xff6b7280),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
