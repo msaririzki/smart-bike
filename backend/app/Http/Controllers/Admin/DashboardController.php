@@ -243,6 +243,7 @@ class DashboardController extends Controller
 
         $observations = $this->cellObservationSequence($deviceUserId, $rentalId)->values();
         $events = collect();
+        $lastHandoverObservation = null;
 
         for ($index = 1; $index < $observations->count(); $index++) {
             /** @var CellObservation $from */
@@ -255,6 +256,10 @@ class DashboardController extends Controller
             }
 
             $classification = $this->classifyHandover($observations, $index);
+            $observationDistanceMeters = $this->distanceMeters($from, $current);
+            $handoverDistanceMeters = $lastHandoverObservation
+                ? $this->distanceMeters($lastHandoverObservation, $current)
+                : null;
 
             $events->push([
                 'id' => "{$from->id}-{$current->id}",
@@ -269,12 +274,15 @@ class DashboardController extends Controller
                 'latitude' => (float) $current->latitude,
                 'longitude' => (float) $current->longitude,
                 'signal_dbm' => $current->signal_dbm,
-                'distance_from_previous_meters' => $this->distanceMeters($from, $current),
+                'distance_from_previous_meters' => $observationDistanceMeters,
+                'distance_from_previous_observation_meters' => $observationDistanceMeters,
+                'distance_from_previous_handover_meters' => $handoverDistanceMeters,
                 'classification' => $classification['classification'],
                 'classification_label' => $classification['label'],
                 'classification_reason' => $classification['reason'],
                 'observed_at' => $current->observed_at?->format('Y-m-d H:i:s'),
             ]);
+            $lastHandoverObservation = $current;
         }
 
         return $events->values();

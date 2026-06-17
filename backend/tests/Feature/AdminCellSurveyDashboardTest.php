@@ -105,13 +105,18 @@ class AdminCellSurveyDashboardTest extends TestCase
         $this->observation($towerA, $bike, $device, -8.583020, 116.116020, $rental, $startedAt->copy()->addSeconds(10));
         $this->observation($towerB, $bike, $device, -8.583500, 116.116500, $rental, $startedAt->copy()->addSeconds(30));
 
-        $this->actingAs($admin)
+        $response = $this->actingAs($admin)
             ->get("/admin/dashboard/map-data?cell_device_id={$device->id}&cell_rental_id={$rental->id}")
             ->assertOk()
             ->assertJsonCount(3, 'cell_handovers')
             ->assertJsonPath('cell_handovers.0.classification', 'fluctuation')
             ->assertJsonPath('cell_handovers.1.classification', 'fluctuation')
             ->assertJsonPath('cell_handovers.2.classification', 'confirmed');
+
+        $handovers = $response->json('cell_handovers');
+        $this->assertNull($handovers[0]['distance_from_previous_handover_meters']);
+        $this->assertArrayHasKey('distance_from_previous_observation_meters', $handovers[0]);
+        $this->assertGreaterThan(70, $handovers[2]['distance_from_previous_handover_meters']);
     }
 
     public function test_admin_can_clear_cell_survey_for_selected_rental_only(): void

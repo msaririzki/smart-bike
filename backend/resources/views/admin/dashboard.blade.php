@@ -549,9 +549,12 @@
                 const fromOperator = event.from_operator_label ?? 'Cell awal';
                 const toOperator = event.to_operator_label ?? 'Cell baru';
                 const signal = event.signal_dbm === null ? '-' : `${event.signal_dbm} dBm`;
-                const distance = event.distance_from_previous_meters === null || event.distance_from_previous_meters === undefined
+                const distance = event.distance_from_previous_handover_meters === null || event.distance_from_previous_handover_meters === undefined
                     ? '-'
-                    : `${Number(event.distance_from_previous_meters).toFixed(1)} m`;
+                    : `${Number(event.distance_from_previous_handover_meters).toFixed(1)} m`;
+                const observationDistance = event.distance_from_previous_observation_meters === null || event.distance_from_previous_observation_meters === undefined
+                    ? '-'
+                    : `${Number(event.distance_from_previous_observation_meters).toFixed(1)} m`;
                 const classificationLabel = event.classification_label ?? 'Pindah raw';
                 const classificationReason = event.classification_reason ?? 'Cell ID berubah dari observasi sebelumnya.';
                 const sampleNote = event.display_total && event.display_total > maxVisibleHandoverMarkers
@@ -581,7 +584,7 @@
                                 <span class="map-popup-value">${escapeHtml(signal)}</span>
                             </div>
                             <div class="map-popup-item">
-                                <span class="map-popup-label">Jarak GPS</span>
+                                <span class="map-popup-label">Jarak antar marker</span>
                                 <span class="map-popup-value">${escapeHtml(distance)}</span>
                             </div>
                             <div class="map-popup-item">
@@ -590,8 +593,9 @@
                             </div>
                         </div>
                         <div class="map-popup-details">
-                            <p><strong>Catatan:</strong> Titik ini adalah lokasi GPS saat perangkat terdeteksi berpindah dari satu cell ke cell lain dalam perjalanan yang dipilih.</p>
+                            <p><strong>Catatan:</strong> Titik ini adalah lokasi GPS saat perangkat terdeteksi berpindah dari satu cell ke cell lain. Jarak antar marker dihitung dari marker pindah jaringan sebelumnya ke marker ini.</p>
                             <p><strong>Klasifikasi:</strong> ${escapeHtml(classificationReason)}</p>
+                            <p><strong>Validasi teknis:</strong> Perpindahan GPS pada saat cell berubah ${escapeHtml(observationDistance)}.</p>
                             ${sampleNote}
                         </div>
                     </div>
