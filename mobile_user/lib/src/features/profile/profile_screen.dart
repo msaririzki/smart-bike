@@ -107,18 +107,6 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _showEditProfileSheet() async {
-    final nameController = TextEditingController(text: _name);
-    final emailController = TextEditingController(text: _email);
-    final phoneController = TextEditingController(
-      text: _phone == 'Belum diisi' ? '' : _phone,
-    );
-    final weightController = TextEditingController(
-      text: _weight != null ? _weight.toString() : '',
-    );
-    final formKey = GlobalKey<FormState>();
-    var isBusy = false;
-    String? sheetError;
-
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -127,235 +115,19 @@ class ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            Future<void> saveProfile() async {
-              if (!formKey.currentState!.validate()) return;
-
-              setSheetState(() {
-                isBusy = true;
-                sheetError = null;
-              });
-
-              try {
-                await widget.api.updateProfile(
-                  name: nameController.text.trim(),
-                  email: emailController.text.trim(),
-                  phone: phoneController.text.trim().isEmpty
-                      ? null
-                      : phoneController.text.trim(),
-                  weight: weightController.text.trim().isEmpty
-                      ? null
-                      : int.tryParse(weightController.text.trim()),
-                );
-
-                if (!mounted) return;
-                if (sheetContext.mounted) {
-                  Navigator.of(sheetContext).pop();
-                }
-                _showMessage('Profil berhasil diperbarui');
-                loadProfile();
-              } on ApiException catch (e) {
-                setSheetState(() {
-                  sheetError = e.message;
-                  isBusy = false;
-                });
-              } catch (e) {
-                setSheetState(() {
-                  sheetError = 'Gagal menyimpan perubahan';
-                  isBusy = false;
-                });
-              }
-            }
-
-            return SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  28,
-                  20,
-                  28,
-                  28 + MediaQuery.of(context).viewInsets.bottom,
-                ),
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Edit Profil',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xff1e293b),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(sheetContext),
-                            child: const Text(
-                              'Batal',
-                              style: TextStyle(
-                                color: Color(0xff64748b),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Perbarui informasi identitas Anda agar tetap akurat.',
-                        style: TextStyle(
-                          color: Color(0xff64748b),
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      if (sheetError != null) ...[
-                        _SheetBanner(
-                          icon: Icons.error_outline_rounded,
-                          message: sheetError!,
-                          color: Colors.red,
-                          backgroundColor: const Color(0xfffff1f2),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                      TextFormField(
-                        controller: nameController,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                        decoration: _buildInputDecoration(
-                          label: 'Nama Lengkap',
-                          icon: Icons.person_rounded,
-                        ),
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'Nama wajib diisi' : null,
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                        decoration: _buildInputDecoration(
-                          label: 'Email',
-                          icon: Icons.alternate_email_rounded,
-                        ),
-                        validator: (v) => v == null || !v.contains('@')
-                            ? 'Email tidak valid'
-                            : null,
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: phoneController,
-                        keyboardType: TextInputType.phone,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                        decoration: _buildInputDecoration(
-                          label: 'Nomor Telepon',
-                          icon: Icons.phone_rounded,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: weightController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                        decoration: _buildInputDecoration(
-                          label: 'Berat Badan (kg)',
-                          icon: Icons.monitor_weight_rounded,
-                        ),
-                        validator: (value) {
-                          final text = value?.trim() ?? '';
-                          if (text.isEmpty) return null;
-
-                          final weight = int.tryParse(text);
-                          if (weight == null || weight < 30 || weight > 300) {
-                            return 'Berat badan harus 30-300 kg';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 40),
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryLight.withValues(
-                                alpha: 0.25,
-                              ),
-                              blurRadius: 15,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: FilledButton(
-                          onPressed: isBusy ? null : saveProfile,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primaryLight,
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: isBusy
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle_outline_rounded,
-                                      size: 20,
-                                    ),
-                                    SizedBox(width: 10),
-                                    Text(
-                                      'Simpan Perubahan',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
+        return _EditProfileSheet(
+          api: widget.api,
+          name: _name,
+          email: _email,
+          phone: _phone,
+          onSaved: () {
+            _showMessage('Profil berhasil diperbarui');
+            loadProfile();
           },
+          buildInputDecoration: _buildInputDecoration,
         );
       },
     );
-
-    nameController.dispose();
-    emailController.dispose();
-    phoneController.dispose();
-    weightController.dispose();
   }
 
   InputDecoration _buildInputDecoration({
@@ -665,15 +437,6 @@ class ProfileScreenState extends State<ProfileScreen> {
                       iconColor: const Color(0xff8b5cf6),
                       onTap: _showEditProfileSheet,
                     ),
-                    _MenuDivider(),
-                    _ProfileInfoTile(
-                      icon: Icons.monitor_weight_rounded,
-                      title: 'Berat Badan',
-                      subtitle: _weight != null ? '$_weight kg' : 'Belum diisi',
-                      iconBgColor: const Color(0xfff0fdf4),
-                      iconColor: const Color(0xff16a34a),
-                      onTap: _showEditProfileSheet,
-                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -739,6 +502,355 @@ class ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: body,
+    );
+  }
+}
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({
+    required this.api,
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.onSaved,
+    required this.buildInputDecoration,
+  });
+
+  final ApiClient api;
+  final String name;
+  final String email;
+  final String phone;
+  final VoidCallback onSaved;
+  final InputDecoration Function({required String label, required IconData icon}) buildInputDecoration;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController nameController;
+  late final TextEditingController emailController;
+  late final TextEditingController phoneController;
+  final formKey = GlobalKey<FormState>();
+  var isBusy = false;
+  String? sheetError;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController = TextEditingController(text: widget.name);
+    emailController = TextEditingController(text: widget.email);
+    phoneController = TextEditingController(
+      text: widget.phone == 'Belum diisi' ? '' : widget.phone,
+    );
+    nameController.addListener(_onControllerChanged);
+    emailController.addListener(_onControllerChanged);
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    nameController.removeListener(_onControllerChanged);
+    emailController.removeListener(_onControllerChanged);
+    nameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    super.dispose();
+  }
+
+  String get initials {
+    final name = nameController.text.trim();
+    if (name.isEmpty || name == '-') return '?';
+    final parts = name.split(' ');
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  Future<void> saveProfile() async {
+    if (!formKey.currentState!.validate()) return;
+
+    setState(() {
+      isBusy = true;
+      sheetError = null;
+    });
+
+    try {
+      await widget.api.updateProfile(
+        name: nameController.text.trim(),
+        email: emailController.text.trim(),
+        phone: phoneController.text.trim().isEmpty
+            ? null
+            : phoneController.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        widget.onSaved();
+      }
+    } on ApiException catch (e) {
+      setState(() {
+        sheetError = e.message;
+        isBusy = false;
+      });
+    } catch (e) {
+      setState(() {
+        sheetError = 'Gagal menyimpan perubahan';
+        isBusy = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          20,
+          24,
+          24 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xffcbd5e1),
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Ubah Profil',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xff0f172a),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, color: Color(0xff64748b)),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xfff1f5f9),
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primaryLight.withValues(alpha: 0.05),
+                      AppColors.primaryLight.withValues(alpha: 0.01),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppColors.primaryLight.withValues(alpha: 0.1),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor: AppColors.primaryLight,
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            nameController.text.trim().isEmpty
+                                ? 'Nama Anda'
+                                : nameController.text.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xff0f172a),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            emailController.text.trim().isEmpty
+                                ? 'Email Anda'
+                                : emailController.text.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xff64748b),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              if (sheetError != null) ...[
+                _SheetBanner(
+                  icon: Icons.error_outline_rounded,
+                  message: sheetError!,
+                  color: Colors.red,
+                  backgroundColor: const Color(0xfffff1f2),
+                ),
+                const SizedBox(height: 20),
+              ],
+              const Text(
+                'NAMA LENGKAP',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xff475569),
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: nameController,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+                decoration: widget.buildInputDecoration(
+                  label: 'Masukkan nama lengkap',
+                  icon: Icons.person_outline_rounded,
+                ),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Nama wajib diisi' : null,
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'EMAIL AKUN',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xff475569),
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+                decoration: widget.buildInputDecoration(
+                  label: 'Masukkan alamat email',
+                  icon: Icons.alternate_email_rounded,
+                ),
+                validator: (v) => v == null || !v.contains('@')
+                    ? 'Email tidak valid'
+                    : null,
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'NOMOR TELEPON',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xff475569),
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+                decoration: widget.buildInputDecoration(
+                  label: 'Masukkan nomor telepon (opsional)',
+                  icon: Icons.phone_android_rounded,
+                ),
+              ),
+              const SizedBox(height: 36),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryLight.withValues(
+                        alpha: 0.3,
+                      ),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: FilledButton(
+                  onPressed: isBusy ? null : saveProfile,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryLight,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: isBusy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline_rounded,
+                              size: 20,
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'Simpan Perubahan',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

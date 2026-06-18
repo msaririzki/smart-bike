@@ -314,58 +314,37 @@ class _RideMetricsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final calories = _estimatedCyclingCalories(history, userWeight);
-
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xffe3ebe7)),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              _MetricItem(
-                label: 'Jarak',
-                value: history.totalDistanceKilometers.toStringAsFixed(1),
-                unit: 'km',
-                icon: Icons.map_rounded,
-                color: Colors.blue,
-              ),
-              Container(width: 1, height: 40, color: const Color(0xffe3ebe7)),
-              _MetricItem(
-                label: 'Durasi',
-                value: history.durationMinutes.toString(),
-                unit: 'min',
-                icon: Icons.timer_rounded,
-                color: Colors.orange,
-              ),
-            ],
+          _MetricItem(
+            label: 'Jarak',
+            value: history.totalDistanceKilometers.toStringAsFixed(1),
+            unit: 'km',
+            icon: Icons.map_rounded,
+            color: Colors.blue,
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Divider(height: 1, color: Color(0xffe3ebe7)),
+          Container(width: 1, height: 36, color: const Color(0xffe3ebe7)),
+          _MetricItem(
+            label: 'Durasi',
+            value: history.durationMinutes.toString(),
+            unit: 'min',
+            icon: Icons.timer_rounded,
+            color: Colors.orange,
           ),
-          Row(
-            children: [
-              _MetricItem(
-                label: 'Rata-rata Kecepatan',
-                value: history.averageSpeed.toStringAsFixed(1),
-                unit: 'km/j',
-                icon: Icons.speed_rounded,
-                color: Colors.purple,
-              ),
-              Container(width: 1, height: 40, color: const Color(0xffe3ebe7)),
-              _MetricItem(
-                label: 'Est. Kalori',
-                value: calories.toStringAsFixed(0),
-                unit: 'kkal',
-                icon: Icons.local_fire_department_rounded,
-                color: Colors.red,
-              ),
-            ],
+          Container(width: 1, height: 36, color: const Color(0xffe3ebe7)),
+          _MetricItem(
+            label: 'Avg. Kecepatan',
+            value: history.averageSpeed.toStringAsFixed(1),
+            unit: 'km/j',
+            icon: Icons.speed_rounded,
+            color: Colors.purple,
           ),
         ],
       ),
@@ -391,46 +370,44 @@ class _MetricItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Row(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color.withValues(alpha: 0.7), size: 24),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Icon(icon, color: color.withValues(alpha: 0.7), size: 22),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xff073f3a),
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    unit,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xff8a9590),
-                    ),
-                  ),
-                ],
-              ),
               Text(
-                label,
+                value,
                 style: const TextStyle(
-                  fontSize: 11,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xff073f3a),
+                ),
+              ),
+              const SizedBox(width: 2),
+              Text(
+                unit,
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
                   color: Color(0xff8a9590),
-                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xff8a9590),
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -691,7 +668,6 @@ class _ShareSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('EEEE, d MMM yyyy', 'id_ID');
-    final calories = _estimatedCyclingCalories(history, userWeight);
 
     return Container(
       constraints: BoxConstraints(
@@ -832,11 +808,6 @@ class _ShareSheet extends StatelessWidget {
                                   value: history.durationMinutes.toString(),
                                   unit: 'min',
                                 ),
-                                _CompactStat(
-                                  label: 'KALORI',
-                                  value: calories.toStringAsFixed(0),
-                                  unit: 'kkal',
-                                ),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
@@ -883,7 +854,6 @@ class _ShareSheet extends StatelessWidget {
 Sepeda: ${history.bike?.code ?? 'N/A'}
 Jarak: ${history.totalDistanceKilometers.toStringAsFixed(2)} km
 Durasi: ${history.durationString}
-Est. Kalori: ${calories.toStringAsFixed(0)} kkal
 Total Biaya: Rp${NumberFormat('#,###', 'id_ID').format(history.totalCost)}
 
 #SmartBike #EcoFriendly #Cycling
