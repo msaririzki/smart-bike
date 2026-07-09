@@ -375,29 +375,32 @@ class _MetricItem extends StatelessWidget {
         children: [
           Icon(icon, color: color.withValues(alpha: 0.7), size: 22),
           const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xff073f3a),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xff073f3a),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 2),
-              Text(
-                unit,
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xff8a9590),
+                const SizedBox(width: 2),
+                Text(
+                  unit,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xff8a9590),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 2),
           Text(
@@ -506,22 +509,24 @@ class _TimelineRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              time,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: Color(0xff073f3a),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                time,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xff073f3a),
+                ),
               ),
-            ),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12, color: Color(0xff8a9590)),
-            ),
-          ],
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Color(0xff8a9590)),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -568,14 +573,18 @@ class _BillingDetailCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Total Biaya',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xff073f3a),
+              const Expanded(
+                child: Text(
+                  'Total Biaya',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xff073f3a),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 currency.format(history.totalCost),
                 style: const TextStyle(
@@ -603,7 +612,14 @@ class _InfoRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xff8a9590))),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: Color(0xff8a9590)),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: const TextStyle(
@@ -723,11 +739,11 @@ class _ShareSheet extends StatelessWidget {
                 child: Stack(
                   children: [
                     // BACKGROUND: Mesh Gradient Effect (Compact)
-                    Container(
-                      height: 180,
-                      width: double.infinity,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primaryLight,
+                    Positioned.fill(
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: AppColors.primaryLight,
+                        ),
                       ),
                     ),
                     // DECORATION: Abstract Waves
@@ -747,7 +763,7 @@ class _ShareSheet extends StatelessWidget {
                       right: -40,
                       child: Opacity(
                         opacity: 0.08,
-                        child: Icon(
+                        child: const Icon(
                           Icons.pedal_bike,
                           size: 220,
                           color: Colors.white,
@@ -755,64 +771,68 @@ class _ShareSheet extends StatelessWidget {
                       ),
                     ),
                     // CONTENT
-                    Positioned.fill(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'SMART BIKE',
-                                      style: TextStyle(
-                                        color: Color(0xff4ade80),
-                                        letterSpacing: 2,
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w900,
-                                      ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'SMART BIKE',
+                                    style: TextStyle(
+                                      color: Color(0xff4ade80),
+                                      letterSpacing: 2,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
                                     ),
-                                    Text(
-                                      'HIGHLIGHT',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w900,
-                                      ),
+                                  ),
+                                  Text(
+                                    'HIGHLIGHT',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
                                     ),
-                                  ],
-                                ),
-                                const Icon(
-                                  Icons.eco_rounded,
-                                  color: Color(0xff4ade80),
-                                  size: 24,
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _CompactStat(
-                                  label: 'JARAK',
-                                  value: history.totalDistanceKilometers
-                                      .toStringAsFixed(1),
-                                  unit: 'km',
-                                ),
-                                _CompactStat(
-                                  label: 'DURASI',
-                                  value: history.durationMinutes.toString(),
-                                  unit: 'min',
-                                ),
-                                Column(
+                                  ),
+                                ],
+                              ),
+                              const Icon(
+                                Icons.eco_rounded,
+                                color: Color(0xff4ade80),
+                                size: 24,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 36),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _CompactStat(
+                                label: 'JARAK',
+                                value: history.totalDistanceKilometers
+                                    .toStringAsFixed(1),
+                                unit: 'km',
+                              ),
+                              _CompactStat(
+                                label: 'DURASI',
+                                value: history.durationMinutes.toString(),
+                                unit: 'min',
+                              ),
+                              Flexible(
+                                child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
                                       dateFormat.format(history.startedAt),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: Colors.white.withValues(
                                           alpha: 0.6,
@@ -823,6 +843,8 @@ class _ShareSheet extends StatelessWidget {
                                     ),
                                     Text(
                                       history.bike?.code ?? 'UNIT-01',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 10,
@@ -831,10 +853,10 @@ class _ShareSheet extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -922,27 +944,30 @@ class _CompactStat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ),
-            const SizedBox(width: 2),
-            Text(
-              unit,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 8,
+              const SizedBox(width: 2),
+              Text(
+                unit,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 8,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         Text(
           label,
